@@ -111,3 +111,13 @@ Form layout (P1) — grouped into 4 sections instead of 17 flat fields:
 4. Auth: A1 (+ locked).
 5. Admin: X1 → X2.
 6. Dashboard.
+
+## UI polish and responsive behavior
+
+The interface keeps the green action color, English UI, and existing role permissions. Sign-in uses a forest-green brand panel on large screens and a focused single-column layout on phones. Password visibility is optional and errors are announced to assistive technology.
+
+Below 1024px, navigation moves into a keyboard-accessible drawer. Ticket form sections stack on smaller screens, ticket details move the status timeline below the content, and tables scroll horizontally rather than squeezing their columns. The Users screen includes a keyboard-accessible edit action.
+
+Hover feedback uses short color and position transitions. Page entry animations and decorative sign-in motion respect `prefers-reduced-motion`. Keyboard users have visible focus indicators, a skip-to-content link, and focus on the first invalid ticket field.
+
+GitHub Actions runs lint, a production build, and TypeScript checks. CI uses placeholder public Supabase configuration only for compilation; authenticated end-to-end testing requires a configured Supabase project and test account.

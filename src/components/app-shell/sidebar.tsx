@@ -3,12 +3,17 @@
 import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useState } from "react";
+import { Sheet, SheetContent, SheetTitle, SheetDescription, SheetTrigger } from "@/components/ui/sheet";
 import {
   BarChart3,
   Inbox,
   List,
   LogOut,
   MessageCircle,
+  Menu,
+  ChevronRight,
+  Headphones,
   PlusCircle,
   Settings,
   Users,
@@ -30,6 +35,7 @@ const ICONS: Record<NavIcon, LucideIcon> = {
 
 export function Sidebar({ user, sections }: { user: CurrentUser; sections: NavSection[] }) {
   const pathname = usePathname();
+  const [open, setOpen] = useState(false);
   const initials = user.fullName
     .split(" ")
     .map((part) => part[0])
@@ -37,8 +43,8 @@ export function Sidebar({ user, sections }: { user: CurrentUser; sections: NavSe
     .join("")
     .toUpperCase();
 
-  return (
-    <aside className="sticky top-0 flex h-screen w-60 shrink-0 flex-col gap-2 overflow-y-auto border-r border-sidebar-border bg-sidebar px-4 py-5">
+  const content = (
+    <div className="flex h-full flex-col gap-2 overflow-y-auto bg-sidebar px-4 py-5">
       <Image
         src="/brand/logo.jpg"
         alt="Selah El Telmeez"
@@ -47,7 +53,8 @@ export function Sidebar({ user, sections }: { user: CurrentUser; sections: NavSe
         className="mx-2 mb-4 h-[52px] w-auto object-contain mix-blend-multiply"
       />
 
-      <nav className="flex flex-1 flex-col gap-1">
+      <div className="mx-2 mb-5 flex items-center gap-2 border-t pt-5 text-sm font-semibold"><Headphones className="size-4 text-brand-action" /> Support Center</div>
+      <nav aria-label="Main navigation" className="flex flex-1 flex-col gap-5">
         {sections.map((section) => (
           <div key={section.heading} className="flex flex-col gap-1">
             <p className="px-3 pt-2 pb-1.5 text-xs font-semibold tracking-wider text-muted-foreground uppercase">
@@ -60,15 +67,18 @@ export function Sidebar({ user, sections }: { user: CurrentUser; sections: NavSe
                 <Link
                   key={item.href}
                   href={item.href}
+                  aria-current={active ? "page" : undefined}
+                  onClick={() => setOpen(false)}
                   className={cn(
-                    "flex h-[38px] items-center gap-2.5 rounded-lg px-3 text-sm font-medium transition-colors",
+                    "nav-link group flex h-11 items-center gap-2.5 rounded-xl px-3 text-sm font-medium",
                     active
                       ? "bg-sidebar-accent font-semibold text-sidebar-accent-foreground"
-                      : "text-foreground hover:bg-muted",
+                      : "text-muted-foreground hover:bg-white hover:text-foreground",
                   )}
                 >
                   <Icon className={cn("size-[18px]", active ? "text-brand-action" : "text-muted-foreground")} />
                   {item.label}
+                  {active && <ChevronRight className="ml-auto size-3.5" />}
                 </Link>
               );
             })}
@@ -76,8 +86,8 @@ export function Sidebar({ user, sections }: { user: CurrentUser; sections: NavSe
         ))}
       </nav>
 
-      <div className="flex items-center gap-2.5 px-2 py-1.5">
-        <div className="flex size-[34px] shrink-0 items-center justify-center rounded-full bg-brand text-[13px] font-semibold text-white">
+      <div className="flex items-center gap-2.5 border-t px-2 pt-5 pb-1.5">
+        <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-brand-action text-[13px] font-semibold text-white">
           {initials}
         </div>
         <div className="flex min-w-0 flex-1 flex-col">
@@ -98,6 +108,23 @@ export function Sidebar({ user, sections }: { user: CurrentUser; sections: NavSe
           </button>
         </form>
       </div>
-    </aside>
+    </div>
+  );
+
+  return (
+    <>
+      <aside className="sticky top-0 hidden h-svh w-64 shrink-0 border-r border-sidebar-border lg:block">{content}</aside>
+      <div className="flex h-16 shrink-0 items-center justify-between border-b bg-background px-4 lg:hidden">
+        <span className="flex items-center gap-2 text-sm font-semibold"><Headphones className="size-5 text-brand-action" /> Support Center</span>
+        <Sheet open={open} onOpenChange={setOpen}>
+          <SheetTrigger aria-label="Open navigation" className="rounded-lg border p-2.5"><Menu className="size-5" /></SheetTrigger>
+          <SheetContent side="left" className="w-[min(85vw,280px)] gap-0">
+            <SheetTitle className="sr-only">Navigation</SheetTitle>
+            <SheetDescription className="sr-only">Your workspace pages and account.</SheetDescription>
+            {content}
+          </SheetContent>
+        </Sheet>
+      </div>
+    </>
   );
 }
