@@ -24,6 +24,7 @@
   },
   "include": [
     "next-env.d.ts",
+    "src/lib/email/nodemailer.d.ts",
     "**/*.ts",
     "**/*.tsx",
     ".next/types/**/*.ts",

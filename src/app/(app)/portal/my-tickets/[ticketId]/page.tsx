@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ChevronRight, FileImage, FileVideo, Lock } from "lucide-react";
+import { UserNotifications } from "@/components/app-shell/user-notifications";
 import { StatusBadge } from "@/components/tickets/status-badge";
 import { requireUser } from "@/lib/auth/session";
 import { createClient } from "@/lib/supabase/server";
@@ -69,6 +70,7 @@ export default async function PortalTicketPage({ params }: PageProps<"/portal/my
   return (
     <>
       <header className="flex flex-col gap-3 border-b bg-background px-8 py-5">
+        <div className="flex items-center justify-between gap-3">
         <nav className="flex items-center gap-1.5 text-[13px]">
           <Link href="/portal/my-tickets" className="font-medium text-muted-foreground hover:text-foreground">
             My tickets
@@ -76,6 +78,8 @@ export default async function PortalTicketPage({ params }: PageProps<"/portal/my
           <ChevronRight className="size-3.5 text-muted-foreground" />
           <span className="font-mono font-medium">{ticket.ticket_number}</span>
         </nav>
+        <UserNotifications />
+        </div>
         <div className="flex flex-wrap items-center gap-4">
           <h1 className="min-w-0 flex-1 break-words text-2xl font-semibold tracking-tight">{ticket.issue_description}</h1>
           <StatusBadge status={status} size="lg" />
