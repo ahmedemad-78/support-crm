@@ -51,16 +51,6 @@ if (profileError) {
   process.exit(1);
 }
 
-// Supabase writes app_metadata after the insert trigger runs, so set the role explicitly.
-const { error: profileError } = await supabase
-  .from("profiles")
-  .update({ role: "support_agent", full_name: name })
-  .eq("id", data.user.id);
-if (profileError) {
-  console.error(`Created the login but couldn't set the role: ${profileError.message}`);
-  process.exit(1);
-}
-
 console.log(`Created ${email} (${data.user.id}) as Technical Support.`);
 console.log("Last step — run this once in the Supabase SQL editor to make the account admin:");
 console.log(`  update public.profiles set is_admin = true where id = '${data.user.id}';`);
