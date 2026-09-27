@@ -76,8 +76,8 @@ export default async function PortalTicketPage({ params }: PageProps<"/portal/my
           <ChevronRight className="size-3.5 text-muted-foreground" />
           <span className="font-mono font-medium">{ticket.ticket_number}</span>
         </nav>
-        <div className="flex items-center gap-4">
-          <h1 className="flex-1 text-2xl font-semibold tracking-tight">{ticket.issue_description}</h1>
+        <div className="flex flex-wrap items-center gap-4">
+          <h1 className="min-w-0 flex-1 break-words text-2xl font-semibold tracking-tight">{ticket.issue_description}</h1>
           <StatusBadge status={status} size="lg" />
         </div>
         <p className="flex items-center gap-1.5 text-[13px] text-muted-foreground">
@@ -86,14 +86,14 @@ export default async function PortalTicketPage({ params }: PageProps<"/portal/my
         </p>
       </header>
 
-      <div className="flex flex-1 items-start gap-6 px-8 py-6">
-        <section className="flex flex-1 flex-col gap-5 rounded-xl border bg-background p-6">
+      <div className="flex flex-1 flex-col items-stretch gap-6 px-4 py-6 sm:px-8 xl:flex-row xl:items-start">
+        <section className="flex min-w-0 flex-1 flex-col gap-5 rounded-xl border bg-background p-6">
           <h2 className="text-base font-semibold">What you submitted</h2>
-          <dl className="grid grid-cols-3 gap-x-6 gap-y-4">
+          <dl className="grid grid-cols-1 gap-x-6 gap-y-4 sm:grid-cols-2 2xl:grid-cols-3">
             {fields.map(([label, value]) => (
               <div key={label} className="flex flex-col gap-1">
                 <dt className="text-xs font-medium text-muted-foreground">{label}</dt>
-                <dd className="text-sm">{value}</dd>
+                <dd className="break-words text-sm">{value}</dd>
               </div>
             ))}
           </dl>
@@ -123,7 +123,7 @@ export default async function PortalTicketPage({ params }: PageProps<"/portal/my
           )}
         </section>
 
-        <aside className="flex w-[360px] shrink-0 flex-col gap-4 rounded-xl border bg-background p-5">
+        <aside className="flex w-full shrink-0 xl:w-[300px] flex-col gap-4 rounded-xl border bg-background p-5">
           <h2 className="text-base font-semibold">Status updates</h2>
           {nextStep && <TimelineStep status={nextStep} meta="Waiting" done={false} />}
           {(history ?? []).map((h) => (
