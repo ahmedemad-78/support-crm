@@ -94,9 +94,9 @@ export function NewTicketForm({ cities }: { cities: City[] }) {
   const err = (field: Field) => errors[field];
 
   return (
-    <form ref={formRef} onSubmit={onSubmit} noValidate className="flex flex-col gap-5 px-8 py-6">
+    <form ref={formRef} onSubmit={onSubmit} noValidate className="flex flex-col gap-5 px-4 py-6 sm:px-8">
       <Section title="1. Customer" hint="Who is having the problem.">
-        <div className="grid grid-cols-2 gap-x-5 gap-y-4">
+        <div className="grid grid-cols-1 gap-x-5 gap-y-4 sm:grid-cols-2">
           <TextField name="customer_name" label="Name" error={err("customer_name")} />
           <TextField name="customer_email" label="Email" type="email" error={err("customer_email")} />
           <SelectField name="end_user_type" label="User type" error={err("end_user_type")}>
@@ -135,7 +135,7 @@ export function NewTicketForm({ cities }: { cities: City[] }) {
       </Section>
 
       <Section title="2. Device & app" hint="Helps Support reproduce the issue.">
-        <div className="grid grid-cols-3 gap-x-5 gap-y-4">
+        <div className="grid grid-cols-1 gap-x-5 gap-y-4 sm:grid-cols-2 xl:grid-cols-3">
           <ChoiceField
             name="platform"
             label="Platform"
@@ -173,7 +173,7 @@ export function NewTicketForm({ cities }: { cities: City[] }) {
 
       <Section title="3. Issue" hint="What happened and where.">
         <div className="flex flex-col gap-4">
-          <div className="grid grid-cols-2 gap-x-5">
+          <div className="grid grid-cols-1 gap-x-5 gap-y-4 sm:grid-cols-2">
             <TextField name="issue_date" label="Date of issue" type="date" error={err("issue_date")} />
             <TextField
               name="page_screen"
@@ -196,7 +196,7 @@ export function NewTicketForm({ cities }: { cities: City[] }) {
               e.preventDefault();
               addFiles(e.dataTransfer.files);
             }}
-            className="flex cursor-pointer items-center gap-3.5 rounded-lg border-2 border-dashed bg-muted px-5 py-4 hover:border-brand-action"
+            className="flex cursor-pointer items-center gap-3.5 rounded-lg border-2 border-dashed bg-muted px-5 py-4 transition-colors hover:border-brand-action hover:bg-brand-tint/40 has-focus-visible:ring-2 has-focus-visible:ring-ring"
           >
             <UploadCloud className="size-6 text-brand-action" />
             <span className="flex flex-col">
@@ -283,7 +283,9 @@ async function uploadAttachments(ticketId: string, files: File[]): Promise<strin
 
 function scrollToFirstError() {
   requestAnimationFrame(() => {
-    document.querySelector("[aria-invalid='true']")?.scrollIntoView({ behavior: "smooth", block: "center" });
+    const field = document.querySelector<HTMLElement>("[aria-invalid='true']");
+    (field?.matches("input, textarea, select") ? field : field?.querySelector<HTMLElement>("input"))?.focus({ preventScroll: true });
+    field?.scrollIntoView({ behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "instant" : "smooth", block: "center" });
   });
 }
 
@@ -293,12 +295,12 @@ function formatSize(bytes: number) {
 
 function Section({ title, hint, children }: { title: string; hint: string; children: React.ReactNode }) {
   return (
-    <section className="flex gap-8 rounded-xl border bg-background p-6">
-      <div className="flex w-[220px] shrink-0 flex-col gap-1">
+    <section className="form-section flex flex-col gap-5 rounded-2xl border bg-background p-5 xl:flex-row xl:gap-8 xl:p-6">
+      <div className="flex shrink-0 flex-col gap-1 xl:w-[200px]">
         <h2 className="text-base font-semibold">{title}</h2>
         <p className="text-[13px] leading-5 text-muted-foreground">{hint}</p>
       </div>
-      <div className="flex-1">{children}</div>
+      <div className="min-w-0 flex-1">{children}</div>
     </section>
   );
 }
@@ -424,7 +426,7 @@ function ChoiceField({
         {options.map((o) => (
           <label
             key={o.value}
-            className="flex flex-1 cursor-pointer items-center justify-center rounded-md text-[13px] font-medium text-muted-foreground has-checked:border has-checked:bg-background has-checked:font-semibold has-checked:text-foreground"
+            className="flex flex-1 cursor-pointer items-center justify-center rounded-md text-[13px] font-medium text-muted-foreground has-focus-visible:ring-2 has-focus-visible:ring-ring has-checked:border has-checked:bg-background has-checked:font-semibold has-checked:text-foreground"
           >
             <input type="radio" name={name} value={o.value} className="sr-only" />
             {o.label}

@@ -50,7 +50,7 @@ export function SettingsTabs({
 }) {
   return (
     <Tabs defaultValue="issue_categories" className="gap-4 bg-background px-8 py-5">
-      <TabsList variant="line">
+      <TabsList variant="line" className="h-auto max-w-full flex-wrap justify-start gap-y-2">
         {LISTS.map((l) => (
           <TabsTrigger key={l.table} value={l.table}>
             {l.label}
