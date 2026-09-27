@@ -77,8 +77,13 @@ export function Sidebar({ user, sections }: { user: CurrentUser; sections: NavSe
                   )}
                 >
                   <Icon className={cn("size-[18px]", active ? "text-brand-action" : "text-muted-foreground")} />
-                  {item.label}
-                  {active && <ChevronRight className="ml-auto size-3.5" />}
+                  <span className="min-w-0 flex-1 truncate">{item.label}</span>
+                  {item.badge && (
+                    <span className="rounded-full bg-brand-tint px-2 py-0.5 text-[11px] font-semibold text-brand-action">
+                      {item.badge}
+                    </span>
+                  )}
+                  {active && !item.badge && <ChevronRight className="ml-auto size-3.5" />}
                 </Link>
               );
             })}

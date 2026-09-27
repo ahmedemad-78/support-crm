@@ -1,7 +1,7 @@
 import type { CurrentUser } from "@/lib/auth/roles";
 
 export type NavIcon = "inbox" | "tickets" | "dashboard" | "users" | "settings" | "new-ticket" | "my-tickets";
-export type NavItem = { href: string; label: string; icon: NavIcon };
+export type NavItem = { href: string; label: string; icon: NavIcon; badge?: string };
 export type NavSection = { heading: string; items: NavItem[] };
 
 export function navFor(user: CurrentUser): NavSection[] {
