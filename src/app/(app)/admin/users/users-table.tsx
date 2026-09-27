@@ -55,11 +55,12 @@ export function UsersTable({ rows, currentUserId }: { rows: UserRow[]; currentUs
 
   return (
     <div className="flex flex-col gap-4 bg-background px-8 py-5">
-      <div className="flex items-center gap-2.5">
-        <div className="relative w-72">
+      <div className="flex flex-wrap items-center gap-2.5">
+        <div className="relative w-full sm:w-72">
           <Search className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
           <Input
             placeholder="Search name or email"
+            aria-label="Search users by name or email"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             className="h-9 pl-9"
@@ -75,8 +76,8 @@ export function UsersTable({ rows, currentUserId }: { rows: UserRow[]; currentUs
         </span>
       </div>
 
-      <div className="overflow-hidden rounded-lg border">
-        <table className="w-full text-sm">
+      <div className="overflow-x-auto rounded-xl border">
+        <table className="w-full min-w-[680px] text-sm">
           <thead className="bg-muted text-left text-xs font-semibold tracking-wide text-muted-foreground uppercase">
             <tr>
               <th className="px-4 py-3">User</th>
@@ -103,7 +104,7 @@ export function UsersTable({ rows, currentUserId }: { rows: UserRow[]; currentUs
                     </div>
                     <div className="flex flex-col">
                       <span className="font-medium text-foreground">
-                        {row.fullName}
+                        <button type="button" className="rounded text-left hover:text-brand-action hover:underline" onClick={(event) => { event.stopPropagation(); setSelectedId(row.id); }} aria-label={`Edit ${row.fullName}`}>{row.fullName}</button>
                         {row.id === currentUserId && <span className="ml-1.5 text-xs text-muted-foreground">(you)</span>}
                       </span>
                       <span className="text-xs text-muted-foreground">{row.email}</span>

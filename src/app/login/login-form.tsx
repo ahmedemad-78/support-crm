@@ -1,7 +1,7 @@
 "use client";
 
 import { useActionState, useEffect, useState } from "react";
-import { Lock, Mail } from "lucide-react";
+import { ArrowRight, Eye, EyeOff, LoaderCircle, Lock, Mail } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -11,9 +11,10 @@ export function LoginForm({ deactivated }: { deactivated: boolean }) {
   const [state, formAction, pending] = useActionState<SignInState, FormData>(signIn, {});
   const minutesLeft = useMinutesUntil(state.lockedUntil);
   const locked = minutesLeft > 0;
+  const [showPassword, setShowPassword] = useState(false);
 
   return (
-    <form action={formAction} className="flex flex-col gap-5">
+    <form action={formAction} aria-busy={pending} className="flex flex-col gap-5">
       {deactivated && !state.error && (
         <Notice title="Your account is deactivated" body="Contact the Digital Team to reactivate it." />
       )}
@@ -33,6 +34,7 @@ export function LoginForm({ deactivated }: { deactivated: boolean }) {
             name="email"
             type="email"
             autoComplete="email"
+            placeholder="you@company.com"
             required
             defaultValue={state.email}
             className="h-11 pl-9"
@@ -47,18 +49,25 @@ export function LoginForm({ deactivated }: { deactivated: boolean }) {
           <Input
             id="password"
             name="password"
-            type="password"
+            type={showPassword ? "text" : "password"}
             autoComplete="current-password"
             required
-            className="h-11 pl-9"
+            placeholder="Enter your password"
+            className="h-11 pr-12 pl-9"
+            aria-describedby={state.error ? "signin-error" : undefined}
             aria-invalid={Boolean(state.error) || undefined}
           />
+          <button type="button" aria-label={showPassword ? "Hide password" : "Show password"} aria-pressed={showPassword} onClick={() => setShowPassword(!showPassword)} className="absolute inset-y-0 right-0 flex w-11 items-center justify-center rounded-r-lg text-muted-foreground hover:text-brand-action">
+            {showPassword ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
+          </button>
         </div>
-        {state.error && <p className="text-sm font-medium text-destructive">{state.error}</p>}
+        {state.error && <p id="signin-error" role="alert" className="text-sm font-medium text-destructive">{state.error}</p>}
       </div>
 
       <Button type="submit" size="lg" className="h-11 text-[15px] font-semibold" disabled={pending || locked}>
-        {pending ? "Signing in…" : "Sign in"}
+        {pending ? <LoaderCircle className="animate-spin" /> : null}
+        {pending ? "Signing in…" : "Sign in to workspace"}
+        {!pending && <ArrowRight className="ml-auto transition-transform group-hover/button:translate-x-1" />}
       </Button>
     </form>
   );

@@ -49,8 +49,8 @@ export default async function MyTicketsPage({ searchParams }: PageProps<"/portal
 
         {tickets && tickets.length > 0 ? (
           <>
-            <div className="overflow-hidden rounded-lg border">
-              <table className="w-full text-sm">
+            <div className="overflow-x-auto rounded-xl border">
+              <table className="w-full min-w-[760px] text-sm">
                 <thead className="bg-muted text-left text-xs font-semibold tracking-wide text-muted-foreground uppercase">
                   <tr>
                     <th className="w-40 px-4 py-3">Ticket</th>
