@@ -1,7 +1,13 @@
 import "server-only";
 import { createAdminClient } from "@/lib/supabase/admin";
-
-const FROM = process.env.EMAIL_FROM ?? "Support Center <onboarding@resend.dev>";
+import {
+  MailNotConfiguredError,
+  MISSING_MAIL_CONFIG,
+  outboxFailurePatch,
+  publicMailError,
+  sendOutbound,
+  smtpConfigured,
+} from "@/lib/email/send";
 
 function appOrigin() {
   if (process.env.NEXT_PUBLIC_APP_URL) return process.env.NEXT_PUBLIC_APP_URL.replace(/\/$/, "");
@@ -33,6 +39,11 @@ function messageHtml(row: OutboxRow) {
   return `<p>Ticket status is now <strong>${escapeHtml(status)}</strong>.</p><p><strong>Problem</strong><br />${summary}</p><p><a href="${link}">Open the ticket</a></p>`;
 }
 
+function messageText(row: OutboxRow) {
+  const status = row.subject.replace(/^.* is now /, "");
+  return `Ticket status is now ${status}.\n\nProblem\n${row.body_text}\n\nOpen the ticket: ${appOrigin()}${row.ticket_path}`;
+}
+
 export async function deliverPendingEmails() {
   const admin = createAdminClient();
   const now = new Date().toISOString();
@@ -47,11 +58,10 @@ export async function deliverPendingEmails() {
   const rows = (data ?? []) as OutboxRow[];
   if (rows.length === 0) return { sent: 0 };
 
-  const apiKey = process.env.RESEND_API_KEY;
-  if (!apiKey) {
+  if (!smtpConfigured() && !process.env.RESEND_API_KEY) {
     await admin
       .from("email_outbox")
-      .update({ last_error: "RESEND_API_KEY is not set" })
+      .update({ last_error: MISSING_MAIL_CONFIG })
       .in(
         "id",
         rows.map((row) => row.id),
@@ -61,41 +71,26 @@ export async function deliverPendingEmails() {
 
   let sent = 0;
   for (const row of rows) {
-    const response = await fetch("https://api.resend.com/emails", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${apiKey}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        from: FROM,
-        to: [row.to_address],
+    try {
+      await sendOutbound({
+        to: row.to_address,
         subject: row.subject,
         html: messageHtml(row),
-      }),
-    });
-
-    if (response.ok) {
+        text: messageText(row),
+      });
       sent += 1;
       await admin
         .from("email_outbox")
         .update({ status: "sent", sent_at: new Date().toISOString(), last_error: null })
         .eq("id", row.id);
-      continue;
+    } catch (error) {
+      const message = publicMailError(error);
+      const patch =
+        error instanceof MailNotConfiguredError
+          ? { last_error: MISSING_MAIL_CONFIG }
+          : outboxFailurePatch(row.attempts, message);
+      await admin.from("email_outbox").update(patch).eq("id", row.id);
     }
-
-    const attempts = row.attempts + 1;
-    const detail = (await response.text()).slice(0, 500);
-    const delayMinutes = Math.min(60, 2 ** attempts);
-    await admin
-      .from("email_outbox")
-      .update({
-        attempts,
-        status: attempts >= 8 ? "failed" : "pending",
-        next_attempt_at: new Date(Date.now() + delayMinutes * 60_000).toISOString(),
-        last_error: detail || `Email provider returned ${response.status}`,
-      })
-      .eq("id", row.id);
   }
 
   return { sent };
