@@ -243,7 +243,7 @@ function NotificationEmails({ initial }: { initial: string[] }) {
       }}
     >
       <Label htmlFor="emails" className="text-sm font-semibold">
-        Who gets an email when a new ticket is created
+        Extra addresses saved for later
       </Label>
       <Textarea
         id="emails"
@@ -252,7 +252,7 @@ function NotificationEmails({ initial }: { initial: string[] }) {
         rows={4}
         placeholder="support@selaheltelmeez.com"
       />
-      <p className="text-xs text-muted-foreground">One address per line, up to 10. In-app notifications go to all Technical Support users regardless.</p>
+      <p className="text-xs text-muted-foreground">Not used for ticket mail yet. A new ticket alerts Technical Support in the app. A status change emails the employee who opened the ticket.</p>
       <Button type="submit" className="w-fit" disabled={pending}>
         {pending ? "Saving…" : "Save recipients"}
       </Button>

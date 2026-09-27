@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/auth/session";
 import { createClient } from "@/lib/supabase/server";
+import { deliverPendingEmails } from "@/lib/email/deliver";
 import { TICKET_STATUSES, type TicketStatus } from "@/lib/tickets/constants";
 
 async function supportAgent() {
@@ -33,6 +34,14 @@ export async function updateTicketHeader(formData: FormData) {
       assignee_id: assignee || null,
     })
     .eq("id", id);
+
+  if (!error) {
+    try {
+      await deliverPendingEmails();
+    } catch {
+      // The status change is saved. Delivery retries from the outbox.
+    }
+  }
 
   revalidatePath("/tickets");
   revalidatePath(`/tickets/${id}`);
