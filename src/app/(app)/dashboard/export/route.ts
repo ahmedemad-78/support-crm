@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth/session";
 import { createClient } from "@/lib/supabase/server";
+import { cairoDayBound } from "@/lib/tickets/dashboard-model";
 import { parseDashboardFilters } from "@/lib/tickets/filters";
 
 export async function GET(request: Request) {
@@ -15,10 +16,10 @@ export async function GET(request: Request) {
   let query = supabase
     .from("tickets")
     .select("ticket_number, source, status, customer_name, issue_description, created_at, resolved_at")
-    .gte("created_at", `${filters.from}T00:00:00`)
-    .lte("created_at", `${filters.to}T23:59:59`)
     .order("created_at", { ascending: false })
     .limit(5000);
+  if (filters.from) query = query.gte("created_at", cairoDayBound(filters.from, false));
+  if (filters.to) query = query.lte("created_at", cairoDayBound(filters.to, true));
   if (filters.source) query = query.eq("source", filters.source);
   if (filters.status) query = query.eq("status", filters.status);
   if (filters.city) query = query.eq("city_id", filters.city);
