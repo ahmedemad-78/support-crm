@@ -1,11 +1,11 @@
 import { PageHeader } from "@/components/app-shell/page-header";
 import { requireUser } from "@/lib/auth/session";
-import { ROLE_LABELS } from "@/lib/auth/roles";
+import { PORTAL_ROLES, ROLE_LABELS } from "@/lib/auth/roles";
 import { createClient } from "@/lib/supabase/server";
 import { NewTicketForm } from "./new-ticket-form";
 
 export default async function NewTicketPage() {
-  const user = await requireUser(["moderation", "call_center"]);
+  const user = await requireUser([...PORTAL_ROLES]);
   const supabase = await createClient();
   const { data: cities, error } = await supabase
     .from("cities")

@@ -33,6 +33,8 @@ const ROLE_CHIP: Record<Role, string> = {
   support_agent: "bg-brand-tint text-brand-action",
   moderation: "bg-status-awaiting-bg text-status-awaiting",
   call_center: "bg-status-new-bg text-status-new",
+  june_schools: "bg-status-resolved-bg text-status-resolved",
+  business_development: "bg-status-closed-bg text-status-closed",
   manager: "bg-status-progress-bg text-status-progress",
 };
 
