@@ -86,7 +86,7 @@ Roles are stored in `public.profiles.role` (never in `user_metadata`, which user
 
 There is **no separate owner/super-admin role** (D-18). The owner is a Technical Support user with `is_admin = true`; only that account sees the **Admin** section (Users, Settings). `is_admin` cannot be granted from the UI — it is set once in the database.
 
-| Resource | Technical Support | Technical Support + Admin | Moderation / Call Center | Manager |
+| Resource | Technical Support | Technical Support + Admin | Moderation / Call Center / 30 June Schools / Business Development | Manager |
 |---|---|---|---|---|
 | WhatsApp inbox & messages | Read / send | Read / send | — | — |
 | Tickets | Read all, create (WhatsApp), update | same | Create; read **own** only | Read all |
@@ -99,16 +99,17 @@ There is **no separate owner/super-admin role** (D-18). The owner is a Technical
 | Users (add, role, password, unlock, deactivate) | — | Yes | — | — |
 | Settings (cities, issue categories, root causes, notification email) | — | Yes | — | — |
 
-Post-login landing: Technical Support → `/inbox`, Moderation/Call Center → `/portal/my-tickets`, Manager → `/dashboard`.
+Post-login landing: Technical Support → `/inbox`, form roles (Moderation, Call Center, 30 June Schools, Business Development) → `/portal/my-tickets`, Manager → `/dashboard`. Form roles share one portal and see only tickets they created. The database stamps `source` from the role, so 30 June Schools and Business Development stay separate from Moderation and Call Center on the dashboard.
 
 ## 5. Data Model
 
 ### 5.1 Enums
 
 ```
-user_role        : support_agent | moderation | call_center | manager      (support_agent = "Technical Support" in the UI)
+user_role        : support_agent | moderation | call_center | june_schools | business_development | manager
+                   (support_agent = "Technical Support", june_schools = "30 June Schools", business_development = "Business Development")
 ticket_status    : new | in_progress | awaiting_customer | resolved | closed
-ticket_source    : whatsapp | moderation | call_center
+ticket_source    : whatsapp | moderation | call_center | june_schools | business_development
 end_user_type    : student | teacher | parent | other
 app_platform     : android | ios | web
 msg_direction    : inbound | outbound
@@ -196,7 +197,7 @@ Every table in `public` has RLS enabled. Helper: `private.current_role()` → `u
 
 - **tickets**
   - SELECT: role in (agent, manager) **or** `created_by = auth.uid()`
-  - INSERT: (role in (moderation, call_center) and source matches role) **or** (role = agent and source = whatsapp)
+  - INSERT: role in (moderation, call_center, june_schools, business_development, support_agent). `set_ticket_defaults` sets source from the role (form roles keep their own source; support_agent becomes whatsapp).
   - UPDATE: role = agent (triggers enforce the rest)
   - DELETE: none
 - **ticket_status_history / ticket_attachments**: SELECT follows ticket visibility (via `exists` on tickets); attachment INSERT by the ticket creator at submit time or by agents.

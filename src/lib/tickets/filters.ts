@@ -1,4 +1,4 @@
-import { TICKET_STATUSES, type TicketSource, type TicketStatus } from "./constants";
+import { TICKET_SOURCES, TICKET_STATUSES, type TicketSource, type TicketStatus } from "./constants";
 
 export const TICKET_VIEWS = ["all", "new", "mine", "awaiting", "resolved"] as const;
 export type TicketView = (typeof TICKET_VIEWS)[number];
@@ -16,8 +16,6 @@ export type TicketListFilters = {
   page: number;
 };
 
-const SOURCES = ["whatsapp", "moderation", "call_center"] as const;
-
 function one(value: string | string[] | undefined): string {
   return (Array.isArray(value) ? value[0] : value)?.trim() ?? "";
 }
@@ -34,7 +32,7 @@ export function parseTicketListFilters(
   return {
     view: TICKET_VIEWS.includes(view as TicketView) ? (view as TicketView) : "all",
     status: TICKET_STATUSES.includes(status as TicketStatus) ? (status as TicketStatus) : "",
-    source: SOURCES.includes(source as TicketSource) ? (source as TicketSource) : "",
+    source: (TICKET_SOURCES as readonly string[]).includes(source) ? (source as TicketSource) : "",
     city: one(searchParams.city),
     category: one(searchParams.category),
     assignee: one(searchParams.assignee),
@@ -90,7 +88,7 @@ export function parseDashboardFilters(
   const monthStart = new Date(today.getFullYear(), today.getMonth(), 1);
   const iso = (date: Date) => date.toISOString().slice(0, 10);
   return {
-    source: SOURCES.includes(source as TicketSource) ? (source as TicketSource) : "",
+    source: (TICKET_SOURCES as readonly string[]).includes(source) ? (source as TicketSource) : "",
     status: TICKET_STATUSES.includes(status as TicketStatus) ? (status as TicketStatus) : "",
     city: one(searchParams.city),
     category: one(searchParams.category),

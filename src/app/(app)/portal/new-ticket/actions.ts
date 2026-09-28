@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { isPortalRole } from "@/lib/auth/roles";
 import { getCurrentUser } from "@/lib/auth/session";
 import { createClient } from "@/lib/supabase/server";
 import {
@@ -16,8 +17,8 @@ export type CreateTicketResult =
 
 export async function createPortalTicket(input: PortalTicketInput): Promise<CreateTicketResult> {
   const user = await getCurrentUser();
-  if (!user || (user.role !== "moderation" && user.role !== "call_center")) {
-    return { ok: false, error: "Only Moderation and Call Center can use this form." };
+  if (!user || !isPortalRole(user.role)) {
+    return { ok: false, error: "This account can't open a ticket from this form." };
   }
 
   const parsed = portalTicketSchema.safeParse(input);

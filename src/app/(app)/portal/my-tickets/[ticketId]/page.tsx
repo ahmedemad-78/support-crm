@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { ChevronRight, FileImage, FileVideo, Lock } from "lucide-react";
 import { UserNotifications } from "@/components/app-shell/user-notifications";
 import { StatusBadge } from "@/components/tickets/status-badge";
+import { PORTAL_ROLES } from "@/lib/auth/roles";
 import { requireUser } from "@/lib/auth/session";
 import { createClient } from "@/lib/supabase/server";
 import { formatDate, formatDateTime } from "@/lib/format";
@@ -17,7 +18,7 @@ import {
 } from "@/lib/tickets/constants";
 
 export default async function PortalTicketPage({ params }: PageProps<"/portal/my-tickets/[ticketId]">) {
-  const user = await requireUser(["moderation", "call_center"]);
+  const user = await requireUser([...PORTAL_ROLES]);
   const { ticketId } = await params;
   const supabase = await createClient();
 

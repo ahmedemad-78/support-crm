@@ -1,11 +1,11 @@
 import "server-only";
 import { createClient } from "@/lib/supabase/server";
-import type { Role } from "@/lib/auth/roles";
+import { isPortalRole, type Role } from "@/lib/auth/roles";
 import type { TicketStatus } from "@/lib/tickets/constants";
 import type { AppNotification, NotificationKind } from "./types";
 
 function hrefFor(role: Role, kind: NotificationKind, ticketId: string) {
-  if (kind === "status_changed" && (role === "moderation" || role === "call_center")) {
+  if (kind === "status_changed" && isPortalRole(role)) {
     return `/portal/my-tickets/${ticketId}`;
   }
   return `/tickets/${ticketId}`;
