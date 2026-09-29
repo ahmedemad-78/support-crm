@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth/session";
 import { createClient } from "@/lib/supabase/server";
-import { cairoDayBound, effectiveDashboardRange } from "@/lib/tickets/dashboard-model";
+import { cairoDayBound } from "@/lib/tickets/dashboard-model";
 import { parseDashboardFilters } from "@/lib/tickets/filters";
 
 export async function GET(request: Request) {
@@ -18,14 +18,10 @@ export async function GET(request: Request) {
     .select("ticket_number, source, status, customer_name, issue_description, created_at, resolved_at")
     .order("created_at", { ascending: false })
     .limit(5000);
-  const range = effectiveDashboardRange(filters);
-  if (range.from) query = query.gte("created_at", cairoDayBound(range.from, false));
-  if (range.to) query = query.lte("created_at", cairoDayBound(range.to, true));
+  if (filters.from) query = query.gte("created_at", cairoDayBound(filters.from, false));
+  if (filters.to) query = query.lte("created_at", cairoDayBound(filters.to, true));
   if (filters.source) query = query.eq("source", filters.source);
   if (filters.status) query = query.eq("status", filters.status);
-  if (filters.fawry === "yes") query = query.eq("fawry_payment", true);
-  if (filters.fawry === "no") query = query.eq("fawry_payment", false);
-  if (filters.fawry === "unknown") query = query.is("fawry_payment", null);
   if (filters.city) query = query.eq("city_id", filters.city);
   if (filters.category) query = query.eq("issue_category_id", filters.category);
   if (filters.userType) query = query.eq("end_user_type", filters.userType);
