@@ -69,6 +69,9 @@ export function ticketListQuery(filters: TicketListFilters, extras?: Record<stri
   return query ? `?${query}` : "";
 }
 
+export const FAWRY_FILTERS = ["yes", "no", "unknown"] as const;
+export type FawryFilter = (typeof FAWRY_FILTERS)[number];
+
 export type DashboardFilters = {
   source: TicketSource | "";
   status: TicketStatus | "";
@@ -77,9 +80,12 @@ export type DashboardFilters = {
   userType: string;
   from: string;
   to: string;
+  month: string;
+  fawry: FawryFilter | "";
 };
 
 const DAY = /^\d{4}-\d{2}-\d{2}$/;
+const MONTH = /^\d{4}-\d{2}$/;
 
 export function parseDashboardFilters(
   searchParams: Record<string, string | string[] | undefined>,
@@ -89,6 +95,8 @@ export function parseDashboardFilters(
   const userType = one(searchParams.userType);
   const from = one(searchParams.from);
   const to = one(searchParams.to);
+  const month = one(searchParams.month);
+  const fawry = one(searchParams.fawry);
   return {
     source: (TICKET_SOURCES as readonly string[]).includes(source) ? (source as TicketSource) : "",
     status: TICKET_STATUSES.includes(status as TicketStatus) ? (status as TicketStatus) : "",
@@ -97,6 +105,8 @@ export function parseDashboardFilters(
     userType: (END_USER_TYPES as readonly string[]).includes(userType) ? userType : "",
     from: DAY.test(from) ? from : "",
     to: DAY.test(to) ? to : "",
+    month: MONTH.test(month) ? month : "",
+    fawry: (FAWRY_FILTERS as readonly string[]).includes(fawry) ? (fawry as FawryFilter) : "",
   };
 }
 
@@ -109,6 +119,8 @@ export function dashboardQuery(filters: DashboardFilters): string {
   if (filters.userType) params.set("userType", filters.userType);
   if (filters.from) params.set("from", filters.from);
   if (filters.to) params.set("to", filters.to);
+  if (filters.month) params.set("month", filters.month);
+  if (filters.fawry) params.set("fawry", filters.fawry);
   const query = params.toString();
   return query ? `?${query}` : "";
 }

@@ -12,6 +12,7 @@ type DbRow = {
   created_at: string;
   resolved_at: string | null;
   end_user_type: string | null;
+  fawry_payment: boolean | null;
   city_id: number | null;
   issue_category_id: number | null;
   issue_categories: { name: string } | { name: string }[] | null;
@@ -37,7 +38,7 @@ export default async function DashboardPage({ searchParams }: PageProps<"/dashbo
     for (let from = 0; from < 10000; from += pageSize) {
       const { data, error } = await supabase
         .from("tickets")
-        .select("status, source, created_at, resolved_at, end_user_type, city_id, issue_category_id, issue_categories(name), root_causes(name)")
+        .select("status, source, created_at, resolved_at, end_user_type, fawry_payment, city_id, issue_category_id, issue_categories(name), root_causes(name)")
         .order("created_at", { ascending: true })
         .range(from, from + pageSize - 1);
       if (error) throw error;
@@ -72,6 +73,7 @@ function toTicket(row: DbRow): DashboardTicket {
     categoryId: row.issue_category_id == null ? "" : String(row.issue_category_id),
     category: nameOf(row.issue_categories),
     cause: nameOf(row.root_causes),
+    fawryPayment: row.fawry_payment,
   };
 }
 

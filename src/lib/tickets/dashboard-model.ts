@@ -6,7 +6,7 @@ import {
   type TicketSource,
   type TicketStatus,
 } from "./constants";
-import type { DashboardFilters } from "./filters";
+import type { DashboardFilters, FawryFilter } from "./filters";
 
 export type DashboardTicket = {
   status: TicketStatus;
@@ -19,6 +19,14 @@ export type DashboardTicket = {
   categoryId: string;
   category: string;
   cause: string;
+  fawryPayment: boolean | null;
+};
+
+export type MonthStack = {
+  key: string;
+  label: string;
+  total: number;
+  sources: Record<TicketSource, number>;
 };
 
 export type DashboardBar = {
@@ -60,8 +68,29 @@ export function filterTickets(tickets: DashboardTicket[], filters: DashboardFilt
     if (filters.city && ticket.cityId !== filters.city) return false;
     if (filters.category && ticket.categoryId !== filters.category) return false;
     if (filters.userType && ticket.endUserType !== filters.userType) return false;
+    if (filters.month && ticket.createdOn.slice(0, 7) !== filters.month) return false;
+    if (filters.fawry && fawryKey(ticket) !== filters.fawry) return false;
     return true;
   });
+}
+
+export function fawryKey(ticket: Pick<DashboardTicket, "fawryPayment">): FawryFilter {
+  if (ticket.fawryPayment === true) return "yes";
+  if (ticket.fawryPayment === false) return "no";
+  return "unknown";
+}
+
+export function effectiveDashboardRange(filters: Pick<DashboardFilters, "from" | "to" | "month">) {
+  let from = filters.from;
+  let to = filters.to;
+  if (/^\d{4}-\d{2}$/.test(filters.month)) {
+    const start = `${filters.month}-01`;
+    const [year, month] = filters.month.split("-").map(Number);
+    const end = new Date(Date.UTC(year, month, 0)).toISOString().slice(0, 10);
+    if (!from || start > from) from = start;
+    if (!to || end < to) to = end;
+  }
+  return { from, to };
 }
 
 export function summarize(tickets: DashboardTicket[]) {
@@ -129,6 +158,53 @@ export function barsForResolution(tickets: DashboardTicket[]): DashboardBar[] {
     }))
     .sort((a, b) => b.value - a.value)
     .slice(0, 6);
+}
+
+const MONTH_LABELS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+
+export function monthLabel(monthKey: string): string {
+  const [year, month] = monthKey.split("-").map(Number);
+  const name = MONTH_LABELS[month - 1] ?? monthKey;
+  return `${name} ${String(year).slice(2)}`;
+}
+
+export function monthStacks(tickets: DashboardTicket[], from: string, to: string): MonthStack[] {
+  if (!from || !to || from > to) return [];
+  const stacks: MonthStack[] = [];
+  for (let cursor = from.slice(0, 7); cursor <= to.slice(0, 7); ) {
+    stacks.push({
+      key: cursor,
+      label: monthLabel(cursor),
+      total: 0,
+      sources: {
+        whatsapp: 0,
+        moderation: 0,
+        call_center: 0,
+        june_schools: 0,
+        business_development: 0,
+      },
+    });
+    const [year, month] = cursor.split("-").map(Number);
+    cursor = new Date(Date.UTC(year, month, 1)).toISOString().slice(0, 7);
+  }
+  const byKey = new Map(stacks.map((stack) => [stack.key, stack]));
+  for (const ticket of tickets) {
+    const stack = byKey.get(ticket.createdOn.slice(0, 7));
+    if (!stack) continue;
+    stack.sources[ticket.source] += 1;
+    stack.total += 1;
+  }
+  return stacks;
+}
+
+export function fawryShares(tickets: DashboardTicket[]): DashboardBar[] {
+  const counts: Record<FawryFilter, number> = { yes: 0, no: 0, unknown: 0 };
+  for (const ticket of tickets) counts[fawryKey(ticket)] += 1;
+  return [
+    { key: "yes", label: "Fawry", value: counts.yes },
+    { key: "no", label: "Not Fawry", value: counts.no },
+    { key: "unknown", label: "Not recorded", value: counts.unknown },
+  ];
 }
 
 export function timeBuckets(tickets: DashboardTicket[], from: string, to: string): DashboardBar[] {
