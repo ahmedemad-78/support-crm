@@ -70,6 +70,11 @@ export function ticketListQuery(filters: TicketListFilters, extras?: Record<stri
 }
 
 export type DashboardFilters = {
+  cause?: string;
+  platform?: string;
+  assignee?: string;
+  view?: "created" | "resolved" | "open";
+  age?: string;
   source: TicketSource | "";
   status: TicketStatus | "";
   city: string;
@@ -97,11 +102,19 @@ export function parseDashboardFilters(
     userType: (END_USER_TYPES as readonly string[]).includes(userType) ? userType : "",
     from: DAY.test(from) ? from : "",
     to: DAY.test(to) ? to : "",
+    cause: one(searchParams.cause).slice(0, 200),
+    platform: one(searchParams.platform),
+    assignee: one(searchParams.assignee),
+    view: one(searchParams.view) === "open" ? "open" : one(searchParams.view) === "resolved" ? "resolved" : "created",
+    age: /^[0-3]$/.test(one(searchParams.age)) ? one(searchParams.age) : "",
   };
 }
 
 export function dashboardQuery(filters: DashboardFilters): string {
   const params = new URLSearchParams();
+  for (const key of ["cause", "platform", "assignee", "view", "age"] as const) {
+    if (filters[key]) params.set(key, filters[key]);
+  }
   if (filters.source) params.set("source", filters.source);
   if (filters.status) params.set("status", filters.status);
   if (filters.city) params.set("city", filters.city);
