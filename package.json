@@ -7,7 +7,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "typecheck": "tsc --noEmit",
+    "typecheck": "next typegen && tsc --noEmit",
     "test:analytics": "node --test scripts/analytics.test.mjs",
     "create-admin": "node --env-file=.env.local scripts/create-admin.mjs"
   },
