@@ -20,6 +20,7 @@ scaling polling to many simultaneous users.
   Age selections narrow that open-ticket list; headline period metrics keep their
   stated scope. The activity chart always compares period arrivals and resolutions.
 - Missing root causes are a data-quality indicator, not an inferred cause ranking.
+- City and user-type breakdowns live in the expandable analysis section; selecting a value filters the ticket table, including records where those fields were not captured.
 - Pareto uses all selected tickets as its denominator. The line remains below 100% when only the leading categories are shown. The category/cause matrix includes recorded causes only; missing causes are shown separately. Selecting a chart value applies its dimensions to all panels and the ticket table.
 - A resolved ticket can have a cause but no valid duration. Per-category median displays its sample size. The ticket table links to details with a return path that keeps dashboard filters.
 - CSV exports the current matching cohort; PDF uses the browser print dialog.

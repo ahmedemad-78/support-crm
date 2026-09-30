@@ -99,7 +99,7 @@ export function parseDashboardFilters(
     status: TICKET_STATUSES.includes(status as TicketStatus) ? (status as TicketStatus) : "",
     city: one(searchParams.city),
     category: one(searchParams.category),
-    userType: (END_USER_TYPES as readonly string[]).includes(userType) ? userType : "",
+    userType: userType === "__missing__" || (END_USER_TYPES as readonly string[]).includes(userType) ? userType : "",
     from: DAY.test(from) ? from : "",
     to: DAY.test(to) ? to : "",
     cause: one(searchParams.cause).slice(0, 200),

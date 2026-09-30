@@ -146,9 +146,10 @@ test("Pareto uses the whole selected cohort and matrix only counts recorded caus
 test("drill-down filters intersect and missing values remain explicit", () => {
   const rows = [
     ticket({ id: "1", cause: "Version", platform: "android", assigneeId: "agent" }),
-    ticket({ id: "2", cause: "", platform: "android", assigneeId: "" }),
+    ticket({ id: "2", cause: "", platform: "android", assigneeId: "", cityId: "", endUserType: "" }),
     ticket({ id: "3", cause: "Version", platform: "ios", assigneeId: "" }),
   ];
   assert.deepEqual(a.scopeTickets(rows, { cause: "Version", platform: "android", assignee: "agent" }).map(t => t.id), ["1"]);
   assert.deepEqual(a.scopeTickets(rows, { cause: "__missing__", assignee: "__missing__" }).map(t => t.id), ["2"]);
+  assert.deepEqual(a.scopeTickets(rows, { city: "__missing__", userType: "__missing__" }).map(t => t.id), ["2"]);
 });

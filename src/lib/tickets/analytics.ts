@@ -32,12 +32,12 @@ export function scopeTickets(
     (t) =>
       (!filters.source || t.source === filters.source) &&
       (!filters.status || t.status === filters.status) &&
-      (!filters.city || t.cityId === filters.city) &&
+      (!filters.city || (filters.city === "__missing__" ? !t.cityId : t.cityId === filters.city)) &&
       (!filters.category || (filters.category === "__missing__" ? !t.categoryId : t.categoryId === filters.category)) &&
       (!filters.cause || (filters.cause === "__missing__" ? !t.cause : t.cause === filters.cause)) &&
       (!filters.platform || t.platform === filters.platform) &&
       (!filters.assignee || (filters.assignee === "__missing__" ? !t.assigneeId : t.assigneeId === filters.assignee)) &&
-      (!filters.userType || t.endUserType === filters.userType),
+      (!filters.userType || (filters.userType === "__missing__" ? !t.endUserType : t.endUserType === filters.userType)),
   );
 }
 export function cohort(
