@@ -23,14 +23,15 @@ export default async function AgentTicketPage({
 }: PageProps<"/tickets/[ticketId]">) {
   const user = await requireUser(["support_agent", "manager"]);
   const { ticketId } = await params;
-  const { error: errorMessage } = await searchParams;
+  const { error: errorMessage, returnTo } = await searchParams;
+  const backHref = typeof returnTo === "string" && returnTo.startsWith("/dashboard") && !returnTo.startsWith("//") ? returnTo : "/tickets";
   const supabase = await createClient();
 
   const { data: ticket } = await supabase
     .from("tickets")
     .select(
       `id, ticket_number, status, source, created_at, customer_name, customer_email, customer_phone, school_name,
-       credentials_username, issue_date, end_user_type, fawry_payment, platform, is_latest_version, app_version,
+       credentials_username, issue_date, end_user_type, platform, is_latest_version, app_version,
        device_type, page_screen, steps, issue_description, assignee_id, issue_category_id, root_cause_id,
        action_taken, resolution_notes, cities(name),
        creator:profiles!tickets_created_by_fkey(full_name)`,
@@ -83,7 +84,6 @@ export default async function AgentTicketPage({
     ["Platform", ticket.platform ? PLATFORM_LABELS[ticket.platform as keyof typeof PLATFORM_LABELS] : "—"],
     ["Device", ticket.device_type ?? "—"],
     ["App version", version],
-    ["Fawry payment", ticket.fawry_payment == null ? "—" : ticket.fawry_payment ? "Yes" : "No"],
     ["Page / screen", ticket.page_screen ?? "—"],
     ["Phone", ticket.customer_phone ?? "—"],
   ];
@@ -92,7 +92,7 @@ export default async function AgentTicketPage({
     <AgentFrame title="Ticket details">
       <div className="flex flex-col gap-4 border-b bg-background px-5 py-4 sm:px-8">
         <nav className="flex items-center gap-1.5 text-[13px]">
-          <Link href="/tickets" className="font-medium text-muted-foreground hover:text-foreground">Tickets</Link>
+          <Link href={backHref} className="font-medium text-muted-foreground hover:text-foreground">{backHref.startsWith("/dashboard") ? "Support analytics" : "Tickets"}</Link>
           <ChevronRight className="size-3.5 text-muted-foreground" />
           <span className="font-mono font-medium">{ticket.ticket_number}</span>
           <CopyTicketNumber value={ticket.ticket_number} />

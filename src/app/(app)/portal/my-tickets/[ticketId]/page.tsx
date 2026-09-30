@@ -25,7 +25,7 @@ export default async function PortalTicketPage({ params }: PageProps<"/portal/my
   const { data: ticket } = await supabase
     .from("tickets")
     .select(
-      "id, ticket_number, status, created_at, customer_name, customer_email, school_name, credentials_username, issue_date, end_user_type, fawry_payment, platform, is_latest_version, app_version, device_type, page_screen, steps, issue_description, cities(name)",
+      "id, ticket_number, status, created_at, customer_name, customer_email, school_name, credentials_username, issue_date, end_user_type, platform, is_latest_version, app_version, device_type, page_screen, steps, issue_description, cities(name)",
     )
     .eq("id", ticketId)
     .eq("created_by", user.id)
@@ -59,7 +59,6 @@ export default async function PortalTicketPage({ params }: PageProps<"/portal/my
     ["Platform", ticket.platform ? PLATFORM_LABELS[ticket.platform as keyof typeof PLATFORM_LABELS] : "—"],
     ["Device", ticket.device_type ?? "—"],
     ["App version", `${ticket.app_version ?? "—"}${ticket.is_latest_version === false ? " (not latest)" : ""}`],
-    ["Fawry payment", ticket.fawry_payment == null ? "—" : ticket.fawry_payment ? "Yes" : "No"],
     ["Date of issue", ticket.issue_date ? formatDate(ticket.issue_date) : "—"],
     ["Page / screen", ticket.page_screen ?? "—"],
   ];
