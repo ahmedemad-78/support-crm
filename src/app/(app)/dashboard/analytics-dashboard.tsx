@@ -8,7 +8,7 @@ import { dashboardQuery, type DashboardFilters } from "@/lib/tickets/filters";
 import { AGE_LABELS, ageBand, causeMatrix, cohort, csvCell, durationHours, formatHours, issuePareto, isOpen, median, scopeTickets, trend, validDay, type AnalyticsTicket, type View } from "@/lib/tickets/analytics";
 import { ActivityChart, ParetoChart, StatusDonut } from "./charts";
 type Snapshot = { tickets: AnalyticsTicket[]; asOf: string };
-type Selection = Partial<DashboardFilters> & { completed?: boolean; openOnly?: boolean };
+type Selection = Partial<DashboardFilters> & { completed?: boolean; openOnly?: boolean; timed?: boolean };
 type Option = { id: string; name: string };
 const viewLabels = { created: "Received in period", resolved: "Resolved in period", open: "Open now · all creation dates" };
 
@@ -29,11 +29,11 @@ export function DashboardBoard({ initialSnapshot, initialFilters, cities, catego
   const matching = (valid || view === "open" ? cohort(scopeTickets(scoped, { ...filters, ...selection }), view, tableFrom, tableTo) : []).filter(t =>
     (!selection.age || ageBand(t, Date.parse(snapshot.asOf)) === Number(selection.age)) &&
     (!selection.completed || t.status === "resolved" || t.status === "closed") &&
-    (!selection.openOnly || isOpen(t)));
+    (!selection.openOnly || isOpen(t)) && (!selection.timed || durationHours(t) !== null));
   const completed = rows.filter(t => t.status === "resolved" || t.status === "closed").length;
   const missingDates = rows.filter(t => (t.status === "resolved" || t.status === "closed") && !t.resolvedAt).length;
   const uncategorized = rows.filter(t => !t.categoryId).length;
-  const durations = current.resolved.map(durationHours).filter((h): h is number => h !== null);
+  const durations = rows.map(durationHours).filter((h): h is number => h !== null);
   const pareto = issuePareto(rows), matrix = causeMatrix(rows), matrixMax = Math.max(1, ...matrix.cells.flat()), missing = rows.filter(t => !t.cause).length;
   const buckets = useMemo(() => valid ? trend(scoped, filters.from, filters.to) : [], [scoped, filters.from, filters.to, valid]);
   const causes = [...new Set(snapshot.tickets.map(t => t.cause).filter(Boolean))].sort().map(name => ({ id: name, name }));
@@ -82,6 +82,7 @@ export function DashboardBoard({ initialSnapshot, initialFilters, cities, catego
     selection.userType && (selection.userType === "__missing__" ? "User type not recorded" : END_USER_TYPE_LABELS[selection.userType as keyof typeof END_USER_TYPE_LABELS]),
     selection.age && AGE_LABELS[Number(selection.age)],
     selection.completed && "Resolved / closed arrivals", selection.openOnly && "Open period arrivals",
+    selection.timed && "Valid resolution timestamps",
   ].filter(Boolean).join(" · ") || viewLabels[view];
 
   const cityBreakdown = [...new Set(rows.map(t => t.cityId || "__missing__"))].map(id => ({ id, name: id === "__missing__" ? "City not recorded" : cities.find(c => c.id === id)?.name || "Unknown city", count: rows.filter(t => (t.cityId || "__missing__") === id).length })).sort((a, b) => b.count - a.count);
@@ -108,14 +109,14 @@ export function DashboardBoard({ initialSnapshot, initialFilters, cities, catego
       <Select label="City" value={filters.city} options={[...cities,{id:"__missing__",name:"Not recorded"}]} onChange={city => patch({city})}/><Select label="User type" value={filters.userType} options={[...END_USER_TYPES.map(t => ({id:t,name:END_USER_TYPE_LABELS[t]})),{id:"__missing__",name:"Not recorded"}]} onChange={userType => patch({userType})}/>
     </div>}
     {!valid && <p className="bi-warning" role="alert">Choose a valid date range. Start must be on or before end.</p>}{error && <p className="bi-warning" role="alert">{error}</p>}
-    <div className="bi-report-scope"><div><span className="bi-kicker">PERIOD PERFORMANCE</span><h3>{filters.from} — {filters.to}</h3></div><p>All charts below use <strong>{rows.length} tickets received</strong> in this period.<br/>Current statuses · Cairo calendar dates</p></div>
+    <div className="bi-report-scope"><div><span className="bi-kicker">PERIOD PERFORMANCE</span><h3>{filters.from} — {filters.to}</h3></div><p>Period breakdowns cover <strong>{rows.length} tickets received</strong> in this period.<br/>Current statuses · Cairo calendar dates</p></div>
     <div className="bi-kpis">{[
       { label:"Total tickets received", value:rows.length.toLocaleString(), icon:Ticket, selection:{view:"created"} as Selection, detail:"Created within the selected dates" },
       { label:"Resolved / closed", value:completed.toLocaleString(), icon:CheckCheck, selection:{completed:true} as Selection, detail:rows.length?`${Math.round(completed/rows.length*100)}% of period arrivals · current status`:"No arrivals in this period" },
       { label:"Still open", value:rows.filter(isOpen).length.toLocaleString(), icon:Inbox, selection:{openOnly:true} as Selection, detail:"Of period arrivals · needs follow-up" },
-      { label:"Median resolution time", value:formatHours(median(durations)), icon:Clock3, selection:{view:"resolved"} as Selection, detail:`${durations.length} timed resolutions in period · elapsed hours` },
+      { label:"Median resolution time", value:formatHours(median(durations)), icon:Clock3, selection:{completed:true,timed:true} as Selection, detail:`${durations.length} of ${completed} completed arrivals · valid elapsed times` },
     ].map((m,i) => <button key={m.label} className={`bi-kpi bi-kpi-${i}`} onClick={() => drill(m.selection)}><span className="bi-kpi-label">{m.label}<m.icon size={18}/></span><strong>{m.value}</strong><span>{m.detail}</span><small>View tickets ↗</small></button>)}</div>
-    {(uncategorized>0||missingDates>0) && <div className="bi-data-note"><strong>Reporting coverage</strong><span>{uncategorized} of {rows.length} arrivals have no issue category.{missingDates>0?` ${missingDates} resolved/closed arrivals have no resolution date and cannot be included in timed metrics.`:""} Missing fields are not inferred from ticket text.</span><button onClick={()=>drill({category:"__missing__"})}>Review classification ↗</button></div>}
+    {(uncategorized>0||missingDates>0) && <div className="bi-data-note"><strong>Reporting coverage</strong><span>{uncategorized} of {rows.length} arrivals have no issue category.{missingDates>0?` ${missingDates} resolved/closed arrivals have no resolution date and cannot be included in timed metrics.`:""} Missing fields are not inferred from ticket text.</span>{uncategorized>0&&<button onClick={()=>drill({category:"__missing__"})}>Review classification ↗</button>}</div>}
     {chips.length>0 && <div className="bi-chips no-print">{chips.map(k => <button key={k} onClick={() => patch({[k]:""})}>{k}: {chipLabel(k)} <X size={12}/></button>)}<span>Report filters · selecting a chart only changes the ticket list</span></div>}
     <div className="bi-top-grid"><Panel title="Demand & recorded resolutions" subtitle="Arrivals by creation date · resolved/closed tickets by recorded resolution date" badge="VOLUME"><ActivityChart buckets={buckets} onSelect={(from,to,selectedView) => drill({from,to,view:selectedView,age:""})}/></Panel><Panel title="Where these tickets stand" subtitle={`Current status of all ${rows.length} period arrivals`} badge="DISTRIBUTION"><StatusDonut rows={rows} selected={filters.status} onSelect={status => drill({status:filters.status===status?"":status})}/></Panel></div>
     <div className="bi-analysis-grid"><Panel title="Most reported issues" subtitle={`${rows.length-uncategorized} classified / ${rows.length} arrivals · cumulative share of all arrivals`} badge="PARETO"><ParetoChart entries={pareto} onSelect={category => drill({category:filters.category===category?"":category})}/></Panel>

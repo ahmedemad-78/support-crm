@@ -20,6 +20,8 @@ try {
   assert.equal(await total.textContent(), '47');
   assert.equal(await page.locator('.bi-kpi').nth(1).locator('strong').textContent(), '43');
   assert.equal(await page.locator('.bi-kpi').nth(2).locator('strong').textContent(), '4');
+  await page.locator('.bi-kpi').nth(3).click();
+  assert.equal(await page.locator('.bi-result-count').textContent(), '2', 'Median must drill into its valid timestamp sample');
   await page.locator('.bi-kpi').nth(2).click();
   assert.equal(await total.textContent(), '47', 'Drilldown must not change report population');
   assert.equal(await page.locator('.bi-result-count').textContent(), '4');
@@ -42,6 +44,11 @@ try {
   await page.setViewportSize({ width:390,height:844 });
   await page.screenshot({ path: 'artifacts/dashboard-mobile.png', fullPage: true });
   assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=window.innerWidth+1), 'Mobile page must not overflow');
+  await page.setViewportSize({width:1440,height:1100});
+  await page.goto('http://localhost:3100/login/preview', {waitUntil:'networkidle'});
+  await page.getByRole('button', {name:'Last year to date',exact:true}).click();
+  assert.equal(await total.textContent(), '96');
+  await page.screenshot({path:'artifacts/dashboard-classified.png',fullPage:true});
   assert.deepEqual(errors, []);
   console.log('Dashboard cohort, incomplete data, date drilldown and mobile checks passed.');
 } finally {
