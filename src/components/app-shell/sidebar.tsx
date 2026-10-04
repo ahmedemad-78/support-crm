@@ -4,7 +4,13 @@ import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useState } from "react";
-import { Sheet, SheetContent, SheetTitle, SheetDescription, SheetTrigger } from "@/components/ui/sheet";
+import {
+  Sheet,
+  SheetContent,
+  SheetTitle,
+  SheetDescription,
+  SheetTrigger,
+} from "@/components/ui/sheet";
 import {
   BarChart3,
   Inbox,
@@ -13,6 +19,8 @@ import {
   MessageCircle,
   Menu,
   ChevronRight,
+  PanelLeftClose,
+  PanelLeftOpen,
   Headphones,
   PlusCircle,
   Settings,
@@ -33,9 +41,16 @@ const ICONS: Record<NavIcon, LucideIcon> = {
   "my-tickets": List,
 };
 
-export function Sidebar({ user, sections }: { user: CurrentUser; sections: NavSection[] }) {
+export function Sidebar({
+  user,
+  sections,
+}: {
+  user: CurrentUser;
+  sections: NavSection[];
+}) {
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
+  const [collapsed, setCollapsed] = useState(false);
   const initials = user.fullName
     .split(" ")
     .map((part) => part[0])
@@ -44,16 +59,19 @@ export function Sidebar({ user, sections }: { user: CurrentUser; sections: NavSe
     .toUpperCase();
 
   const content = (
-    <div className="flex h-full flex-col gap-2 overflow-y-auto bg-sidebar px-4 py-5">
+    <div className="support-nav-content flex h-full flex-col gap-2 overflow-y-auto bg-sidebar px-4 py-5">
       <Image
         src="/brand/logo.jpg"
         alt="Selah El Telmeez"
-        width={132}
-        height={52}
-        className="mx-2 mb-4 h-[52px] w-auto object-contain mix-blend-multiply"
+        width={156}
+        height={62}
+        className="support-company-logo mx-2 mb-4 h-[62px] w-auto object-contain mix-blend-multiply"
       />
 
-      <div className="mx-2 mb-5 flex items-center gap-2 border-t pt-5 text-sm font-semibold"><Headphones className="size-4 text-brand-action" /> Support Center</div>
+      <div className="support-nav-brand mx-2 mb-5 flex items-center gap-2 border-t pt-5 text-sm font-semibold">
+        <Headphones className="size-4 shrink-0 text-brand-action" />
+        <span>Support Center</span>
+      </div>
       <nav aria-label="Main navigation" className="flex flex-1 flex-col gap-5">
         {sections.map((section) => (
           <div key={section.heading} className="flex flex-col gap-1">
@@ -62,11 +80,14 @@ export function Sidebar({ user, sections }: { user: CurrentUser; sections: NavSe
             </p>
             {section.items.map((item) => {
               const Icon = ICONS[item.icon];
-              const active = pathname === item.href || pathname.startsWith(`${item.href}/`);
+              const active =
+                pathname === item.href || pathname.startsWith(`${item.href}/`);
               return (
                 <Link
                   key={item.href}
                   href={item.href}
+                  title={item.label}
+                  aria-label={item.label}
                   aria-current={active ? "page" : undefined}
                   onClick={() => setOpen(false)}
                   className={cn(
@@ -76,14 +97,23 @@ export function Sidebar({ user, sections }: { user: CurrentUser; sections: NavSe
                       : "text-muted-foreground hover:bg-white hover:text-foreground",
                   )}
                 >
-                  <Icon className={cn("size-[18px]", active ? "text-brand-action" : "text-muted-foreground")} />
-                  <span className="min-w-0 flex-1 truncate">{item.label}</span>
+                  <Icon
+                    className={cn(
+                      "size-[18px]",
+                      active ? "text-brand-action" : "text-muted-foreground",
+                    )}
+                  />
+                  <span className="support-nav-label min-w-0 flex-1 truncate">
+                    {item.label}
+                  </span>
                   {item.badge && (
-                    <span className="rounded-full bg-brand-tint px-2 py-0.5 text-[11px] font-semibold text-brand-action">
+                    <span className="support-nav-badge rounded-full bg-brand-tint px-2 py-0.5 text-[11px] font-semibold text-brand-action">
                       {item.badge}
                     </span>
                   )}
-                  {active && !item.badge && <ChevronRight className="ml-auto size-3.5" />}
+                  {active && !item.badge && (
+                    <ChevronRight className="ml-auto size-3.5" />
+                  )}
                 </Link>
               );
             })}
@@ -95,8 +125,10 @@ export function Sidebar({ user, sections }: { user: CurrentUser; sections: NavSe
         <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-brand-action text-[13px] font-semibold text-white">
           {initials}
         </div>
-        <div className="flex min-w-0 flex-1 flex-col">
-          <span className="truncate text-sm font-semibold">{user.fullName}</span>
+        <div className="support-nav-user flex min-w-0 flex-1 flex-col">
+          <span className="truncate text-sm font-semibold">
+            {user.fullName}
+          </span>
           <span className="truncate text-xs text-muted-foreground">
             {ROLE_LABELS[user.role]}
             {user.isAdmin ? " · Admin" : ""}
@@ -118,14 +150,42 @@ export function Sidebar({ user, sections }: { user: CurrentUser; sections: NavSe
 
   return (
     <>
-      <aside className="sticky top-0 hidden h-svh w-64 shrink-0 border-r border-sidebar-border lg:block">{content}</aside>
+      <aside
+        data-collapsed={collapsed}
+        className="support-sidebar sticky top-0 hidden h-svh shrink-0 border-r border-sidebar-border lg:block"
+      >
+        <button
+          type="button"
+          className="support-nav-collapse"
+          onClick={() => setCollapsed(!collapsed)}
+          aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
+          aria-expanded={!collapsed}
+        >
+          {collapsed ? (
+            <PanelLeftOpen className="size-3.5" />
+          ) : (
+            <PanelLeftClose className="size-3.5" />
+          )}
+        </button>
+        {content}
+      </aside>
       <div className="flex h-16 shrink-0 items-center justify-between border-b bg-background px-4 lg:hidden">
-        <span className="flex items-center gap-2 text-sm font-semibold"><Headphones className="size-5 text-brand-action" /> Support Center</span>
+        <span className="flex items-center gap-2 text-sm font-semibold">
+          <Image src="/brand/logo.jpg" alt="Selah El Telmeez" width={98} height={40} className="h-10 w-auto object-contain mix-blend-multiply" />
+          <span className="sr-only">Support Center</span>
+        </span>
         <Sheet open={open} onOpenChange={setOpen}>
-          <SheetTrigger aria-label="Open navigation" className="rounded-lg border p-2.5"><Menu className="size-5" /></SheetTrigger>
+          <SheetTrigger
+            aria-label="Open navigation"
+            className="rounded-lg border p-2.5"
+          >
+            <Menu className="size-5" />
+          </SheetTrigger>
           <SheetContent side="left" className="w-[min(85vw,280px)] gap-0">
             <SheetTitle className="sr-only">Navigation</SheetTitle>
-            <SheetDescription className="sr-only">Your workspace pages and account.</SheetDescription>
+            <SheetDescription className="sr-only">
+              Your workspace pages and account.
+            </SheetDescription>
             {content}
           </SheetContent>
         </Sheet>

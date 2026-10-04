@@ -24,7 +24,6 @@ export const portalTicketSchema = z.object({
     .refine((d) => d <= todayInCairo(), "Date of issue can't be in the future"),
   city_id: z.coerce.number({ error: "Choose a city" }).int().positive("Choose a city"),
   end_user_type: z.enum(END_USER_TYPES, { error: "Choose the user type" }),
-  fawry_payment: yesNo("Paid with Fawry?"),
   platform: z.enum(PLATFORMS, { error: "Choose the platform" }),
   is_latest_version: yesNo("On the latest version?"),
   app_version: optionalText(20),
