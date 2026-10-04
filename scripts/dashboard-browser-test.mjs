@@ -10,6 +10,12 @@ try {
   browser = await chromium.launch({ headless: true });
   const page = await browser.newPage({ viewport: { width: 1440, height: 1100 } });
   const errors = [];
+  async function assertReadableDates() {
+    const labels = await page.locator('.bi-flow .bi-axis-label').evaluateAll(nodes=>nodes.map(node=>{
+      const rect=node.getBoundingClientRect(); return {left:rect.left,right:rect.right};
+    }));
+    for(let i=1;i<labels.length;i++) assert.ok(labels[i].left>=labels[i-1].right,'Timeline date labels must not overlap');
+  }
   page.on('pageerror', error => errors.push(error.message));
   for (let attempt = 0; attempt < 40; attempt++) {
     try { await page.goto('http://localhost:3100/login/preview?scenario=unclassified', { waitUntil: 'networkidle', timeout: 90000 }); break; }
@@ -40,6 +46,7 @@ try {
   await page.evaluate(() => window.scrollTo(0,0));
   await page.emulateMedia({ reducedMotion: 'reduce' });
   await mkdir('artifacts', { recursive: true });
+  await assertReadableDates();
   await page.screenshot({ path: 'artifacts/dashboard-desktop.png', fullPage: true });
   await page.setViewportSize({ width:390,height:844 });
   await page.screenshot({ path: 'artifacts/dashboard-mobile.png', fullPage: true });
@@ -48,6 +55,7 @@ try {
   await page.goto('http://localhost:3100/login/preview', {waitUntil:'networkidle'});
   await page.getByRole('button', {name:'Last year to date',exact:true}).click();
   assert.equal(await total.textContent(), '96');
+  await assertReadableDates();
   await page.screenshot({path:'artifacts/dashboard-classified.png',fullPage:true});
   assert.deepEqual(errors, []);
   console.log('Dashboard cohort, incomplete data, date drilldown and mobile checks passed.');

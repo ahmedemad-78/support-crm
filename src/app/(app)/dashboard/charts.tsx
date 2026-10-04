@@ -14,6 +14,8 @@ export function ActivityChart({buckets,onSelect}:{buckets:ReturnType<typeof tren
   const x = (i:number) => 60 + i * step, y = (v:number) => 238 - v / ceiling * 180;
   const received = buckets.reduce((n,b)=>n+b.created,0), resolved = buckets.reduce((n,b)=>n+b.resolved,0);
   const interval = buckets[0].interval;
+  const labelCount = Math.min(7,buckets.length);
+  const labelIndexes = new Set(Array.from({length:labelCount},(_,i)=>Math.round(i*(buckets.length-1)/Math.max(1,labelCount-1))));
   const label = (day:string) => interval === "quarter" ? `Q${Math.floor(Number(day.slice(5,7))/3-.01)+1} ${day.slice(0,4)}` : new Date(`${day}T12:00:00Z`).toLocaleDateString("en-GB", interval === "month" ? {month:"short",year:"2-digit",timeZone:"UTC"} : {day:"numeric",month:"short",timeZone:"UTC"});
   return <div className="bi-flow">
     <div className="bi-flow-summary"><div><i style={{background:"#128364"}}/><span>Received<strong>{received}</strong></span></div><div><i style={{background:"#7e8adc"}}/><span>Recorded resolutions<strong>{resolved}</strong></span></div><p>Grouped by <strong>{interval}</strong><br/>Whole tickets · same scale</p></div>
@@ -27,7 +29,7 @@ export function ActivityChart({buckets,onSelect}:{buckets:ReturnType<typeof tren
           {(buckets.length<=20||hover===i)&&b[key]>0&&<text x={x(i)+step*(.27+k*.4)} y={y(b[key])-8} textAnchor="middle">{b[key]}</text>}
           <title>{`${b.from} to ${b.to}: ${b[key]} ${key==="created"?"received":"recorded resolutions"}`}</title>
         </g>)}
-        {(i % Math.max(1,Math.ceil(buckets.length/7))===0 || i===buckets.length-1)&&<text x={x(i)+step*.47} y="263" textAnchor={i===0?"start":i===buckets.length-1?"end":"middle"}>{label(b.from)}</text>}
+        {labelIndexes.has(i)&&<text className="bi-axis-label" x={x(i)+step*.47} y="263" textAnchor={i===0?"start":i===buckets.length-1?"end":"middle"}>{label(b.from)}</text>}
       </g>)}
     </svg></div>
     <div className="bi-chart-readout" aria-live="polite">{hover!==null&&buckets[hover]?`${buckets[hover].from} — ${buckets[hover].to} · ${buckets[hover].created} received · ${buckets[hover].resolved} recorded resolutions`:"Click a column to inspect its tickets. Empty intervals remain visible; no interpolated values."}</div>
