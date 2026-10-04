@@ -7,8 +7,9 @@ import type { AnalyticsTicket } from "@/lib/tickets/analytics";
 import { TICKET_SOURCES, TICKET_STATUSES } from "@/lib/tickets/constants";
 
 // Development-only, synthetic fixture. Never reads Supabase or real ticket data.
-export default function DashboardPreview() {
+export default async function DashboardPreview({ searchParams }: PageProps<"/login/preview">) {
   if (process.env.NODE_ENV !== "development") notFound();
+  const unclassified = (await searchParams).scenario === "unclassified";
   const asOf = new Date().toISOString();
   const now = Date.parse(asOf);
   const categories = [
@@ -25,11 +26,11 @@ export default function DashboardPreview() {
     "App closes when opening a lesson",
     "Payment confirmation is missing",
   ];
-  const tickets: AnalyticsTicket[] = Array.from({ length: 96 }, (_, i) => {
+  const tickets: AnalyticsTicket[] = Array.from({ length: unclassified ? 47 : 96 }, (_, i) => {
     const createdAt = new Date(
-      now - ((i * 13) % 56) * 86400000 - (i % 15) * 3600000,
+      now - ((i * 13) % 400) * 86400000 - (i % 15) * 3600000,
     ).toISOString();
-    const status = i % 9 < 6 ? "resolved" : TICKET_STATUSES[i % 3];
+    const status = unclassified ? (i < 2 ? "resolved" : i < 43 ? "closed" : TICKET_STATUSES[i % 3]) : i % 9 < 6 ? "resolved" : TICKET_STATUSES[i % 3];
     return {
       id: `sample-${i}`,
       number: `TKT-DEMO-${String(i + 1).padStart(4, "0")}`,
@@ -44,11 +45,11 @@ export default function DashboardPreview() {
               Math.min(now, Date.parse(createdAt) + (2 + (i % 38)) * 3600000),
             ).toISOString()
           : null,
-      categoryId: String((i % 5) + 1),
-      category: categories[i % 5],
+      categoryId: unclassified ? "" : String((i % 5) + 1),
+      category: unclassified ? "" : categories[i % 5],
       cityId: i % 2 ? "1" : "2",
       endUserType: i % 3 ? "student" : "parent",
-      cause: i % 4 ? "Configuration needs review" : "",
+      cause: unclassified ? "" : i % 4 ? ["App version", "Account setup", "Content publishing"][i % 3] : "",
     };
   });
   const user = {

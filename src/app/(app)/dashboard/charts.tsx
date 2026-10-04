@@ -7,28 +7,38 @@ function activate(event: KeyboardEvent<SVGElement>, action: () => void) { if (ev
 
 export function ActivityChart({buckets,onSelect}:{buckets:ReturnType<typeof trend>;onSelect:(from:string,to:string,view:View)=>void}) {
   const [hover,setHover] = useState<number|null>(null);
+  if (!buckets.length) return <div className="bi-empty">Choose a valid reporting period.</div>;
   const max = Math.max(1,...buckets.flatMap(b=>[b.created,b.resolved]));
-  const x=(i:number)=>50+(buckets.length===1?290:i/(buckets.length-1)*580), y=(v:number)=>205-v/max*165;
-  const path=(key:"created"|"resolved")=>buckets.map((b,i)=>`${i?"L":"M"}${x(i)},${y(b[key])}`).join(" ");
-  if (!buckets.length) return <div className="bi-empty">No data for this period.</div>;
+  const tick = Math.max(1, Math.ceil(max / 4)), ceiling = tick * 4;
+  const width = Math.max(760, buckets.length * 48 + 100), plot = width - 110, step = plot / buckets.length;
+  const x = (i:number) => 60 + i * step, y = (v:number) => 238 - v / ceiling * 180;
+  const received = buckets.reduce((n,b)=>n+b.created,0), resolved = buckets.reduce((n,b)=>n+b.resolved,0);
+  const interval = buckets[0].interval;
+  const label = (day:string) => interval === "quarter" ? `Q${Math.floor(Number(day.slice(5,7))/3-.01)+1} ${day.slice(0,4)}` : new Date(`${day}T12:00:00Z`).toLocaleDateString("en-GB", interval === "month" ? {month:"short",year:"2-digit",timeZone:"UTC"} : {day:"numeric",month:"short",timeZone:"UTC"});
   return <div className="bi-flow">
-    <div className="bi-chart-legend"><span><i style={{background:"#15976c"}}/>Received <strong>{buckets.reduce((s,b)=>s+b.created,0)}</strong></span><span><i style={{background:"#687ddd"}}/>Resolved <strong>{buckets.reduce((s,b)=>s+b.resolved,0)}</strong></span><small>Tickets / {buckets.length>1&&buckets[0].from!==buckets[0].to?"period":"day"}</small></div>
-    <svg viewBox="0 0 670 250" role="group" aria-label="Ticket flow by date">
-      <defs><linearGradient id="bi-flow-fill" x1="0" x2="0" y1="0" y2="1"><stop offset="0%" stopColor="#15976c" stopOpacity=".18"/><stop offset="100%" stopColor="#15976c" stopOpacity=".01"/></linearGradient></defs>
-      {[0,.25,.5,.75,1].map(n=><g key={n}><line x1="50" x2="630" y1={y(max*n)} y2={y(max*n)} stroke="#e8eeec" strokeDasharray="3 4"/><text x="38" y={y(max*n)+4} textAnchor="end">{Number((max*n).toFixed(1))}</text></g>)}
-      <path d={`${path("created")} L${x(buckets.length-1)},205 L${x(0)},205 Z`} fill="url(#bi-flow-fill)"/>
-      <path d={path("created")} fill="none" stroke="#15976c" strokeWidth="2.5"/>
-      <path d={path("resolved")} fill="none" stroke="#687ddd" strokeWidth="2.5" strokeDasharray="5 3"/>
-      {hover!==null&&buckets[hover]&&<line x1={x(hover)} x2={x(hover)} y1="28" y2="205" stroke="#94aba0" strokeDasharray="3 3"/>}
-      {buckets.map((b,i)=><g key={b.from}>{(["created","resolved"] as const).map((key,k)=><circle key={key} cx={x(i)} cy={y(b[key])} r={hover===i||buckets.length===1?5:3} fill={k?"#687ddd":"#15976c"} stroke="white" strokeWidth="1.5" role="button" tabIndex={0} aria-label={`${b.from} to ${b.to}: ${b[key]} ${key==="created"?"received":"resolved"}. Filter these tickets`} onMouseEnter={()=>setHover(i)} onMouseLeave={()=>setHover(null)} onFocus={()=>setHover(i)} onBlur={()=>setHover(null)} onClick={()=>onSelect(b.from,b.to,key)} onKeyDown={e=>activate(e,()=>onSelect(b.from,b.to,key))}><title>{b.from} · {b[key]} {key==="created"?"received":"resolved"}</title></circle>)}{(i===0||i===buckets.length-1||i%Math.max(1,Math.ceil(buckets.length/5))===0)&&<text x={x(i)} y="231" textAnchor={i===0?"start":i===buckets.length-1?"end":"middle"}>{b.from.slice(5)}</text>}</g>)}
-    </svg>
-    <div className="bi-chart-readout" aria-live="polite">{hover!==null&&buckets[hover]?`${buckets[hover].from} — ${buckets[hover].to} · ${buckets[hover].created} received · ${buckets[hover].resolved} resolved`:"Select a point to filter the period and its ticket cohort."}</div>
+    <div className="bi-flow-summary"><div><i style={{background:"#128364"}}/><span>Received<strong>{received}</strong></span></div><div><i style={{background:"#7e8adc"}}/><span>Recorded resolutions<strong>{resolved}</strong></span></div><p>Grouped by <strong>{interval}</strong><br/>Whole tickets · same scale</p></div>
+    <div className="bi-flow-scroll"><svg viewBox={`0 0 ${width} 294`} style={{minWidth:width>900?width:undefined}} role="group" aria-label={`Tickets received and recorded resolutions by ${interval}`}>
+      {[0,1,2,3,4].map(n=><g key={n}><line x1="55" x2={width-40} y1={y(tick*n)} y2={y(tick*n)} stroke="#e5ebe8" strokeDasharray={n?"3 5":undefined}/><text x="42" y={y(tick*n)+4} textAnchor="end">{tick*n}</text></g>)}
+      {buckets.map((b,i)=><g key={b.from}>
+        {hover===i&&<rect x={x(i)} y="40" width={step} height="198" rx="5" fill="#f0f6f3"/>}
+        {(["created","resolved"] as const).map((key,k)=><g key={key} role="button" tabIndex={0} aria-label={`${b.from} to ${b.to}: ${b[key]} ${key==="created"?"received":"recorded resolutions"}. View tickets`} onMouseEnter={()=>setHover(i)} onMouseLeave={()=>setHover(null)} onFocus={()=>setHover(i)} onBlur={()=>setHover(null)} onClick={()=>onSelect(b.from,b.to,key)} onKeyDown={e=>activate(e,()=>onSelect(b.from,b.to,key))}>
+          <rect x={x(i)+step*(.12+k*.4)} y="40" width={step*.36} height="198" fill="transparent"/>
+          <rect x={x(i)+step*(.12+k*.4)} y={y(b[key])} width={Math.max(3,step*.3)} height={238-y(b[key])} rx="3" fill={k?"#7e8adc":"#128364"}/>
+          {(buckets.length<=20||hover===i)&&b[key]>0&&<text x={x(i)+step*(.27+k*.4)} y={y(b[key])-8} textAnchor="middle">{b[key]}</text>}
+          <title>{b.from} to {b.to}: {b[key]} {key==="created"?"received":"recorded resolutions"}</title>
+        </g>)}
+        <text x={x(i)+step*.47} y="263" textAnchor="middle">{label(b.from)}</text>
+      </g>)}
+    </svg></div>
+    <div className="bi-chart-readout" aria-live="polite">{hover!==null&&buckets[hover]?`${buckets[hover].from} — ${buckets[hover].to} · ${buckets[hover].created} received · ${buckets[hover].resolved} recorded resolutions`:"Click a column to inspect its tickets. Empty intervals remain visible; no interpolated values."}</div>
+    <p className="bi-note">Resolution dates can belong to older arrivals. This is recorded activity, not a resolution rate or historical backlog. Reopened tickets and missing resolution dates are excluded from the resolution series.</p>
   </div>;
 }
 
 export function ParetoChart({entries,onSelect}:{entries:ReturnType<typeof issuePareto>;onSelect:(key:string)=>void}) {
   const shown=entries.slice(0,6), max=Math.max(1,...shown.map(e=>e.value)), step=540/Math.max(1,shown.length), x=(i:number)=>50+step*(i+.5), y=(v:number)=>183-v/max*133, cy=(p:number)=>183-p/100*133;
-  if(!shown.length) return <div className="bi-empty">No issue categories for this selection.</div>;
+  if(!shown.length) return <div className="bi-empty">No arrivals in this period.</div>;
+  if(shown.length===1) return <div className="bi-quality-empty"><h4>{shown[0].key==="__missing__"?"Issue classification is missing":"One issue category recorded"}</h4><p>{shown[0].key==="__missing__"?`All ${shown[0].value} arrivals are uncategorized. A cause ranking would be misleading until these tickets are classified.`:`${shown[0].label} accounts for all ${shown[0].value} arrivals. There are no other categories to compare.`}</p><button onClick={()=>onSelect(shown[0].key)}>Review {shown[0].value} tickets ↗</button></div>;
   return <div className="bi-pareto"><div className="bi-chart-legend"><span><i style={{background:"#2ca77e"}}/>Ticket count</span><span><i style={{background:"#8260c4"}}/>Cumulative %</span><small>Top {shown.length} of {entries.length} categories</small></div>
     <svg viewBox="0 0 650 215" role="group" aria-label="Pareto chart: issue volume and cumulative percentage">
       {[0,.5,1].map(n=><g key={n}><line x1="48" x2="590" y1={cy(n*100)} y2={cy(n*100)} stroke="#e8eeec"/><text x="36" y={cy(n*100)+4} textAnchor="end">{Number((max*n).toFixed(1))}</text><text x="601" y={cy(n*100)+4}>{n*100}%</text></g>)}

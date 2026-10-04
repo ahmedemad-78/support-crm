@@ -153,3 +153,22 @@ test("drill-down filters intersect and missing values remain explicit", () => {
   assert.deepEqual(a.scopeTickets(rows, { cause: "__missing__", assignee: "__missing__" }).map(t => t.id), ["2"]);
   assert.deepEqual(a.scopeTickets(rows, { city: "__missing__", userType: "__missing__" }).map(t => t.id), ["2"]);
 });
+
+test("long reporting periods use calendar quarters without losing boundary events", () => {
+  const rows = [
+    ticket({ createdOn: "2023-02-12" }),
+    ticket({ createdOn: "2023-03-31" }),
+    ticket({ createdOn: "2023-04-01", status: "resolved", resolvedAt: "2024-01-01T12:00:00Z" }),
+    ticket({ createdOn: "2026-09-30", status: "closed", resolvedAt: null }),
+  ];
+  const buckets = a.trend(rows, "2023-02-01", "2026-09-30");
+  assert.equal(buckets[0].interval, "quarter");
+  assert.equal(buckets[0].to, "2023-03-31");
+  assert.equal(buckets[1].from, "2023-04-01");
+  assert.equal(buckets[0].created, 2);
+  assert.equal(buckets.reduce((n,b)=>n+b.created,0), 4);
+  assert.equal(buckets.reduce((n,b)=>n+b.resolved,0), 1);
+  assert.equal(buckets.at(-1).to, "2026-09-30");
+  assert.ok(buckets.some(b=>!b.created&&!b.resolved));
+  assert.equal(a.trend(rows,"2025-01-01","2026-09-30")[0].interval,"month");
+});

@@ -87,18 +87,19 @@ export function changeLabel(current: number, previous: number) {
 export function trend(tickets: AnalyticsTicket[], from: string, to: string) {
   if (!validDay(from) || !validDay(to) || from > to) return [];
   const span = Math.round((Date.parse(to) - Date.parse(from)) / 86_400_000) + 1;
-  const mode = span <= 31 ? "day" : span <= 120 ? "week" : "month";
+  const mode = span <= 31 ? "day" : span <= 90 ? "week" : span <= 730 ? "month" : "quarter";
   const result: {
     from: string;
     to: string;
     created: number;
     resolved: number;
+    interval: string;
   }[] = [];
   for (let cursor = from; cursor <= to;) {
     let next: string;
-    if (mode === "month") {
+    if (mode === "month" || mode === "quarter") {
       const date = new Date(`${cursor}T12:00:00Z`);
-      date.setUTCMonth(date.getUTCMonth() + 1, 1);
+      date.setUTCMonth(mode === "quarter" ? Math.floor(date.getUTCMonth() / 3) * 3 + 3 : date.getUTCMonth() + 1, 1);
       next = date.toISOString().slice(0, 10);
     } else next = shiftDay(cursor, mode === "week" ? 7 : 1);
     result.push({
@@ -106,6 +107,7 @@ export function trend(tickets: AnalyticsTicket[], from: string, to: string) {
       to: shiftDay(next, -1) < to ? shiftDay(next, -1) : to,
       created: 0,
       resolved: 0,
+      interval: mode,
     });
     cursor = next;
   }
