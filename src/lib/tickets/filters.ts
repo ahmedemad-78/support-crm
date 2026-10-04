@@ -1,4 +1,4 @@
-import { TICKET_STATUSES, type TicketSource, type TicketStatus } from "./constants";
+import { END_USER_TYPES, TICKET_SOURCES, TICKET_STATUSES, type TicketSource, type TicketStatus } from "./constants";
 
 export const TICKET_VIEWS = ["all", "new", "mine", "awaiting", "resolved"] as const;
 export type TicketView = (typeof TICKET_VIEWS)[number];
@@ -16,8 +16,6 @@ export type TicketListFilters = {
   page: number;
 };
 
-const SOURCES = ["whatsapp", "moderation", "call_center"] as const;
-
 function one(value: string | string[] | undefined): string {
   return (Array.isArray(value) ? value[0] : value)?.trim() ?? "";
 }
@@ -34,7 +32,7 @@ export function parseTicketListFilters(
   return {
     view: TICKET_VIEWS.includes(view as TicketView) ? (view as TicketView) : "all",
     status: TICKET_STATUSES.includes(status as TicketStatus) ? (status as TicketStatus) : "",
-    source: SOURCES.includes(source as TicketSource) ? (source as TicketSource) : "",
+    source: (TICKET_SOURCES as readonly string[]).includes(source) ? (source as TicketSource) : "",
     city: one(searchParams.city),
     category: one(searchParams.category),
     assignee: one(searchParams.assignee),
@@ -72,6 +70,11 @@ export function ticketListQuery(filters: TicketListFilters, extras?: Record<stri
 }
 
 export type DashboardFilters = {
+  cause?: string;
+  platform?: string;
+  assignee?: string;
+  view?: "created" | "resolved" | "open";
+  age?: string;
   source: TicketSource | "";
   status: TicketStatus | "";
   city: string;
@@ -81,33 +84,44 @@ export type DashboardFilters = {
   to: string;
 };
 
+const DAY = /^\d{4}-\d{2}-\d{2}$/;
+
 export function parseDashboardFilters(
   searchParams: Record<string, string | string[] | undefined>,
 ): DashboardFilters {
   const source = one(searchParams.source);
   const status = one(searchParams.status);
-  const today = new Date();
-  const monthStart = new Date(today.getFullYear(), today.getMonth(), 1);
-  const iso = (date: Date) => date.toISOString().slice(0, 10);
+  const userType = one(searchParams.userType);
+  const from = one(searchParams.from);
+  const to = one(searchParams.to);
   return {
-    source: SOURCES.includes(source as TicketSource) ? (source as TicketSource) : "",
+    source: (TICKET_SOURCES as readonly string[]).includes(source) ? (source as TicketSource) : "",
     status: TICKET_STATUSES.includes(status as TicketStatus) ? (status as TicketStatus) : "",
     city: one(searchParams.city),
     category: one(searchParams.category),
-    userType: one(searchParams.userType),
-    from: one(searchParams.from) || iso(monthStart),
-    to: one(searchParams.to) || iso(today),
+    userType: userType === "__missing__" || (END_USER_TYPES as readonly string[]).includes(userType) ? userType : "",
+    from: DAY.test(from) ? from : "",
+    to: DAY.test(to) ? to : "",
+    cause: one(searchParams.cause).slice(0, 200),
+    platform: one(searchParams.platform),
+    assignee: one(searchParams.assignee),
+    view: one(searchParams.view) === "open" ? "open" : one(searchParams.view) === "resolved" ? "resolved" : "created",
+    age: /^[0-3]$/.test(one(searchParams.age)) ? one(searchParams.age) : "",
   };
 }
 
 export function dashboardQuery(filters: DashboardFilters): string {
   const params = new URLSearchParams();
+  for (const key of ["cause", "platform", "assignee", "view", "age"] as const) {
+    if (filters[key]) params.set(key, filters[key]);
+  }
   if (filters.source) params.set("source", filters.source);
   if (filters.status) params.set("status", filters.status);
   if (filters.city) params.set("city", filters.city);
   if (filters.category) params.set("category", filters.category);
   if (filters.userType) params.set("userType", filters.userType);
-  params.set("from", filters.from);
-  params.set("to", filters.to);
-  return `?${params.toString()}`;
+  if (filters.from) params.set("from", filters.from);
+  if (filters.to) params.set("to", filters.to);
+  const query = params.toString();
+  return query ? `?${query}` : "";
 }

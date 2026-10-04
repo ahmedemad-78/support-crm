@@ -1,4 +1,4 @@
-import type { CurrentUser } from "@/lib/auth/roles";
+import { isPortalRole, ROLE_LABELS, type CurrentUser } from "@/lib/auth/roles";
 
 export type NavIcon = "inbox" | "tickets" | "dashboard" | "users" | "settings" | "new-ticket" | "my-tickets";
 export type NavItem = { href: string; label: string; icon: NavIcon; badge?: string };
@@ -39,9 +39,10 @@ export function navFor(user: CurrentUser): NavSection[] {
         },
       ];
     default:
+      if (!isPortalRole(user.role)) return [];
       return [
         {
-          heading: user.role === "moderation" ? "Moderation" : "Call Center",
+          heading: ROLE_LABELS[user.role],
           items: [
             { href: "/portal/new-ticket", label: "New ticket", icon: "new-ticket" },
             { href: "/portal/my-tickets", label: "My tickets", icon: "my-tickets" },

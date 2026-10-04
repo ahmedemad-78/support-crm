@@ -17,11 +17,20 @@ export const STATUS_STYLES: Record<TicketStatus, { chip: string; dot: string }> 
   closed: { chip: "bg-status-closed-bg text-status-closed", dot: "bg-status-closed" },
 };
 
-export type TicketSource = "whatsapp" | "moderation" | "call_center";
+export const TICKET_SOURCES = [
+  "whatsapp",
+  "moderation",
+  "call_center",
+  "june_schools",
+  "business_development",
+] as const;
+export type TicketSource = (typeof TICKET_SOURCES)[number];
 export const SOURCE_LABELS: Record<TicketSource, string> = {
   whatsapp: "WhatsApp",
   moderation: "Moderation",
   call_center: "Call Center",
+  june_schools: "30 June Schools",
+  business_development: "Business Development",
 };
 
 export const END_USER_TYPES = ["student", "teacher", "parent", "other"] as const;

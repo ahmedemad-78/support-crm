@@ -4,13 +4,14 @@ import { CheckCircle2, Plus } from "lucide-react";
 import { PageHeader } from "@/components/app-shell/page-header";
 import { StatusBadge } from "@/components/tickets/status-badge";
 import { buttonVariants } from "@/components/ui/button";
+import { PORTAL_ROLES } from "@/lib/auth/roles";
 import { requireUser } from "@/lib/auth/session";
 import { createClient } from "@/lib/supabase/server";
 import type { TicketStatus } from "@/lib/tickets/constants";
 import { formatRelative } from "@/lib/format";
 
 export default async function MyTicketsPage({ searchParams }: PageProps<"/portal/my-tickets">) {
-  const user = await requireUser(["moderation", "call_center"]);
+  const user = await requireUser([...PORTAL_ROLES]);
   const { submitted } = await searchParams;
 
   const supabase = await createClient();

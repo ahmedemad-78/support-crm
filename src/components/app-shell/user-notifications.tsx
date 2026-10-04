@@ -1,3 +1,4 @@
+import { isPortalRole } from "@/lib/auth/roles";
 import { getCurrentUser } from "@/lib/auth/session";
 import { loadNotifications } from "@/lib/notifications/load";
 import { NotificationBell } from "./notification-bell";
@@ -6,7 +7,7 @@ export async function UserNotifications() {
   const user = await getCurrentUser();
   if (!user) return null;
   const { items, unreadCount } = await loadNotifications(user.id, user.role);
-  const portal = user.role === "moderation" || user.role === "call_center";
+  const portal = isPortalRole(user.role);
   return (
     <NotificationBell
       userId={user.id}

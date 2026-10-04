@@ -159,15 +159,6 @@ export function NewTicketForm({ cities }: { cities: City[] }) {
             ]}
             error={err("is_latest_version")}
           />
-          <ChoiceField
-            name="fawry_payment"
-            label="Paid with Fawry?"
-            options={[
-              { value: "yes", label: "Yes" },
-              { value: "no", label: "No" },
-            ]}
-            error={err("fawry_payment")}
-          />
         </div>
       </Section>
 
