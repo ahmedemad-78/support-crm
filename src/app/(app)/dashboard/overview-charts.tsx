@@ -1,5 +1,5 @@
 "use client";
-import { useState, type ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { sourceLabel } from "@/lib/tickets/constants";
 import { STATUS_GROUP_LABEL, type RankRow, type StatusGroup, type VolumeBucket } from "@/lib/tickets/overview";
 
@@ -32,6 +32,15 @@ function mark(selected: boolean, active: boolean) {
   return active ? "on" : "dim";
 }
 
+export function useFillIn() {
+  const [drawn, setDrawn] = useState(false);
+  useEffect(() => {
+    const frame = requestAnimationFrame(() => setDrawn(true));
+    return () => cancelAnimationFrame(frame);
+  }, []);
+  return drawn;
+}
+
 export function VolumeChart({
   buckets,
   sources,
@@ -48,6 +57,7 @@ export function VolumeChart({
   onSegment: (source: string, from: string, to: string) => void;
 }) {
   const [tip, setTip] = useState<{ x: number; y: number; bucket: VolumeBucket } | null>(null);
+  const drawn = useFillIn();
   if (!buckets.length) return <EmptyChart text="Choose a valid reported-date range." />;
   const max = Math.max(1, ...buckets.map((bucket) => bucket.total));
   const width = Math.max(640, buckets.length * 28 + 48);
@@ -88,8 +98,8 @@ export function VolumeChart({
                   return (
                     <rect
                       key={part.key}
-                      className={`cs-rise cs-${state}`}
-                      style={{ animationDelay: `${index * 18}ms`, color: sourceColor(part.key) }}
+                      className={`cs-rise cs-${state}${drawn ? " is-drawn" : ""}`}
+                      style={{ transitionDelay: `${index * 28}ms`, color: sourceColor(part.key) }}
                       x={x + 4}
                       y={cursor}
                       width={Math.max(8, step - 12)}
@@ -150,15 +160,16 @@ export function RankChart({
   showRequests?: boolean;
 }) {
   const max = Math.max(1, ...rows.map((row) => row.count));
+  const drawn = useFillIn();
   if (!rows.length) return <EmptyChart text="No cases match the current filters." />;
   return (
     <div className="cs-ranks">
       {rows.map((row, index) => {
         const state = mark(Boolean(selectedId), selectedId === row.id);
         return (
-          <button key={row.id} className={`cs-rank cs-${state}`} style={{ animationDelay: `${index * 45}ms` }} aria-pressed={state === "on"} onClick={() => onPick(row.id)}>
+          <button key={row.id} className={`cs-rank cs-${state}`} aria-pressed={state === "on"} onClick={() => onPick(row.id)}>
             <span className="cs-rank-name">{row.name}</span>
-            <span className="cs-rank-track"><i className="cs-rank-fill" style={{ width: `${(row.count / max) * 100}%`, background: color, animationDelay: `${80 + index * 45}ms` }} /></span>
+            <span className="cs-rank-track"><i className={`cs-rank-fill${drawn ? " is-drawn" : ""}`} style={{ width: `${(row.count / max) * 100}%`, background: color, transitionDelay: `${90 + index * 80}ms` }} /></span>
             <strong>{row.count}</strong>
             <span className="cs-pop">
               <b>{row.name}</b>
@@ -189,6 +200,7 @@ export function SegmentChart({
   onStack: (segment: string, group: StatusGroup) => void;
 }) {
   const max = Math.max(1, ...rows.map((row) => row.total));
+  const drawn = useFillIn();
   return (
     <div className="cs-segments">
       {rows.map((row, index) => {
@@ -205,8 +217,8 @@ export function SegmentChart({
                 return (
                   <button
                     key={part.group}
-                    className={`cs-segment-part cs-${state}`}
-                    style={{ width: `${width}%`, background: STATUS_COLORS[part.group], animationDelay: `${120 + index * 40}ms` }}
+                    className={`cs-segment-part cs-${state}${drawn ? " is-drawn" : ""}`}
+                    style={{ width: `${width}%`, background: STATUS_COLORS[part.group], transitionDelay: `${120 + index * 70}ms` }}
                     aria-label={`${row.segment}, ${STATUS_GROUP_LABEL[part.group]}: ${part.count}`}
                     onClick={() => onStack(row.segment, part.group)}
                   >

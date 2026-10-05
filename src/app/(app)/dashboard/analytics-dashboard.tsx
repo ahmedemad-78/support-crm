@@ -28,7 +28,7 @@ import {
   type StatusGroup,
   type VolumeMode,
 } from "@/lib/tickets/overview";
-import { EmptyChart, Panel, RankChart, SegmentChart, STATUS_COLORS, VolumeChart } from "./overview-charts";
+import { EmptyChart, Panel, RankChart, SegmentChart, STATUS_COLORS, useFillIn, VolumeChart } from "./overview-charts";
 
 type Snapshot = { tickets: AnalyticsTicket[]; asOf: string };
 type Option = { id: string; name: string };
@@ -322,6 +322,7 @@ export function DashboardBoard({
               action={<div className="cs-modes">{(["day", "week", "month"] as VolumeMode[]).map((item) => <button type="button" key={item} aria-pressed={volumeMode === item} onClick={() => { setMode(item); patch({ bucketFrom: "", bucketTo: "" }); }}>{item === "day" ? "Daily" : item === "week" ? "Weekly" : "Monthly"}</button>)}</div>}
             >
               <VolumeChart
+                key={buckets.map((bucket) => bucket.total).join(",")}
                 buckets={buckets}
                 sources={sources}
                 selectedSource={filters.source}
@@ -337,7 +338,7 @@ export function DashboardBoard({
               />
             </Panel>
             <Panel title="Root causes" question="What is causing these support issues?">
-              <RankChart rows={causeRank} color="#0f766e" selectedId={filters.trackerCause ?? ""} onPick={(id) => toggle("trackerCause", id)} />
+              <RankChart key={causeRank.map((row) => row.count).join(",")} rows={causeRank} color="#0f766e" selectedId={filters.trackerCause ?? ""} onPick={(id) => toggle("trackerCause", id)} />
             </Panel>
           </div>
           <div className="cs-row cs-row-even">
@@ -348,6 +349,7 @@ export function DashboardBoard({
             >
               <div className="cs-status-key"><span><i style={{ background: STATUS_COLORS.resolved }} />Resolved</span><span><i style={{ background: STATUS_COLORS.followup }} />Needs Follow-up</span><span><i style={{ background: STATUS_COLORS.closed }} />Closed Without Response</span></div>
               <SegmentChart
+                key={segments.map((row) => row.total).join(",")}
                 rows={segments}
                 mode={share ? "share" : "count"}
                 selectedSegment={filters.segment ?? ""}
@@ -360,7 +362,7 @@ export function DashboardBoard({
               />
             </Panel>
             <Panel title="Most common topics" question="What are customers contacting support about?" action={<button type="button" className="cs-text" onClick={() => setAllTopics((open) => !open)}>{allTopics ? "Show top topics" : "View all topics"}</button>}>
-              <RankChart rows={topicRank} color="#3730a3" selectedId={filters.topic ?? ""} showRequests onPick={(id) => toggle("topic", id)} />
+              <RankChart key={topicRank.map((row) => `${row.id}:${row.count}`).join(",")} rows={topicRank} color="#3730a3" selectedId={filters.topic ?? ""} showRequests onPick={(id) => toggle("topic", id)} />
             </Panel>
           </div>
           <section className="cs-panel" id="follow-up">
@@ -410,19 +412,27 @@ export function DashboardBoard({
             <RankChart rows={teamRows} color="#7c3aed" selectedId={filters.referringTeam ?? ""} onPick={(id) => toggle("referringTeam", id)} />
           </Panel>
           <Panel title="Open cases by age" question="How long open cases have been waiting since the reported date. These are age groups.">
-            <div className="cs-ages">
-              {ages.map((bucket) => (
-                <button type="button" key={bucket.id} className={filters.age === bucket.id ? "is-on" : filters.age ? "is-dim" : ""} aria-pressed={filters.age === bucket.id} onClick={() => patch({ age: filters.age === bucket.id ? "" : bucket.id, statusGroup: "followup" })}>
-                  <i style={{ height: `${(bucket.count / Math.max(1, ...ages.map((item) => item.count))) * 100}%` }} />
-                  <strong>{bucket.count}</strong>
-                  <span>{bucket.label}</span>
-                </button>
-              ))}
-            </div>
+            <AgeColumns ages={ages} selected={filters.age ?? ""} onPick={(id) => patch({ age: filters.age === id ? "" : id, statusGroup: "followup" })} />
           </Panel>
           <p className="cs-notice">Resolution time, grade and subject heatmaps, and reopened-case trends stay out of this view until those dates and fields are recorded on the case.</p>
         </div>
       )}
+    </div>
+  );
+}
+
+function AgeColumns({ ages, selected, onPick }: { ages: { id: string; label: string; count: number }[]; selected: string; onPick: (id: string) => void }) {
+  const drawn = useFillIn();
+  const max = Math.max(1, ...ages.map((item) => item.count));
+  return (
+    <div className="cs-ages">
+      {ages.map((bucket, index) => (
+        <button type="button" key={bucket.id} className={selected === bucket.id ? "is-on" : selected ? "is-dim" : ""} aria-pressed={selected === bucket.id} onClick={() => onPick(bucket.id)}>
+          <i className={drawn ? "is-drawn" : ""} style={{ height: `${(bucket.count / max) * 100}%`, transitionDelay: `${index * 80}ms` }} />
+          <strong>{bucket.count}</strong>
+          <span>{bucket.label}</span>
+        </button>
+      ))}
     </div>
   );
 }
