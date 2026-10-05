@@ -35,10 +35,19 @@ function mark(selected: boolean, active: boolean) {
 export function useFillIn() {
   const [drawn, setDrawn] = useState(false);
   useEffect(() => {
-    const frame = requestAnimationFrame(() => setDrawn(true));
-    return () => cancelAnimationFrame(frame);
+    const timer = window.setTimeout(() => setDrawn(true), 700);
+    return () => window.clearTimeout(timer);
   }, []);
   return drawn;
+}
+
+export function fillStyle(drawn: boolean, axis: "x" | "y", delayMs: number) {
+  return {
+    transform: drawn ? "scale(1)" : axis === "x" ? "scaleX(0)" : "scaleY(0)",
+    transformOrigin: axis === "x" ? "left center" : "center bottom",
+    transformBox: "fill-box" as const,
+    transition: drawn ? `transform 1.6s cubic-bezier(.16,1,.3,1) ${delayMs}ms` : "none",
+  };
 }
 
 export function VolumeChart({
@@ -99,7 +108,7 @@ export function VolumeChart({
                     <rect
                       key={part.key}
                       className={`cs-rise cs-${state}${drawn ? " is-drawn" : ""}`}
-                      style={{ transitionDelay: `${index * 28}ms`, color: sourceColor(part.key) }}
+                      style={{ ...fillStyle(drawn, "y", index * 35), color: sourceColor(part.key) }}
                       x={x + 4}
                       y={cursor}
                       width={Math.max(8, step - 12)}
@@ -169,7 +178,7 @@ export function RankChart({
         return (
           <button key={row.id} className={`cs-rank cs-${state}`} aria-pressed={state === "on"} onClick={() => onPick(row.id)}>
             <span className="cs-rank-name">{row.name}</span>
-            <span className="cs-rank-track"><i className={`cs-rank-fill${drawn ? " is-drawn" : ""}`} style={{ width: `${(row.count / max) * 100}%`, background: color, transitionDelay: `${90 + index * 80}ms` }} /></span>
+            <span className="cs-rank-track"><i className={`cs-rank-fill${drawn ? " is-drawn" : ""}`} style={{ width: `${(row.count / max) * 100}%`, background: color, ...fillStyle(drawn, "x", 80 + index * 90) }} /></span>
             <strong>{row.count}</strong>
             <span className="cs-pop">
               <b>{row.name}</b>
@@ -218,7 +227,7 @@ export function SegmentChart({
                   <button
                     key={part.group}
                     className={`cs-segment-part cs-${state}${drawn ? " is-drawn" : ""}`}
-                    style={{ width: `${width}%`, background: STATUS_COLORS[part.group], transitionDelay: `${120 + index * 70}ms` }}
+                    style={{ width: `${width}%`, background: STATUS_COLORS[part.group], ...fillStyle(drawn, "x", 100 + index * 80) }}
                     aria-label={`${row.segment}, ${STATUS_GROUP_LABEL[part.group]}: ${part.count}`}
                     onClick={() => onStack(row.segment, part.group)}
                   >

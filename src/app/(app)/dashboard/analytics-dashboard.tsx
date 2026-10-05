@@ -28,7 +28,7 @@ import {
   type StatusGroup,
   type VolumeMode,
 } from "@/lib/tickets/overview";
-import { EmptyChart, Panel, RankChart, SegmentChart, STATUS_COLORS, useFillIn, VolumeChart } from "./overview-charts";
+import { EmptyChart, fillStyle, Panel, RankChart, SegmentChart, STATUS_COLORS, useFillIn, VolumeChart } from "./overview-charts";
 
 type Snapshot = { tickets: AnalyticsTicket[]; asOf: string };
 type Option = { id: string; name: string };
@@ -428,7 +428,7 @@ function AgeColumns({ ages, selected, onPick }: { ages: { id: string; label: str
     <div className="cs-ages">
       {ages.map((bucket, index) => (
         <button type="button" key={bucket.id} className={selected === bucket.id ? "is-on" : selected ? "is-dim" : ""} aria-pressed={selected === bucket.id} onClick={() => onPick(bucket.id)}>
-          <i className={drawn ? "is-drawn" : ""} style={{ height: `${(bucket.count / max) * 100}%`, transitionDelay: `${index * 80}ms` }} />
+          <i className={drawn ? "is-drawn" : ""} style={{ height: `${(bucket.count / max) * 100}%`, ...fillStyle(drawn, "y", index * 90) }} />
           <strong>{bucket.count}</strong>
           <span>{bucket.label}</span>
         </button>
