@@ -13,7 +13,7 @@ export async function loadAnalytics() {
     let query = supabase
       .from("tickets")
       .select(
-        "id, ticket_number, issue_description, status, source, created_at, resolved_at, end_user_type, city_id, issue_category_id, platform, assignee_id, fawry_payment, assignee:profiles!tickets_assignee_id_fkey(full_name), issue_categories(name), root_causes(name), request_types(name), topics(name), tracker_causes(name), tracker_actions(name), outcomes(name)",
+        "id, ticket_number, issue_description, status, source, created_at, updated_at, resolved_at, issue_date, customer_name, customer_email, customer_phone, school_name, end_user_type, city_id, issue_category_id, platform, assignee_id, fawry_payment, assignee:profiles!tickets_assignee_id_fkey(full_name), issue_categories(name), root_causes(name), request_types(name), topics(name), tracker_causes(name), tracker_actions(name), outcomes(name)",
       )
       .lte("created_at", asOf)
       .order("id")
@@ -53,6 +53,12 @@ export async function loadAnalytics() {
         trackerAction: nameOf(row.tracker_actions),
         outcome: nameOf(row.outcomes),
         fawry: row.fawry_payment === true ? "yes" : row.fawry_payment === false ? "no" : "",
+        reportedOn: row.issue_date || cairoDate(row.created_at),
+        customerName: row.customer_name ?? "",
+        customerEmail: row.customer_email ?? "",
+        customerPhone: row.customer_phone ?? "",
+        schoolName: row.school_name ?? "",
+        updatedOn: row.updated_at ? cairoDate(row.updated_at) : "",
       });
     }
     cursor = data[data.length - 1].id;

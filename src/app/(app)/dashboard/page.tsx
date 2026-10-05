@@ -19,7 +19,7 @@ export default async function DashboardPage({
   if (cities.error) throw cities.error;
   if (categories.error) throw categories.error;
   return (
-    <AgentFrame title="Support analytics">
+    <AgentFrame title="Dashboard">
       <DashboardBoard
         initialSnapshot={snapshot}
         initialFilters={filters}

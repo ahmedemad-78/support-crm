@@ -83,6 +83,13 @@ export type DashboardFilters = {
   trackerAction?: string;
   outcome?: string;
   fawry?: string;
+  segment?: string;
+  channel?: string;
+  referringTeam?: string;
+  statusGroup?: string;
+  q?: string;
+  bucketFrom?: string;
+  bucketTo?: string;
   city: string;
   category: string;
   userType: string;
@@ -112,13 +119,24 @@ export function parseDashboardFilters(
     platform: one(searchParams.platform),
     assignee: one(searchParams.assignee),
     view: one(searchParams.view) === "open" ? "open" : one(searchParams.view) === "resolved" ? "resolved" : "created",
-    age: /^[0-3]$/.test(one(searchParams.age)) ? one(searchParams.age) : "",
+    age: /^(0-2|3-7|8-14|15)$/.test(one(searchParams.age)) ? one(searchParams.age) : "",
+    requestType: one(searchParams.requestType).slice(0, 160),
+    topic: one(searchParams.topic).slice(0, 160),
+    trackerCause: one(searchParams.trackerCause).slice(0, 160),
+    fawry: ["yes", "no", "__missing__"].includes(one(searchParams.fawry)) ? one(searchParams.fawry) : "",
+    segment: one(searchParams.segment).slice(0, 80),
+    channel: one(searchParams.channel).slice(0, 80),
+    referringTeam: one(searchParams.referringTeam).slice(0, 80),
+    statusGroup: ["followup", "resolved", "closed"].includes(one(searchParams.statusGroup)) ? one(searchParams.statusGroup) : "",
+    q: one(searchParams.q).slice(0, 80),
+    bucketFrom: DAY.test(one(searchParams.bucketFrom)) ? one(searchParams.bucketFrom) : "",
+    bucketTo: DAY.test(one(searchParams.bucketTo)) ? one(searchParams.bucketTo) : "",
   };
 }
 
 export function dashboardQuery(filters: DashboardFilters): string {
   const params = new URLSearchParams();
-  for (const key of ["cause", "platform", "assignee", "view", "age"] as const) {
+  for (const key of ["cause", "platform", "assignee", "view", "age", "requestType", "topic", "trackerCause", "fawry", "segment", "channel", "referringTeam", "statusGroup", "q", "bucketFrom", "bucketTo"] as const) {
     if (filters[key]) params.set(key, filters[key]);
   }
   if (filters.source) params.set("source", filters.source);

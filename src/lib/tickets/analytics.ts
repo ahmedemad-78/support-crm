@@ -14,6 +14,12 @@ export type AnalyticsTicket = DashboardTicket & {
   trackerAction: string;
   outcome: string;
   fawry: string;
+  reportedOn?: string;
+  customerName?: string;
+  customerEmail?: string;
+  customerPhone?: string;
+  schoolName?: string;
+  updatedOn?: string;
 };
 
 export function labeledCounts(tickets: AnalyticsTicket[], pick: (ticket: AnalyticsTicket) => string) {

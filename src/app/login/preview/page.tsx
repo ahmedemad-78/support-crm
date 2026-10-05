@@ -36,7 +36,7 @@ export default async function DashboardPreview({ searchParams }: PageProps<"/log
       number: `TKT-DEMO-${String(i + 1).padStart(4, "0")}`,
       subject: subjects[i % 5],
       status,
-      source: TICKET_SOURCES[i % 5],
+      source: TICKET_SOURCES[i % TICKET_SOURCES.length],
       createdAt,
       createdOn: cairoDate(createdAt),
       resolvedAt:
@@ -56,6 +56,12 @@ export default async function DashboardPreview({ searchParams }: PageProps<"/log
       trackerAction: unclassified ? "" : "Answer Inquiry",
       outcome: unclassified ? "" : status === "resolved" ? "Information Provided" : "",
       fawry: i % 5 === 0 ? "" : i % 2 ? "yes" : "no",
+      reportedOn: cairoDate(createdAt),
+      customerName: i % 7 === 0 ? "Shared Parent" : `Customer ${i + 1}`,
+      customerPhone: i % 7 === 0 ? "+201000000000" : "",
+      customerEmail: i % 11 === 0 ? "parent@example.com" : "",
+      schoolName: TICKET_SOURCES[i % TICKET_SOURCES.length] === "june_schools" ? "Al Masaei Private School" : "",
+      updatedOn: cairoDate(createdAt),
     };
   });
   const user = {
@@ -81,7 +87,7 @@ export default async function DashboardPreview({ searchParams }: PageProps<"/log
       <main className="workspace-main min-w-0 flex-1 bg-muted">
         <header className="no-print flex h-16 items-center border-b bg-white px-8 text-sm">
           <span className="mr-2 text-muted-foreground">Support /</span>
-          <strong>Support analytics</strong>
+          <strong>Dashboard</strong>
           <span className="ml-auto rounded-full bg-amber-50 px-3 py-1 text-xs text-amber-800">
             Design preview · sample data
           </span>
