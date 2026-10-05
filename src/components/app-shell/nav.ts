@@ -11,9 +11,10 @@ export function navFor(user: CurrentUser): NavSection[] {
         {
           heading: "Support",
           items: [
-            { href: "/inbox", label: "Inbox", icon: "inbox" },
-            { href: "/tickets", label: "Tickets", icon: "tickets" },
             { href: "/dashboard", label: "Dashboard", icon: "dashboard" },
+            { href: "/inbox", label: "Inbox", icon: "inbox" },
+            { href: "/tickets/new", label: "New ticket", icon: "new-ticket" },
+            { href: "/tickets", label: "Tickets", icon: "tickets" },
           ],
         },
       ];

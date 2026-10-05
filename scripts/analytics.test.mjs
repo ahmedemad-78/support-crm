@@ -7,7 +7,7 @@ import { createRequire } from "node:module";
 import ts from "typescript";
 
 const directory = mkdtempSync(join(tmpdir(), "crm-analytics-test-"));
-for (const name of ["constants", "dashboard-model", "analytics"]) {
+for (const name of ["constants", "dashboard-model", "analytics", "overview"]) {
   const source = readFileSync(
     new URL(`../src/lib/tickets/${name}.ts`, import.meta.url),
     "utf8",
@@ -171,4 +171,51 @@ test("long reporting periods use calendar quarters without losing boundary event
   assert.equal(buckets.at(-1).to, "2026-09-30");
   assert.ok(buckets.some(b=>!b.created&&!b.resolved));
   assert.equal(a.trend(rows,"2025-01-01","2026-09-30")[0].interval,"month");
+});
+
+const overview = require(join(directory, "overview.js"));
+
+test("customer segment stays unspecified unless the source is a school account", () => {
+  assert.equal(overview.customerSegment("whatsapp"), "Not specified");
+  assert.equal(overview.customerSegment("call_center"), "Not specified");
+  assert.equal(overview.customerSegment("moderation"), "Not specified");
+  assert.equal(overview.customerSegment("business_development"), "B2B Schools");
+  assert.equal(overview.customerSegment("june_schools"), "30 June Schools");
+});
+
+test("status groups are mutually exclusive and keep closed apart from resolved", () => {
+  const rows = [
+    ticket({ id: "a", status: "new" }),
+    ticket({ id: "b", status: "in_progress" }),
+    ticket({ id: "c", status: "awaiting_customer" }),
+    ticket({ id: "d", status: "resolved" }),
+    ticket({ id: "e", status: "closed" }),
+  ];
+  const counts = overview.headline(rows);
+  assert.equal(counts.total, 5);
+  assert.equal(counts.followup, 3);
+  assert.equal(counts.resolved, 1);
+  assert.equal(counts.closed, 1);
+  assert.equal(counts.followup + counts.resolved + counts.closed, counts.total);
+});
+
+test("cause ranking keeps missing causes out of the other group", () => {
+  const rows = ["Content Delay", "Backend Bug", "Frontend Bug", "Payment", "Regional", "App Version", "Usage", "Other", ""].map((cause, index) =>
+    ticket({ id: String(index), trackerCause: cause, status: index < 2 ? "new" : "resolved" }),
+  );
+  const ranked = overview.rankValues(rows, (item) => item.trackerCause, 6, "Other causes");
+  assert.equal(ranked.at(-1).id, "__missing__");
+  assert.equal(ranked.at(-1).name, "Not recorded");
+  assert.equal(ranked.find((row) => row.id === "__other__").name, "Other causes");
+  assert.ok(!ranked.find((row) => row.id === "__other__").requests.some((request) => request.name === "Not recorded" && false));
+  assert.equal(ranked.filter((row) => row.id !== "__other__" && row.id !== "__missing__").length, 6);
+});
+
+test("volume buckets keep days with no cases", () => {
+  const rows = [ticket({ reportedOn: "2026-09-07", source: "whatsapp" })];
+  const buckets = overview.volumeBuckets(rows, "2026-09-07", "2026-09-09", "day", ["whatsapp"]);
+  assert.equal(buckets.length, 3);
+  assert.equal(buckets[0].total, 1);
+  assert.equal(buckets[1].total, 0);
+  assert.equal(buckets[2].total, 0);
 });

@@ -1,139 +1,477 @@
 "use client";
-import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
-import { ArrowDownToLine, ArrowUpRight, CheckCheck, Clock3, Filter, Inbox, RefreshCw, Ticket, X } from "lucide-react";
-import { SOURCE_LABELS, STATUS_LABELS, STATUS_STYLES, TICKET_SOURCES, TICKET_STATUSES, END_USER_TYPES, END_USER_TYPE_LABELS, PLATFORMS, PLATFORM_LABELS } from "@/lib/tickets/constants";
-import { cairoDate, shiftDay } from "@/lib/tickets/dashboard-model";
+import { ArrowDownToLine, ArrowUpRight, RefreshCw, X } from "lucide-react";
+import { sourceLabel, STATUS_LABELS, TICKET_STATUSES, type TicketStatus } from "@/lib/tickets/constants";
+import { cairoDate } from "@/lib/tickets/dashboard-model";
 import { dashboardQuery, type DashboardFilters } from "@/lib/tickets/filters";
-import { AGE_LABELS, ageBand, causeMatrix, cohort, csvCell, durationHours, formatHours, issuePareto, isOpen, median, scopeTickets, trend, validDay, type AnalyticsTicket, type View } from "@/lib/tickets/analytics";
-import { ActivityChart, ParetoChart, StatusDonut } from "./charts";
-type Snapshot = { tickets: AnalyticsTicket[]; asOf: string };
-type Selection = Partial<DashboardFilters> & { completed?: boolean; openOnly?: boolean; timed?: boolean };
-type Option = { id: string; name: string };
-const viewLabels = { created: "Received in period", resolved: "Resolved in period", open: "Open now · all creation dates" };
+import { csvCell, isOpen, validDay, type AnalyticsTicket } from "@/lib/tickets/analytics";
+import {
+  AGE_BUCKETS,
+  SEGMENT_ORDER,
+  STATUS_GROUP_LABEL,
+  ageBucketId,
+  contactChannel,
+  customerSegment,
+  daysSinceReported,
+  headline,
+  matchesOverview,
+  rankValues,
+  referringTeam,
+  reportedDay,
+  siblingCases,
+  statusGroup,
+  topNames,
+  volumeBuckets,
+  volumeModeFor,
+  type OverviewQuery,
+  type StatusGroup,
+  type VolumeMode,
+} from "@/lib/tickets/overview";
+import { EmptyChart, fillStyle, Panel, RankChart, SegmentChart, STATUS_COLORS, useFillIn, VolumeChart } from "./overview-charts";
 
-export function DashboardBoard({ initialSnapshot, initialFilters, cities, categories, preview = false }: { initialSnapshot: Snapshot; initialFilters: DashboardFilters; cities: Option[]; categories: Option[]; preview?: boolean }) {
+type Snapshot = { tickets: AnalyticsTicket[]; asOf: string };
+type Option = { id: string; name: string };
+
+const blank = {
+  source: "",
+  status: "" as const,
+  city: "",
+  category: "",
+  userType: "",
+  segment: "",
+  channel: "",
+  referringTeam: "",
+  statusGroup: "",
+  topic: "",
+  trackerCause: "",
+  requestType: "",
+  fawry: "",
+  q: "",
+  bucketFrom: "",
+  bucketTo: "",
+  age: "",
+};
+
+export function DashboardBoard({
+  initialSnapshot,
+  initialFilters,
+  preview = false,
+}: {
+  initialSnapshot: Snapshot;
+  initialFilters: DashboardFilters;
+  cities?: Option[];
+  categories?: Option[];
+  preview?: boolean;
+}) {
   const [snapshot, setSnapshot] = useState(initialSnapshot);
   const today = cairoDate(snapshot.asOf);
-  const [filters, setFilters] = useState<DashboardFilters>(() => ({ ...initialFilters, from: validDay(initialFilters.from) ? initialFilters.from : shiftDay(today, -29), to: validDay(initialFilters.to) ? initialFilters.to : today }));
-  const [advanced, setAdvanced] = useState(false), [page, setPage] = useState(1), [error, setError] = useState(""), [refreshing, setRefreshing] = useState(false);
-  const table = useRef<HTMLElement>(null), busy = useRef(false), abort = useRef<AbortController | null>(null);
-  const [selection, setSelection] = useState<Selection>({});
-  const view: View = selection.view ?? "created";
+  const earliest = snapshot.tickets.reduce((day, ticket) => {
+    const reported = reportedDay(ticket);
+    return reported < day ? reported : day;
+  }, today);
+  const [filters, setFilters] = useState<DashboardFilters>(() => ({
+    ...blank,
+    ...initialFilters,
+    from: validDay(initialFilters.from) ? initialFilters.from : earliest,
+    to: validDay(initialFilters.to) ? initialFilters.to : today,
+  }));
+  const [more, setMore] = useState(false);
+  const [page, setPage] = useState(1);
+  const [error, setError] = useState("");
+  const [refreshing, setRefreshing] = useState(false);
+  const [surface, setSurface] = useState<"overview" | "analysis">("overview");
+  const [mode, setMode] = useState<VolumeMode | "">("");
+  const [share, setShare] = useState(false);
+  const [allTopics, setAllTopics] = useState(false);
+  const busy = useRef(false);
+  const abort = useRef<AbortController | null>(null);
   const valid = validDay(filters.from) && validDay(filters.to) && filters.from <= filters.to;
-  const scoped = useMemo(() => scopeTickets(snapshot.tickets, filters), [snapshot.tickets, filters]);
-  const current = useMemo(() => ({ created: valid ? cohort(scoped, "created", filters.from, filters.to) : [], resolved: valid ? cohort(scoped, "resolved", filters.from, filters.to) : [], open: cohort(scoped, "open", "", "") }), [scoped, filters.from, filters.to, valid]);
-  // The report always describes arrivals in the selected period. Drilldowns only change the table.
-  const rows = current.created;
-  const tableFrom = selection.from ?? filters.from, tableTo = selection.to ?? filters.to;
-  const matching = (valid || view === "open" ? cohort(scopeTickets(scoped, { ...filters, ...selection }), view, tableFrom, tableTo) : []).filter(t =>
-    (!selection.age || ageBand(t, Date.parse(snapshot.asOf)) === Number(selection.age)) &&
-    (!selection.completed || t.status === "resolved" || t.status === "closed") &&
-    (!selection.openOnly || isOpen(t)) && (!selection.timed || durationHours(t) !== null));
-  const completed = rows.filter(t => t.status === "resolved" || t.status === "closed").length;
-  const missingDates = rows.filter(t => (t.status === "resolved" || t.status === "closed") && !t.resolvedAt).length;
-  const uncategorized = rows.filter(t => !t.categoryId).length;
-  const durations = rows.map(durationHours).filter((h): h is number => h !== null);
-  const pareto = issuePareto(rows), matrix = causeMatrix(rows), matrixMax = Math.max(1, ...matrix.cells.flat()), missing = rows.filter(t => !t.cause).length;
-  const buckets = useMemo(() => valid ? trend(scoped, filters.from, filters.to) : [], [scoped, filters.from, filters.to, valid]);
-  const causes = [...new Set(snapshot.tickets.map(t => t.cause).filter(Boolean))].sort().map(name => ({ id: name, name }));
-  const agents = [...new Map(snapshot.tickets.filter(t => t.assigneeId).map(t => [t.assigneeId!, { id: t.assigneeId!, name: t.assignee || "Assigned agent" }])).values()];
-  const recent = [...matching].sort((a, b) => view === "open" ? a.createdAt.localeCompare(b.createdAt) : b.createdAt.localeCompare(a.createdAt));
-  const pages = Math.max(1, Math.ceil(recent.length / 10)), currentPage = Math.min(page, pages);
+  const volumeMode = mode || (valid ? volumeModeFor(filters.from, filters.to) : "month");
+
+  const queryOf = useCallback((causeTops: string[], topicTops: string[]): OverviewQuery => ({
+    from: filters.from,
+    to: filters.to,
+    source: filters.source,
+    segment: filters.segment ?? "",
+    channel: filters.channel ?? "",
+    referringTeam: filters.referringTeam ?? "",
+    status: filters.status,
+    statusGroup: filters.statusGroup ?? "",
+    topic: filters.topic ?? "",
+    trackerCause: filters.trackerCause ?? "",
+    requestType: filters.requestType ?? "",
+    fawry: filters.fawry ?? "",
+    q: filters.q ?? "",
+    bucketFrom: filters.bucketFrom ?? "",
+    bucketTo: filters.bucketTo ?? "",
+    age: filters.age ?? "",
+    topCauses: causeTops,
+    topTopics: topicTops,
+  }), [filters]);
+
+  const causeFrame = useMemo(() => snapshot.tickets.filter((ticket) => matchesOverview(ticket, queryOf([], []), ["cause"], today)), [snapshot.tickets, queryOf, today]);
+  const topicFrame = useMemo(() => snapshot.tickets.filter((ticket) => matchesOverview(ticket, queryOf([], []), ["topic"], today)), [snapshot.tickets, queryOf, today]);
+  const causeRank = useMemo(() => rankValues(causeFrame, (ticket) => ticket.trackerCause, 6, "Other causes"), [causeFrame]);
+  const topicRank = useMemo(() => rankValues(topicFrame, (ticket) => ticket.topic, allTopics ? 99 : 6, "Other topics"), [topicFrame, allTopics]);
+  const causeTops = useMemo(() => topNames(rankValues(causeFrame, (ticket) => ticket.trackerCause, 6, "Other causes")), [causeFrame]);
+  const topicTops = useMemo(() => topNames(rankValues(topicFrame, (ticket) => ticket.topic, 6, "Other topics")), [topicFrame]);
+  const rows = useMemo(() => snapshot.tickets.filter((ticket) => matchesOverview(ticket, queryOf(causeTops, topicTops), [], today)), [snapshot.tickets, queryOf, causeTops, topicTops, today]);
+  const volumeFrame = useMemo(() => snapshot.tickets.filter((ticket) => matchesOverview(ticket, queryOf(causeTops, topicTops), ["source", "bucket"], today)), [snapshot.tickets, queryOf, causeTops, topicTops, today]);
+  const segmentFrame = useMemo(() => snapshot.tickets.filter((ticket) => matchesOverview(ticket, queryOf(causeTops, topicTops), ["segment", "statusGroup"], today)), [snapshot.tickets, queryOf, causeTops, topicTops, today]);
+  const stats = headline(rows);
+  const sources = useMemo(() => {
+    const order = ["whatsapp", "call_center", "moderation", "marketing_team", "business_development", "june_schools", "google_play"];
+    const present = new Set<string>(volumeFrame.map((ticket) => ticket.source));
+    if (filters.source) present.add(filters.source);
+    return [...order.filter((source) => present.has(source)), ...[...present].filter((source) => !order.includes(source))];
+  }, [volumeFrame, filters.source]);
+  const buckets = useMemo(() => valid ? volumeBuckets(volumeFrame, filters.from, filters.to, volumeMode, sources) : [], [volumeFrame, filters.from, filters.to, volumeMode, sources, valid]);
+  const segments = SEGMENT_ORDER.map((segment) => {
+    const matching = segmentFrame.filter((ticket) => customerSegment(ticket.source) === segment);
+    return {
+      segment,
+      total: matching.length,
+      parts: (["resolved", "followup", "closed"] as StatusGroup[]).map((group) => ({
+        group,
+        count: matching.filter((ticket) => statusGroup(ticket.status) === group).length,
+      })),
+    };
+  });
+  const fawryRows = [
+    { id: "yes", name: "Yes", count: rows.filter((ticket) => ticket.fawry === "yes").length },
+    { id: "no", name: "No", count: rows.filter((ticket) => ticket.fawry === "no").length },
+    { id: "__missing__", name: "Not recorded", count: rows.filter((ticket) => !ticket.fawry).length },
+  ];
+  const openAll = snapshot.tickets.filter(isOpen);
+  const followups = rows
+    .filter((ticket) => statusGroup(ticket.status) === "followup")
+    .sort((a, b) => reportedDay(a).localeCompare(reportedDay(b)) || a.number.localeCompare(b.number));
+  const pages = Math.max(1, Math.ceil(followups.length / 8));
+  const currentPage = Math.min(page, pages);
+  const unclassified = rows.filter((ticket) => !ticket.topic && !ticket.trackerCause).length;
+  const returnTo = `/dashboard${dashboardQuery(filters)}`;
+
   const refresh = useCallback(async () => {
     if (preview || busy.current) return;
-    busy.current = true; setRefreshing(true);
-    const controller = new AbortController(); abort.current = controller;
+    busy.current = true;
+    setRefreshing(true);
+    const controller = new AbortController();
+    abort.current = controller;
     const timeout = setTimeout(() => controller.abort(), 20000);
     try {
       const response = await fetch("/dashboard/data", { cache: "no-store", signal: controller.signal });
       if (!response.ok) throw new Error(response.status === 403 ? "Session expired. Reload and sign in again." : "Refresh failed. Showing the last successful snapshot.");
       const next: Snapshot = await response.json();
       if (!Array.isArray(next.tickets) || !Number.isFinite(Date.parse(next.asOf))) throw new Error("Invalid refresh response. Last snapshot retained.");
-      setSnapshot(next); setError("");
-    } catch (e) { setError(e instanceof Error && e.name !== "AbortError" ? e.message : "Refresh timed out. Last snapshot retained."); }
-    finally { clearTimeout(timeout); busy.current = false; setRefreshing(false); }
+      setSnapshot(next);
+      setError("");
+    } catch (reason) {
+      setError(reason instanceof Error && reason.name !== "AbortError" ? reason.message : "Refresh timed out. Last snapshot retained.");
+    } finally {
+      clearTimeout(timeout);
+      busy.current = false;
+      setRefreshing(false);
+    }
   }, [preview]);
-  useEffect(() => { if (preview) return; const tick = () => { if (document.visibilityState === "visible") void refresh(); }; const interval = setInterval(tick, 30000); document.addEventListener("visibilitychange", tick); return () => { clearInterval(interval); document.removeEventListener("visibilitychange", tick); abort.current?.abort(); }; }, [refresh, preview]);
-  useEffect(() => { if (!preview) window.history.replaceState(null, "", `/dashboard${dashboardQuery(filters)}`); }, [filters, preview]);
-  function patch(next: Partial<DashboardFilters>) { setSelection({}); setFilters(f => ({ ...f, ...next })); setPage(1); }
-  function drill(next: Selection) { setSelection(next); setPage(1); requestAnimationFrame(() => table.current?.scrollIntoView({ behavior: "smooth", block: "start" })); }
-  function reset() { setSelection({}); setFilters({ from: shiftDay(today, -29), to: today, source: "", status: "", city: "", category: "", userType: "", view: "created" }); setPage(1); }
-  function exportCsv() {
-    const data = [["Ticket", "Issue", "Source", "Status", "Created", "Resolved", "Category", "Root cause", "Assignee", "Platform"], ...matching.map(t => [t.number, t.subject, SOURCE_LABELS[t.source], STATUS_LABELS[t.status], t.createdAt, t.resolvedAt ?? "", t.category, t.cause, t.assignee ?? "", t.platform ?? ""])];
-    const url = URL.createObjectURL(new Blob(["\ufeff" + data.map(r => r.map(csvCell).join(",")).join("\r\n")], { type: "text/csv;charset=utf-8" }));
-    const a = document.createElement("a"); a.href = url; a.download = `support-${view}-${tableFrom}-${tableTo}.csv`; a.click(); setTimeout(() => URL.revokeObjectURL(url), 1000);
-  }
-  const chips = (["source", "status", "category", "cause", "platform", "assignee", "city", "userType"] as const).filter(k => filters[k] !== undefined && filters[k] !== "");
-  function chipLabel(key: typeof chips[number]) {
-    const value = filters[key] ?? "", names = key === "category" ? categories : key === "city" ? cities : key === "assignee" ? agents : [];
-    if (value === "__missing__") return key === "cause" ? "Cause not recorded" : key === "category" ? "Uncategorized" : key === "city" ? "City not recorded" : key === "userType" ? "User type not recorded" : "Unassigned";
-    if (key === "source") return SOURCE_LABELS[value as keyof typeof SOURCE_LABELS];
-    if (key === "status") return STATUS_LABELS[value as keyof typeof STATUS_LABELS];
-    return names.find(n => n.id === value)?.name || value;
-  }
-  const returnTo = `/dashboard${dashboardQuery(filters)}`;
-  const selectionSummary = [
-    selection.source && SOURCE_LABELS[selection.source],
-    selection.status && STATUS_LABELS[selection.status],
-    selection.category && (selection.category === "__missing__" ? "Uncategorized" : categories.find(c=>c.id===selection.category)?.name),
-    selection.cause && (selection.cause === "__missing__" ? "Cause not recorded" : selection.cause),
-    selection.city && (selection.city === "__missing__" ? "City not recorded" : cities.find(c=>c.id===selection.city)?.name),
-    selection.userType && (selection.userType === "__missing__" ? "User type not recorded" : END_USER_TYPE_LABELS[selection.userType as keyof typeof END_USER_TYPE_LABELS]),
-    selection.age && AGE_LABELS[Number(selection.age)],
-    selection.completed && "Resolved / closed arrivals", selection.openOnly && "Open period arrivals",
-    selection.timed && "Valid resolution timestamps",
-  ].filter(Boolean).join(" · ") || viewLabels[view];
 
-  const cityBreakdown = [...new Set(rows.map(t => t.cityId || "__missing__"))].map(id => ({ id, name: id === "__missing__" ? "City not recorded" : cities.find(c => c.id === id)?.name || "Unknown city", count: rows.filter(t => (t.cityId || "__missing__") === id).length })).sort((a, b) => b.count - a.count);
-  const userBreakdown = [...new Set(rows.map(t => t.endUserType || "__missing__"))].map(id => ({ id, name: id === "__missing__" ? "User type not recorded" : END_USER_TYPE_LABELS[id as keyof typeof END_USER_TYPE_LABELS] || id, count: rows.filter(t => (t.endUserType || "__missing__") === id).length })).sort((a, b) => b.count - a.count);
-  return <div className="bi-dashboard">
-    <div className="bi-titlebar"><div><p className="bi-kicker">SELAH EL TELMEEZ / SUPPORT INTELLIGENCE</p><h2>Support analytics<span className="bi-period">{preview ? "DEMO" : "LIVE DATA"}</span></h2><p className="bi-subtitle">Support volume, outcomes and the issues that need attention.</p></div><div className="bi-actions no-print"><button onClick={() => void refresh()} disabled={refreshing || preview} aria-label="Refresh dashboard"><RefreshCw size={15} className={refreshing ? "animate-spin" : ""} /></button><button onClick={() => window.print()}>Print / PDF</button><button className="bi-primary" onClick={exportCsv}><ArrowDownToLine size={14}/> Export selection</button></div></div>
-    <div className="bi-range-shortcuts no-print"><span>Reporting period</span>{[
-      {label:"Last 30 days",from:shiftDay(today,-29)},
-      {label:"This year",from:`${today.slice(0,4)}-01-01`},
-      {label:"Last year to date",from:`${Number(today.slice(0,4))-1}-01-01`},
-      {label:"All records",from:snapshot.tickets.reduce((day,t)=>t.createdOn<day?t.createdOn:day,today)}
-    ].map(item=><button key={item.label} aria-pressed={filters.from===item.from&&filters.to===today} onClick={()=>patch({from:item.from,to:today})}>{item.label}</button>)}</div>
-    <div className="bi-filterbar no-print">
-      <label>From<input type="date" value={filters.from} max={filters.to} onChange={e => patch({ from: e.target.value })}/></label><label>To<input type="date" value={filters.to} min={filters.from} onChange={e => patch({ to: e.target.value })}/></label>
-      <Select label="Source" value={filters.source} options={TICKET_SOURCES.map(s => ({ id:s, name:SOURCE_LABELS[s] }))} onChange={source => patch({ source:source as DashboardFilters["source"] })}/>
-      <Select label="Issue category" value={filters.category} options={[...categories, { id:"__missing__", name:"Uncategorized" }]} onChange={category => patch({category})}/>
-      <Select label="Root cause" value={filters.cause ?? ""} options={[...causes, { id:"__missing__", name:"Not recorded" }]} onChange={cause => patch({cause})}/>
-      <button aria-expanded={advanced} onClick={() => setAdvanced(!advanced)}><Filter size={14}/> More filters</button><button onClick={reset}>Reset</button>
+  useEffect(() => {
+    if (preview) return;
+    const tick = () => { if (document.visibilityState === "visible") void refresh(); };
+    const interval = setInterval(tick, 30000);
+    document.addEventListener("visibilitychange", tick);
+    return () => {
+      clearInterval(interval);
+      document.removeEventListener("visibilitychange", tick);
+      abort.current?.abort();
+    };
+  }, [refresh, preview]);
+  useEffect(() => {
+    if (!preview) window.history.replaceState(null, "", `/dashboard${dashboardQuery(filters)}`);
+  }, [filters, preview]);
+
+  function patch(next: Partial<DashboardFilters>) {
+    setFilters((current) => ({ ...current, ...next }));
+    setPage(1);
+  }
+  function reset() {
+    setFilters({ ...blank, from: earliest, to: today });
+    setMode("");
+    setPage(1);
+  }
+  function toggle(key: keyof DashboardFilters, value: string) {
+    patch({ [key]: filters[key] === value ? "" : value });
+  }
+  function pickGroup(group: "" | StatusGroup) {
+    patch({ status: "", statusGroup: group && filters.statusGroup === group ? "" : group });
+  }
+  function exportCsv() {
+    const data = [[
+      "Case", "Customer", "School", "Phone", "Email", "Reported date", "Source", "Segment", "Channel", "Referring team",
+      "Status", "Request type", "Topic", "Root cause", "Action", "Outcome", "Fawry", "Assignee", "Description",
+    ], ...rows.map((ticket) => [
+      ticket.number, ticket.customerName ?? "", ticket.schoolName ?? "", ticket.customerPhone ?? "", ticket.customerEmail ?? "",
+      reportedDay(ticket), sourceLabel(ticket.source), customerSegment(ticket.source), contactChannel(ticket.source), referringTeam(ticket.source),
+      STATUS_LABELS[ticket.status], ticket.requestType, ticket.topic, ticket.trackerCause, ticket.trackerAction, ticket.outcome,
+      ticket.fawry === "yes" ? "Yes" : ticket.fawry === "no" ? "No" : "", ticket.assignee ?? "", ticket.subject,
+    ])];
+    const url = URL.createObjectURL(new Blob(["\ufeff" + data.map((line) => line.map(csvCell).join(",")).join("\r\n")], { type: "text/csv;charset=utf-8" }));
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `support-cases-${filters.from}-${filters.to}.csv`;
+    link.click();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+  }
+
+  const chips: { key: keyof DashboardFilters; label: string }[] = [
+    filters.source ? { key: "source", label: sourceLabel(filters.source) } : null,
+    filters.segment ? { key: "segment", label: filters.segment } : null,
+    filters.channel ? { key: "channel", label: filters.channel } : null,
+    filters.referringTeam ? { key: "referringTeam", label: filters.referringTeam } : null,
+    filters.status ? { key: "status", label: STATUS_LABELS[filters.status] } : null,
+    filters.statusGroup ? { key: "statusGroup", label: STATUS_GROUP_LABEL[filters.statusGroup as StatusGroup] } : null,
+    filters.topic ? { key: "topic", label: filters.topic === "__missing__" ? "Topic not recorded" : filters.topic === "__other__" ? "Other topics" : filters.topic } : null,
+    filters.trackerCause ? { key: "trackerCause", label: filters.trackerCause === "__missing__" ? "Cause not recorded" : filters.trackerCause === "__other__" ? "Other causes" : filters.trackerCause } : null,
+    filters.requestType ? { key: "requestType", label: filters.requestType === "__missing__" ? "Request type not recorded" : filters.requestType } : null,
+    filters.fawry ? { key: "fawry", label: filters.fawry === "__missing__" ? "Fawry not recorded" : `Fawry: ${filters.fawry === "yes" ? "Yes" : "No"}` } : null,
+    filters.bucketFrom ? { key: "bucketFrom", label: `${filters.bucketFrom} – ${filters.bucketTo}` } : null,
+    filters.age ? { key: "age", label: AGE_BUCKETS.find((bucket) => bucket.id === filters.age)?.label ?? filters.age } : null,
+    filters.q ? { key: "q", label: `Search: ${filters.q}` } : null,
+  ].filter((chip): chip is { key: keyof DashboardFilters; label: string } => Boolean(chip));
+
+  const channelRows = rankValues(rows, (ticket) => contactChannel(ticket.source), 8, "Other channels");
+  const teamRows = rankValues(rows, (ticket) => referringTeam(ticket.source), 8, "Other teams");
+  const ages = AGE_BUCKETS.map((bucket) => ({
+    ...bucket,
+    count: rows.filter((ticket) => isOpen(ticket) && ageBucketId(daysSinceReported(reportedDay(ticket), today) ?? 0) === bucket.id).length,
+  }));
+
+  return (
+    <div className="cs-board">
+      <header className="cs-title">
+        <div>
+          <p>Customer Support</p>
+          <h2>Customer Support Overview</h2>
+          <span>Last updated {new Date(snapshot.asOf).toLocaleString("en-GB", { timeZone: "Africa/Cairo", hour: "2-digit", minute: "2-digit", day: "numeric", month: "short" })} · Reported dates {filters.from} – {filters.to}</span>
+        </div>
+        <div className="cs-title-actions no-print">
+          <button type="button" onClick={() => void refresh()} disabled={refreshing || preview} aria-label="Refresh dashboard"><RefreshCw size={15} className={refreshing ? "animate-spin" : ""} /></button>
+          <button type="button" onClick={exportCsv}>Export filtered cases <ArrowDownToLine size={14} /></button>
+        </div>
+      </header>
+
+      <div className="cs-filters no-print">
+        <label>Reported date<input type="date" value={filters.from} max={filters.to} onChange={(event) => patch({ from: event.target.value, bucketFrom: "", bucketTo: "" })} /></label>
+        <label>to<input type="date" value={filters.to} min={filters.from} onChange={(event) => patch({ to: event.target.value, bucketFrom: "", bucketTo: "" })} /></label>
+        <Select label="Customer segment" value={filters.segment ?? ""} options={SEGMENT_ORDER.map((name) => ({ id: name, name }))} onChange={(segment) => patch({ segment })} />
+        <Select label="Contact channel" value={filters.channel ?? ""} options={["WhatsApp", "Phone", "Support Form", "Email", "Not specified"].map((name) => ({ id: name, name }))} onChange={(channel) => patch({ channel })} />
+        <label className="cs-search">Search<input value={filters.q ?? ""} placeholder="Case, school, phone, email, text" onChange={(event) => patch({ q: event.target.value })} /></label>
+        <button type="button" aria-expanded={more} onClick={() => setMore((open) => !open)}>More filters</button>
+        <button type="button" onClick={reset}>Reset filters</button>
+      </div>
+      {more && (
+        <div className="cs-filters no-print">
+          <Select label="Status" value={filters.status} options={TICKET_STATUSES.map((status) => ({ id: status, name: STATUS_LABELS[status] }))} onChange={(status) => patch({ status: status as TicketStatus | "", statusGroup: "" })} />
+          <Select label="Topic" value={filters.topic ?? ""} options={topicRank.map((row) => ({ id: row.id, name: row.name }))} onChange={(topic) => patch({ topic })} />
+          <Select label="Root cause" value={filters.trackerCause ?? ""} options={causeRank.map((row) => ({ id: row.id, name: row.name }))} onChange={(trackerCause) => patch({ trackerCause })} />
+          <Select label="Referring team" value={filters.referringTeam ?? ""} options={["Moderation", "Marketing", "Not specified"].map((name) => ({ id: name, name }))} onChange={(referringTeam) => patch({ referringTeam })} />
+          <Select label="Request type" value={filters.requestType ?? ""} options={[...new Set(snapshot.tickets.map((ticket) => ticket.requestType).filter(Boolean)), "__missing__"].map((name) => ({ id: name, name: name === "__missing__" ? "Not recorded" : name }))} onChange={(requestType) => patch({ requestType })} />
+        </div>
+      )}
+      {chips.length > 0 && (
+        <div className="cs-chips no-print">
+          {chips.map((chip) => (
+            <button type="button" key={chip.key} onClick={() => patch(chip.key === "bucketFrom" ? { bucketFrom: "", bucketTo: "" } : { [chip.key]: "" })}>
+              {chip.label} <X size={12} />
+            </button>
+          ))}
+        </div>
+      )}
+      {!valid && <p className="cs-alert" role="alert">Choose a reported-date range that starts on or before it ends.</p>}
+      {error && <p className="cs-alert" role="alert">{error}</p>}
+      <p className="cs-scope"><strong>{stats.total.toLocaleString()}</strong> cases with a reported date from {filters.from} to {filters.to}</p>
+      {unclassified > 0 && <p className="cs-notice">{unclassified} cases in this selection have no tracker topic or root cause yet. They stay in the totals and appear as Not recorded.</p>}
+
+      <div className="cs-switch no-print" role="tablist" aria-label="Dashboard sections">
+        <button type="button" role="tab" aria-selected={surface === "overview"} onClick={() => setSurface("overview")}>Overview</button>
+        <button type="button" role="tab" aria-selected={surface === "analysis"} onClick={() => setSurface("analysis")}>Detailed analysis</button>
+      </div>
+
+      <section className="cs-kpis">
+        <Kpi label="Total Cases" value={stats.total} detail="Distinct cases in this selection" selected={false} dim={Boolean(filters.status || filters.statusGroup)} onClick={() => pickGroup("")} />
+        <Kpi label="Needs Follow-up" value={stats.followup} detail={`${stats.fresh} new · ${stats.progress} in progress · ${stats.awaiting} awaiting reply`} selected={filters.statusGroup === "followup"} dim={Boolean(filters.statusGroup) && filters.statusGroup !== "followup"} tone="followup" onClick={() => pickGroup("followup")} />
+        <Kpi label="Resolved" value={stats.resolved} detail={`${Math.round(stats.resolvedShare * 100)}% of selected cases`} selected={filters.statusGroup === "resolved"} dim={Boolean(filters.statusGroup) && filters.statusGroup !== "resolved"} tone="resolved" onClick={() => pickGroup("resolved")} />
+        <Kpi label="Closed Without Response" value={stats.closed} detail="Separate from resolved cases" selected={filters.statusGroup === "closed"} dim={Boolean(filters.statusGroup) && filters.statusGroup !== "closed"} tone="closed" onClick={() => pickGroup("closed")} />
+      </section>
+
+      <section className="cs-fawry" aria-label="Fawry payment">
+        <span>Fawry payment</span>
+        {fawryRows.map((item) => (
+          <button key={item.id} type="button" className={filters.fawry === item.id ? "is-on" : filters.fawry ? "is-dim" : ""} aria-pressed={filters.fawry === item.id} onClick={() => toggle("fawry", item.id)}>
+            <b>{item.name}</b><strong>{item.count}</strong>
+          </button>
+        ))}
+      </section>
+
+      {surface === "overview" ? (
+        <>
+          <div className="cs-row cs-row-volume">
+            <Panel
+              title="Case volume over time"
+              question="When are cases reported, and which source sends them?"
+              action={<div className="cs-modes">{(["day", "week", "month"] as VolumeMode[]).map((item) => <button type="button" key={item} aria-pressed={volumeMode === item} onClick={() => { setMode(item); patch({ bucketFrom: "", bucketTo: "" }); }}>{item === "day" ? "Daily" : item === "week" ? "Weekly" : "Monthly"}</button>)}</div>}
+            >
+              <VolumeChart
+                key={buckets.map((bucket) => bucket.total).join(",")}
+                buckets={buckets}
+                sources={sources}
+                selectedSource={filters.source}
+                selectedFrom={filters.bucketFrom ?? ""}
+                onInterval={(from, to) => {
+                  const same = filters.bucketFrom === from && filters.bucketTo === to && !filters.source;
+                  patch({ bucketFrom: same ? "" : from, bucketTo: same ? "" : to, source: "" });
+                }}
+                onSegment={(source, from, to) => {
+                  const same = filters.source === source && filters.bucketFrom === from && filters.bucketTo === to;
+                  patch({ source: same ? "" : source, bucketFrom: same ? "" : from, bucketTo: same ? "" : to });
+                }}
+              />
+            </Panel>
+            <Panel title="Root causes" question="What is causing these support issues?">
+              <RankChart key={causeRank.map((row) => row.count).join(",")} rows={causeRank} color="#0f766e" selectedId={filters.trackerCause ?? ""} onPick={(id) => toggle("trackerCause", id)} />
+            </Panel>
+          </div>
+          <div className="cs-row cs-row-even">
+            <Panel
+              title="Cases by customer segment"
+              question="How does workload and current status differ by customer group?"
+              action={<div className="cs-modes"><button type="button" aria-pressed={!share} onClick={() => setShare(false)}>Count</button><button type="button" aria-pressed={share} onClick={() => setShare(true)}>Percentage</button></div>}
+            >
+              <div className="cs-status-key"><span><i style={{ background: STATUS_COLORS.resolved }} />Resolved</span><span><i style={{ background: STATUS_COLORS.followup }} />Needs Follow-up</span><span><i style={{ background: STATUS_COLORS.closed }} />Closed Without Response</span></div>
+              <SegmentChart
+                key={segments.map((row) => row.total).join(",")}
+                rows={segments}
+                mode={share ? "share" : "count"}
+                selectedSegment={filters.segment ?? ""}
+                selectedGroup={filters.statusGroup ?? ""}
+                onSegment={(segment) => toggle("segment", segment)}
+                onStack={(segment, group) => {
+                  const same = filters.segment === segment && filters.statusGroup === group;
+                  patch({ status: "", segment: same ? "" : segment, statusGroup: same ? "" : group });
+                }}
+              />
+            </Panel>
+            <Panel title="Most common topics" question="What are customers contacting support about?" action={<button type="button" className="cs-text" onClick={() => setAllTopics((open) => !open)}>{allTopics ? "Show top topics" : "View all topics"}</button>}>
+              <RankChart key={topicRank.map((row) => `${row.id}:${row.count}`).join(",")} rows={topicRank} color="#3730a3" selectedId={filters.topic ?? ""} showRequests onPick={(id) => toggle("topic", id)} />
+            </Panel>
+          </div>
+          <section className="cs-panel" id="follow-up">
+            <header>
+              <div><h3>Cases requiring follow-up</h3><p>{followups.length} open cases in this selection, oldest reported date first.</p></div>
+              {!preview && <Link href="/tickets">View all cases <ArrowUpRight size={14} /></Link>}
+            </header>
+            <div className="cs-table-scroll">
+              <table>
+                <thead>
+                  <tr><th>Case</th><th>Customer / school</th><th>Segment</th><th>Topic</th><th>Status</th><th>Reported</th><th>Days since reported</th><th>Assignee</th><th>Latest update</th></tr>
+                </thead>
+                <tbody>
+                  {followups.slice((currentPage - 1) * 8, currentPage * 8).map((ticket) => {
+                    const siblings = siblingCases(ticket, openAll);
+                    const days = daysSinceReported(reportedDay(ticket), today);
+                    return (
+                      <tr key={ticket.id}>
+                        <td>{preview ? ticket.number : <Link href={`/tickets/${ticket.id}?returnTo=${encodeURIComponent(returnTo)}`}>{ticket.number}</Link>}</td>
+                        <td>{ticket.customerName || "Not recorded"}{ticket.schoolName ? <small>{ticket.schoolName}</small> : null}{siblings.length > 0 && <small className="cs-sibling">Also open: {siblings.map((item) => item.number).join(", ")}</small>}</td>
+                        <td>{customerSegment(ticket.source)}</td>
+                        <td>{ticket.topic || "Not recorded"}</td>
+                        <td><em className={`cs-status cs-status-${statusGroup(ticket.status)}`}>{STATUS_LABELS[ticket.status]}</em></td>
+                        <td>{reportedDay(ticket)}</td>
+                        <td>{days == null ? "Not recorded" : days}</td>
+                        <td>{ticket.assignee || "Not assigned"}</td>
+                        <td>{ticket.updatedOn && ticket.updatedOn !== reportedDay(ticket) ? ticket.updatedOn : "Not recorded"}</td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+              {!followups.length && <EmptyChart text="No cases in this selection need follow-up." onReset={reset} />}
+            </div>
+            <footer>
+              <span>{followups.length ? (currentPage - 1) * 8 + 1 : 0}–{Math.min(currentPage * 8, followups.length)} of {followups.length}</span>
+              <div><button type="button" disabled={currentPage <= 1} onClick={() => setPage(currentPage - 1)}>Previous</button><button type="button" disabled={currentPage >= pages} onClick={() => setPage(currentPage + 1)}>Next</button></div>
+            </footer>
+          </section>
+        </>
+      ) : (
+        <div className="cs-analysis">
+          <Panel title="Cases by contact channel" question="How did the case arrive?">
+            <RankChart rows={channelRows} color="#0e7490" selectedId={filters.channel ?? ""} onPick={(id) => toggle("channel", id)} />
+          </Panel>
+          <Panel title="Cases by referring team" question="Which team referred the case, when that is recorded?">
+            <RankChart rows={teamRows} color="#7c3aed" selectedId={filters.referringTeam ?? ""} onPick={(id) => toggle("referringTeam", id)} />
+          </Panel>
+          <Panel title="Open cases by age" question="How long open cases have been waiting since the reported date. These are age groups.">
+            <AgeColumns ages={ages} selected={filters.age ?? ""} onPick={(id) => patch({ age: filters.age === id ? "" : id, statusGroup: "followup" })} />
+          </Panel>
+          <p className="cs-notice">Resolution time, grade and subject heatmaps, and reopened-case trends stay out of this view until those dates and fields are recorded on the case.</p>
+        </div>
+      )}
     </div>
-    {advanced && <div className="bi-filterbar no-print">
-      <Select label="Status" value={filters.status} options={TICKET_STATUSES.map(s => ({id:s,name:STATUS_LABELS[s]}))} onChange={status => patch({status:status as DashboardFilters["status"]})}/>
-      <Select label="Assignee" value={filters.assignee ?? ""} options={[...agents, {id:"__missing__",name:"Unassigned"}]} onChange={assignee => patch({assignee})}/>
-      <Select label="Platform" value={filters.platform ?? ""} options={PLATFORMS.map(p => ({id:p,name:PLATFORM_LABELS[p]}))} onChange={platform => patch({platform})}/>
-      <Select label="City" value={filters.city} options={[...cities,{id:"__missing__",name:"Not recorded"}]} onChange={city => patch({city})}/><Select label="User type" value={filters.userType} options={[...END_USER_TYPES.map(t => ({id:t,name:END_USER_TYPE_LABELS[t]})),{id:"__missing__",name:"Not recorded"}]} onChange={userType => patch({userType})}/>
-    </div>}
-    {!valid && <p className="bi-warning" role="alert">Choose a valid date range. Start must be on or before end.</p>}{error && <p className="bi-warning" role="alert">{error}</p>}
-    <div className="bi-report-scope"><div><span className="bi-kicker">PERIOD PERFORMANCE</span><h3>{filters.from} — {filters.to}</h3></div><p>Period breakdowns cover <strong>{rows.length} tickets received</strong> in this period.<br/>Current statuses · Cairo calendar dates</p></div>
-    <div className="bi-kpis">{[
-      { label:"Total tickets received", value:rows.length.toLocaleString(), icon:Ticket, selection:{view:"created"} as Selection, detail:"Created within the selected dates" },
-      { label:"Resolved / closed", value:completed.toLocaleString(), icon:CheckCheck, selection:{completed:true} as Selection, detail:rows.length?`${Math.round(completed/rows.length*100)}% of period arrivals · current status`:"No arrivals in this period" },
-      { label:"Still open", value:rows.filter(isOpen).length.toLocaleString(), icon:Inbox, selection:{openOnly:true} as Selection, detail:"Of period arrivals · needs follow-up" },
-      { label:"Median resolution time", value:formatHours(median(durations)), icon:Clock3, selection:{completed:true,timed:true} as Selection, detail:`${durations.length} of ${completed} completed arrivals · valid elapsed times` },
-    ].map((m,i) => <button key={m.label} className={`bi-kpi bi-kpi-${i}`} onClick={() => drill(m.selection)}><span className="bi-kpi-label">{m.label}<m.icon size={18}/></span><strong>{m.value}</strong><span>{m.detail}</span><small>View tickets ↗</small></button>)}</div>
-    {(uncategorized>0||missingDates>0) && <div className="bi-data-note"><strong>Reporting coverage</strong><span>{uncategorized} of {rows.length} arrivals have no issue category.{missingDates>0?` ${missingDates} resolved/closed arrivals have no resolution date and cannot be included in timed metrics.`:""} Missing fields are not inferred from ticket text.</span>{uncategorized>0&&<button onClick={()=>drill({category:"__missing__"})}>Review classification ↗</button>}</div>}
-    {chips.length>0 && <div className="bi-chips no-print">{chips.map(k => <button key={k} onClick={() => patch({[k]:""})}>{k}: {chipLabel(k)} <X size={12}/></button>)}<span>Report filters · selecting a chart only changes the ticket list</span></div>}
-    <div className="bi-top-grid"><Panel title="Demand & recorded resolutions" subtitle="Arrivals by creation date · resolved/closed tickets by recorded resolution date" badge="VOLUME"><ActivityChart buckets={buckets} onSelect={(from,to,selectedView) => drill({from,to,view:selectedView,age:""})}/></Panel><Panel title="Where these tickets stand" subtitle={`Current status of all ${rows.length} period arrivals`} badge="DISTRIBUTION"><StatusDonut rows={rows} selected={filters.status} onSelect={status => drill({status:filters.status===status?"":status})}/></Panel></div>
-    <div className="bi-analysis-grid"><Panel title="Most reported issues" subtitle={`${rows.length-uncategorized} classified / ${rows.length} arrivals · cumulative share of all arrivals`} badge="PARETO"><ParetoChart entries={pareto} onSelect={category => drill({category:filters.category===category?"":category})}/></Panel>
-      <Panel title="Why are problems happening?" subtitle="Top 5 categories × top 4 recorded causes · counts, not inferred causality" badge="ROOT CAUSES">
-        {matrix.causes.length ? <div className="bi-matrix-scroll"><table className="bi-matrix"><thead><tr><th>Issue / cause</th>{matrix.causes.map(c => <th key={c}>{c}</th>)}</tr></thead><tbody>{matrix.categories.map((c,i) => <tr key={c.key}><th>{c.label}</th>{matrix.causes.map((cause,j) => <td key={cause}><button disabled={!matrix.cells[i][j]} style={{background:`rgba(15,122,87,${0.06+0.84*matrix.cells[i][j]/matrixMax})`,color:matrix.cells[i][j]/matrixMax>.5?"#fff":"#174d3d"}} aria-label={`${c.label}, ${cause}: ${matrix.cells[i][j]} tickets`} onClick={() => drill({category:c.key,cause})}>{matrix.cells[i][j] || "—"}</button></td>)}</tr>)}</tbody></table><div className="bi-scale"><span>Fewer</span><i/><span>More tickets</span></div></div> : <div className="bi-quality-empty"><Inbox size={28}/><h4>Root causes are not recorded yet</h4><p>These tickets cannot explain why issues happen until the team records a cause. Review the tickets below to complete classification.</p></div>}
-        <button className="bi-coverage" onClick={() => drill({cause:filters.cause==="__missing__"?"":"__missing__"})}><span><strong>{missing}</strong> tickets without a recorded cause</span><span>{rows.length?Math.round((rows.length-missing)/rows.length*100):0}% coverage <ArrowUpRight size={13}/></span></button>
-      </Panel></div>
-    <div className="bi-bottom-grid"><Panel title="Where demand comes from" subtitle="Channels that generated tickets in the reporting period" badge="CHANNELS"><div className="bi-channel-list">{TICKET_SOURCES.map(source=>({source,count:rows.filter(t=>t.source===source).length})).sort((a,b)=>b.count-a.count).map(({source,count})=><button key={source} onClick={()=>drill({source})}><span>{SOURCE_LABELS[source]}</span><i><b style={{width:`${count/Math.max(1,rows.length)*100}%`}}/></i><strong>{count}</strong><small>{rows.length?Math.round(count/rows.length*100):0}%</small></button>)}</div></Panel>
-      <Panel title={`Open workload · ${current.open.length} tickets`} subtitle="Separate live queue · all creation dates, including before this period" badge="ACTION"><div className="bi-age-grid">{AGE_LABELS.map((label,i) => {const count=current.open.filter(t => ageBand(t,Date.parse(snapshot.asOf))===i).length;return <button key={label} onClick={() => drill({view:"open",age:String(i)})} aria-pressed={view==="open"&&selection.age===String(i)}><span>{label}</span><strong>{count}</strong><div><i style={{width:`${count/Math.max(1,current.open.length)*100}%`}}/></div></button>;})}</div><p className="bi-note">Select an age group to review its tickets. Targets are not assumed.</p></Panel></div>
-    <details className="bi-panel bi-breakdown"><summary><span>Explore by city and user type</span><small>{rows.length} tickets received in the reporting period · expand analysis</small></summary><div className="bi-breakdown-grid"><div><h4>Cities</h4>{cityBreakdown.map(item => <button key={item.id} onClick={() => drill({ city: item.id })} aria-label={`${item.name}: ${item.count} tickets. View matching tickets`}><span>{item.name}</span><i><b style={{ width: `${item.count / Math.max(1, rows.length) * 100}%` }} /></i><strong>{item.count}</strong></button>)}{!cityBreakdown.length && <p>No matching tickets.</p>}</div><div><h4>User types</h4>{userBreakdown.map(item => <button key={item.id} onClick={() => drill({ userType: item.id })} aria-label={`${item.name}: ${item.count} tickets. View matching tickets`}><span>{item.name}</span><i><b style={{ width: `${item.count / Math.max(1, rows.length) * 100}%` }} /></i><strong>{item.count}</strong></button>)}{!userBreakdown.length && <p>No matching tickets.</p>}</div></div></details>
-    <section ref={table} id="matching-tickets" className="bi-panel bi-results" tabIndex={-1}><header><div><h3>Ticket explorer <span className="bi-result-count">{matching.length}</span></h3><p>{selection.completed?"Resolved / closed arrivals":selection.openOnly?"Open period arrivals":viewLabels[view]}{view!=="open"?` · ${tableFrom} — ${tableTo}`:""} · Report filters + selected chart value</p></div><button className="bi-text-button no-print" onClick={exportCsv}>Export these rows <ArrowDownToLine size={14}/></button></header>
-      <div className="bi-explorer-scope"><span>{selectionSummary}</span><button onClick={()=>{setSelection({});setPage(1);}}>Clear chart selection</button></div>
-      <div className="bi-table-scroll"><table className="bi-ticket-table"><thead><tr><th>Ticket / reported issue</th><th>Category / root cause</th><th>Status</th><th>Source</th><th>Assignee</th><th>Created</th></tr></thead><tbody>{recent.slice((currentPage-1)*10,currentPage*10).map(t => <tr key={t.id}><td>{preview ? <span className="bi-ticket-id">{t.number}</span> : <Link className="bi-ticket-id" href={`/tickets/${t.id}?returnTo=${encodeURIComponent(returnTo)}`}>{t.number} <ArrowUpRight size={12}/></Link>}<p title={t.subject}>{t.subject}</p></td><td>{t.category||"Uncategorized"}<small>{t.cause||"Cause not recorded"}</small></td><td><span className={`bi-status ${STATUS_STYLES[t.status].chip}`}>{STATUS_LABELS[t.status]}</span></td><td>{SOURCE_LABELS[t.source]}</td><td>{t.assignee||"Unassigned"}</td><td>{t.createdOn}</td></tr>)}</tbody></table>{!matching.length && <Empty/>}</div>
-      <div className="bi-pagination"><span>{matching.length ? (currentPage-1)*10+1:0}–{Math.min(currentPage*10,matching.length)} of {matching.length}{preview?" · Fictional preview records":""}</span><div className="no-print"><button disabled={currentPage<=1} onClick={() => setPage(currentPage-1)}>Previous</button><span>{currentPage} / {pages}</span><button disabled={currentPage>=pages} onClick={() => setPage(currentPage+1)}>Next</button></div></div>
-    </section><footer className="bi-footer"><span>{preview?"Synthetic preview · no customer data":`Updated ${new Date(snapshot.asOf).toLocaleString("en-GB",{timeZone:"Africa/Cairo"})} · refreshes every 30 seconds`}</span><span>Resolution metrics exclude reopened tickets. No SLA or satisfaction scores are assumed.</span></footer><p className="sr-only" aria-live="polite">{matching.length} matching tickets. {viewLabels[view]}.</p>
-  </div>;
+  );
 }
-function Select({label,value,options,onChange}:{label:string;value:string;options:Option[];onChange:(value:string)=>void}) { return <label>{label}<select value={value} onChange={e=>onChange(e.target.value)}><option value="">All</option>{options.map(o=><option key={o.id} value={o.id}>{o.name}</option>)}</select></label>; }
-function Panel({title,subtitle,badge,children}:{title:string;subtitle:string;badge:string;children:ReactNode}) {return <section className="bi-panel"><header><div><h3>{title}</h3><p>{subtitle}</p></div><span className="bi-panel-tag">{badge}</span></header>{children}</section>;}
-function Empty({text="No tickets match these filters."}:{text?:string}) {return <div className="bi-empty"><Inbox size={24}/><p>{text}</p><span>Change the period or reset the filters.</span></div>;}
+
+function AgeColumns({ ages, selected, onPick }: { ages: { id: string; label: string; count: number }[]; selected: string; onPick: (id: string) => void }) {
+  const drawn = useFillIn();
+  const max = Math.max(1, ...ages.map((item) => item.count));
+  return (
+    <div className="cs-ages">
+      {ages.map((bucket, index) => (
+          <button type="button" key={bucket.id} className={selected === bucket.id ? "is-on" : selected ? "is-dim" : ""} style={selected && selected !== bucket.id ? { opacity: 0.16 } : undefined} aria-pressed={selected === bucket.id} onClick={() => onPick(bucket.id)}>
+          <i className={drawn ? "is-drawn" : ""} style={{ height: `${(bucket.count / max) * 100}%`, ...fillStyle(drawn, "y", index * 90) }} />
+          <strong>{bucket.count}</strong>
+          <span>{bucket.label}</span>
+        </button>
+      ))}
+    </div>
+  );
+}
+
+function Kpi({ label, value, detail, selected, dim, tone, onClick }: { label: string; value: number; detail: string; selected: boolean; dim: boolean; tone?: StatusGroup; onClick: () => void }) {
+  return (
+    <button type="button" className={`cs-kpi ${selected ? "is-on" : ""} ${dim ? "is-dim" : ""} ${tone ? `cs-kpi-${tone}` : ""}`} aria-pressed={selected} onClick={onClick}>
+      {selected && <em>Selected</em>}
+      <span>{label}</span>
+      <strong><CountUp value={value} /></strong>
+      <small>{detail}</small>
+    </button>
+  );
+}
+
+function CountUp({ value }: { value: number }) {
+  const [shown, setShown] = useState(0);
+  useEffect(() => {
+    const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    const start = performance.now();
+    let frame = 0;
+    const tick = (now: number) => {
+      const progress = reduce ? 1 : Math.min(1, (now - start) / 720);
+      setShown(Math.round(value * (1 - (1 - progress) ** 3)));
+      if (progress < 1) frame = requestAnimationFrame(tick);
+    };
+    frame = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(frame);
+  }, [value]);
+  return <>{shown.toLocaleString()}</>;
+}
+
+function Select({ label, value, options, onChange }: { label: string; value: string; options: Option[]; onChange: (value: string) => void }) {
+  return (
+    <label>{label}
+      <select value={value} onChange={(event) => onChange(event.target.value)}>
+        <option value="">All</option>
+        {options.map((option) => <option key={option.id} value={option.id}>{option.name}</option>)}
+      </select>
+    </label>
+  );
+}

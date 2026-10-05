@@ -9,12 +9,11 @@ import {
   ATTACHMENTS_BUCKET,
   END_USER_TYPE_LABELS,
   PLATFORM_LABELS,
-  SOURCE_LABELS,
+  sourceLabel,
   STATUS_LABELS,
-  type TicketSource,
   type TicketStatus,
 } from "@/lib/tickets/constants";
-import { addTicketNote, saveResolution } from "../actions";
+import { addTicketNote, saveResolution, saveTracker } from "../actions";
 import { CopyTicketNumber, CredentialsValue, TicketControls } from "./ticket-controls";
 
 export default async function AgentTicketPage({
@@ -33,14 +32,15 @@ export default async function AgentTicketPage({
       `id, ticket_number, status, source, created_at, customer_name, customer_email, customer_phone, school_name,
        credentials_username, issue_date, end_user_type, platform, is_latest_version, app_version,
        device_type, page_screen, steps, issue_description, assignee_id, issue_category_id, root_cause_id,
-       action_taken, resolution_notes, cities(name),
+       action_taken, resolution_notes, follow_up_notes, tracker_notes, fawry_payment,
+       request_type_id, topic_id, tracker_cause_id, tracker_action_id, outcome_id, cities(name),
        creator:profiles!tickets_created_by_fkey(full_name)`,
     )
     .eq("id", ticketId)
     .maybeSingle();
   if (!ticket) notFound();
 
-  const [history, attachments, notes, agents, categories, causes] = await Promise.all([
+  const [history, attachments, notes, agents, categories, causes, requestTypes, topics, trackerCauses, trackerActions, outcomes] = await Promise.all([
     supabase
       .from("ticket_status_history")
       .select("id, from_status, to_status, changed_at, actor:profiles!ticket_status_history_changed_by_fkey(full_name)")
@@ -53,10 +53,15 @@ export default async function AgentTicketPage({
       .eq("ticket_id", ticket.id)
       .order("created_at", { ascending: false }),
     supabase.from("profiles").select("id, full_name").eq("role", "support_agent").eq("is_active", true).order("full_name"),
-    supabase.from("issue_categories").select("id, name").eq("is_active", true).order("name"),
-    supabase.from("root_causes").select("id, name").eq("is_active", true).order("name"),
+    supabase.from("issue_categories").select("id, name, is_active").order("name"),
+    supabase.from("root_causes").select("id, name, is_active").order("name"),
+    supabase.from("request_types").select("id, name, is_active").order("sort_order").order("name"),
+    supabase.from("topics").select("id, name, is_active").order("name"),
+    supabase.from("tracker_causes").select("id, name, is_active").order("name"),
+    supabase.from("tracker_actions").select("id, name, is_active").order("name"),
+    supabase.from("outcomes").select("id, name, is_active").order("name"),
   ]);
-  for (const result of [history, attachments, notes, agents, categories, causes]) {
+  for (const result of [history, attachments, notes, agents, categories, causes, requestTypes, topics, trackerCauses, trackerActions, outcomes]) {
     if (result.error) throw result.error;
   }
 
@@ -69,7 +74,7 @@ export default async function AgentTicketPage({
   const urlByPath = new Map(signed.data?.map((file) => [file.path, file.signedUrl]));
 
   const status = ticket.status as TicketStatus;
-  const locked = status === "closed" || user.role !== "support_agent";
+  const canEdit = user.role === "support_agent";
   const city = nameOf(ticket.cities);
   const creator = nameOf(ticket.creator);
   const version = `${ticket.app_version ?? "—"}${ticket.is_latest_version === false ? " (not latest)" : ""}`;
@@ -86,6 +91,7 @@ export default async function AgentTicketPage({
     ["App version", version],
     ["Page / screen", ticket.page_screen ?? "—"],
     ["Phone", ticket.customer_phone ?? "—"],
+    ["Fawry payment", ticket.fawry_payment === true ? "Yes" : ticket.fawry_payment === false ? "No" : "Not recorded"],
   ];
 
   return (
@@ -103,7 +109,7 @@ export default async function AgentTicketPage({
             <p className="mt-2 flex flex-wrap items-center gap-3 text-[13px] text-muted-foreground">
               <span className="inline-flex items-center gap-1.5">
                 <Shield className="size-3.5 text-status-awaiting" />
-                {SOURCE_LABELS[ticket.source as TicketSource]}
+                {sourceLabel(ticket.source)}
                 {creator ? ` · by ${creator}` : ""}
               </span>
               <span>Created {formatDateTime(ticket.created_at)}</span>
@@ -116,7 +122,6 @@ export default async function AgentTicketPage({
               status={status}
               assigneeId={ticket.assignee_id}
               agents={agents.data ?? []}
-              locked={status === "closed"}
             />
           ) : (
             <p className="text-sm text-muted-foreground">{STATUS_LABELS[status]} · read-only</p>
@@ -127,12 +132,9 @@ export default async function AgentTicketPage({
             {errorMessage}
           </p>
         )}
-        {status === "closed" && (
-          <p className="flex items-center gap-2 text-sm text-muted-foreground">
-            <Lock className="size-4" />
-            Closed tickets can&apos;t be edited. Create a follow-up ticket instead.
-          </p>
-        )}
+        <p className="text-sm text-muted-foreground">
+          Request type, topic, cause, action, and outcome are required before Resolved. Closed - No Response does not require them. Classification can be corrected after the ticket is closed.
+        </p>
       </div>
 
       <div className="grid items-start gap-6 px-5 py-6 lg:grid-cols-[minmax(0,1fr)_320px] sm:px-8">
@@ -201,7 +203,7 @@ export default async function AgentTicketPage({
               ))}
               {notes.data?.length === 0 && <li className="text-sm text-muted-foreground">No internal notes yet.</li>}
             </ul>
-            {user.role === "support_agent" && !locked && (
+            {canEdit && (
               <form action={addTicketNote} className="mt-4 flex flex-col gap-2">
                 <input type="hidden" name="ticketId" value={ticket.id} />
                 <textarea
@@ -221,32 +223,42 @@ export default async function AgentTicketPage({
 
         <div className="flex flex-col gap-5">
           <section className="rounded-xl border bg-background p-5">
-            <h3 className="text-base font-semibold">Resolution</h3>
+            <h3 className="text-base font-semibold">Customer Support Tracker</h3>
+            <p className="mt-1 text-xs text-muted-foreground">Visible to the person who opened the ticket, the manager, and Technical Support.</p>
+            <form action={saveTracker} className="mt-4 flex flex-col gap-3">
+              <input type="hidden" name="ticketId" value={ticket.id} />
+              <TrackerSelect label="Request type" name="requestTypeId" value={ticket.request_type_id} options={requestTypes.data ?? []} disabled={!canEdit} />
+              <TrackerSelect label="Topic" name="topicId" value={ticket.topic_id} options={topics.data ?? []} disabled={!canEdit} />
+              <TrackerSelect label="Cause" name="trackerCauseId" value={ticket.tracker_cause_id} options={trackerCauses.data ?? []} disabled={!canEdit} />
+              <TrackerSelect label="Action" name="trackerActionId" value={ticket.tracker_action_id} options={trackerActions.data ?? []} disabled={!canEdit} />
+              <TrackerSelect label="Outcome" name="outcomeId" value={ticket.outcome_id} options={outcomes.data ?? []} disabled={!canEdit} />
+              <Field label="Technical Support response">
+                <textarea name="resolutionNotes" defaultValue={ticket.resolution_notes ?? ""} disabled={!canEdit} rows={3} className="rounded-lg border bg-background px-3 py-2 text-sm" />
+              </Field>
+              <Field label="Follow-up notes">
+                <textarea name="followUpNotes" defaultValue={ticket.follow_up_notes ?? ""} disabled={!canEdit} rows={3} className="rounded-lg border bg-background px-3 py-2 text-sm" />
+              </Field>
+              <Field label="Tracker notes">
+                <textarea name="trackerNotes" defaultValue={ticket.tracker_notes ?? ""} disabled={!canEdit} rows={3} className="rounded-lg border bg-background px-3 py-2 text-sm" />
+              </Field>
+              {canEdit && (
+                <button type="submit" className="h-9 rounded-lg bg-brand-action text-sm font-semibold text-white">
+                  Save tracker
+                </button>
+              )}
+            </form>
+          </section>
+
+          <section className="rounded-xl border bg-background p-5">
+            <h3 className="text-base font-semibold">Technical classification</h3>
             <form action={saveResolution} className="mt-4 flex flex-col gap-3">
               <input type="hidden" name="ticketId" value={ticket.id} />
-              <Field label="Issue category">
-                <select name="issueCategoryId" defaultValue={ticket.issue_category_id ?? ""} disabled={locked} className="h-9 rounded-lg border bg-background px-3 text-sm">
-                  <option value="">Select</option>
-                  {(categories.data ?? []).map((category) => (
-                    <option key={category.id} value={category.id}>{category.name}</option>
-                  ))}
-                </select>
-              </Field>
-              <Field label="Root cause">
-                <select name="rootCauseId" defaultValue={ticket.root_cause_id ?? ""} disabled={locked} className="h-9 rounded-lg border bg-background px-3 text-sm">
-                  <option value="">Select</option>
-                  {(causes.data ?? []).map((cause) => (
-                    <option key={cause.id} value={cause.id}>{cause.name}</option>
-                  ))}
-                </select>
-              </Field>
+              <TrackerSelect label="Issue category" name="issueCategoryId" value={ticket.issue_category_id} options={categories.data ?? []} disabled={!canEdit} />
+              <TrackerSelect label="Root cause" name="rootCauseId" value={ticket.root_cause_id} options={causes.data ?? []} disabled={!canEdit} />
               <Field label="Action taken">
-                <textarea name="actionTaken" defaultValue={ticket.action_taken ?? ""} disabled={locked} rows={3} className="rounded-lg border bg-background px-3 py-2 text-sm" />
+                <textarea name="actionTaken" defaultValue={ticket.action_taken ?? ""} disabled={!canEdit} rows={3} className="rounded-lg border bg-background px-3 py-2 text-sm" />
               </Field>
-              <Field label="Resolution notes">
-                <textarea name="resolutionNotes" defaultValue={ticket.resolution_notes ?? ""} disabled={locked} rows={3} className="rounded-lg border bg-background px-3 py-2 text-sm" />
-              </Field>
-              {!locked && (
+              {canEdit && (
                 <button type="submit" className="h-9 rounded-lg bg-brand-action text-sm font-semibold text-white">
                   Save changes
                 </button>
@@ -273,6 +285,32 @@ export default async function AgentTicketPage({
         </div>
       </div>
     </AgentFrame>
+  );
+}
+
+function TrackerSelect({
+  label,
+  name,
+  value,
+  options,
+  disabled,
+}: {
+  label: string;
+  name: string;
+  value: number | null;
+  options: { id: number; name: string; is_active: boolean }[];
+  disabled: boolean;
+}) {
+  const visible = options.filter((option) => option.is_active || option.id === value);
+  return (
+    <Field label={label}>
+      <select name={name} defaultValue={value ?? ""} disabled={disabled} className="h-9 rounded-lg border bg-background px-3 text-sm">
+        <option value="">Select</option>
+        {visible.map((option) => (
+          <option key={option.id} value={option.id}>{option.name}</option>
+        ))}
+      </select>
+    </Field>
   );
 }
 

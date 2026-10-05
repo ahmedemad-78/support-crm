@@ -4,9 +4,9 @@ export type TicketStatus = (typeof TICKET_STATUSES)[number];
 export const STATUS_LABELS: Record<TicketStatus, string> = {
   new: "New",
   in_progress: "In Progress",
-  awaiting_customer: "Awaiting Customer",
+  awaiting_customer: "Awaiting Customer Reply",
   resolved: "Resolved",
-  closed: "Closed",
+  closed: "Closed - No Response",
 };
 
 export const STATUS_STYLES: Record<TicketStatus, { chip: string; dot: string }> = {
@@ -21,17 +21,25 @@ export const TICKET_SOURCES = [
   "whatsapp",
   "moderation",
   "call_center",
+  "marketing_team",
   "june_schools",
   "business_development",
+  "google_play",
 ] as const;
 export type TicketSource = (typeof TICKET_SOURCES)[number];
 export const SOURCE_LABELS: Record<TicketSource, string> = {
   whatsapp: "WhatsApp",
   moderation: "Moderation",
-  call_center: "Call Center",
+  call_center: "Call",
+  marketing_team: "Marketing Team",
   june_schools: "30 June Schools",
-  business_development: "Business Development",
+  business_development: "B2B Schools",
+  google_play: "Google Play",
 };
+
+export function sourceLabel(code: string): string {
+  return (SOURCE_LABELS as Record<string, string>)[code] ?? code;
+}
 
 export const END_USER_TYPES = ["student", "teacher", "parent", "other"] as const;
 export const END_USER_TYPE_LABELS: Record<(typeof END_USER_TYPES)[number], string> = {

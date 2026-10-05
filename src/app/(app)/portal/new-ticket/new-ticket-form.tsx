@@ -20,15 +20,25 @@ import {
 import {
   fieldErrorsOf,
   portalTicketSchema,
+  supportTicketSchema,
   type PortalTicketFieldErrors,
-  type PortalTicketInput,
+  type SupportTicketInput,
 } from "@/lib/tickets/schema";
-import { createPortalTicket } from "./actions";
+import { createPortalTicket, createSupportTicket } from "./actions";
 
 type City = { id: number; name: string };
-type Field = keyof PortalTicketInput;
+type SourceOption = { code: string; name: string };
+type Field = keyof SupportTicketInput;
 
-export function NewTicketForm({ cities }: { cities: City[] }) {
+export function NewTicketForm({
+  cities,
+  sources,
+  cancelHref = "/portal/my-tickets",
+}: {
+  cities: City[];
+  sources?: SourceOption[];
+  cancelHref?: string;
+}) {
   const router = useRouter();
   const formRef = useRef<HTMLFormElement>(null);
   const [errors, setErrors] = useState<PortalTicketFieldErrors>({});
@@ -36,18 +46,18 @@ export function NewTicketForm({ cities }: { cities: City[] }) {
   const [files, setFiles] = useState<File[]>([]);
   const [pending, startTransition] = useTransition();
 
-  function readForm(): PortalTicketInput {
+  function readForm(): SupportTicketInput {
     const data = new FormData(formRef.current!);
     return Object.fromEntries(
       [...data.entries()].filter(([, v]) => typeof v === "string"),
-    ) as unknown as PortalTicketInput;
+    ) as unknown as SupportTicketInput;
   }
 
   function onSubmit(e: React.FormEvent) {
     e.preventDefault();
     setFormError(null);
     const input = readForm();
-    const check = portalTicketSchema.safeParse(input);
+    const check = sources ? supportTicketSchema.safeParse(input) : portalTicketSchema.safeParse(input);
     if (!check.success) {
       setErrors(fieldErrorsOf(check.error));
       scrollToFirstError();
@@ -56,7 +66,7 @@ export function NewTicketForm({ cities }: { cities: City[] }) {
     setErrors({});
 
     startTransition(async () => {
-      const result = await createPortalTicket(input);
+      const result = sources ? await createSupportTicket(input) : await createPortalTicket(input);
       if (!result.ok) {
         if (result.fieldErrors) setErrors(result.fieldErrors);
         setFormError(result.error ?? "Please fix the highlighted fields.");
@@ -68,7 +78,7 @@ export function NewTicketForm({ cities }: { cities: City[] }) {
       if (failed.length) {
         toast.warning(`Ticket ${result.ticketNumber} was created, but ${failed.join(", ")} didn't upload.`);
       }
-      router.push(`/portal/my-tickets?submitted=${encodeURIComponent(result.ticketNumber)}`);
+      router.push(sources ? `/tickets/${result.ticketId}` : `/portal/my-tickets?submitted=${encodeURIComponent(result.ticketNumber)}`);
     });
   }
 
@@ -95,6 +105,17 @@ export function NewTicketForm({ cities }: { cities: City[] }) {
 
   return (
     <form ref={formRef} onSubmit={onSubmit} noValidate className="flex flex-col gap-5 px-4 py-6 sm:px-8">
+      {sources && (
+        <Section title="Source" hint="Where this case came from.">
+          <SelectField name="source" label="Source" error={errors.source}>
+            {sources.map((source) => (
+              <option key={source.code} value={source.code}>
+                {source.name}
+              </option>
+            ))}
+          </SelectField>
+        </Section>
+      )}
       <Section title="1. Customer" hint="Who is having the problem.">
         <div className="grid grid-cols-1 gap-x-5 gap-y-4 sm:grid-cols-2">
           <TextField name="customer_name" label="Name" error={err("customer_name")} />
@@ -158,6 +179,15 @@ export function NewTicketForm({ cities }: { cities: City[] }) {
               { value: "no", label: "No" },
             ]}
             error={err("is_latest_version")}
+          />
+          <ChoiceField
+            name="fawry_payment"
+            label="Fawry payment"
+            options={[
+              { value: "yes", label: "Yes" },
+              { value: "no", label: "No" },
+            ]}
+            error={err("fawry_payment")}
           />
         </div>
       </Section>
@@ -236,7 +266,7 @@ export function NewTicketForm({ cities }: { cities: City[] }) {
       )}
 
       <div className="flex items-center justify-end gap-3">
-        <Button type="button" variant="outline" size="lg" className="h-10 px-4" onClick={() => router.push("/portal/my-tickets")}>
+        <Button type="button" variant="outline" size="lg" className="h-10 px-4" onClick={() => router.push(cancelHref)}>
           Cancel
         </Button>
         <Button type="submit" size="lg" className="h-10 px-5 font-semibold" disabled={pending}>

@@ -1,4 +1,4 @@
-import { END_USER_TYPES, TICKET_SOURCES, TICKET_STATUSES, type TicketSource, type TicketStatus } from "./constants";
+import { END_USER_TYPES, TICKET_STATUSES, type TicketStatus } from "./constants";
 
 export const TICKET_VIEWS = ["all", "new", "mine", "awaiting", "resolved"] as const;
 export type TicketView = (typeof TICKET_VIEWS)[number];
@@ -7,7 +7,7 @@ export const PAGE_SIZE = 8;
 export type TicketListFilters = {
   view: TicketView;
   status: TicketStatus | "";
-  source: TicketSource | "";
+  source: string;
   city: string;
   category: string;
   assignee: string;
@@ -32,7 +32,7 @@ export function parseTicketListFilters(
   return {
     view: TICKET_VIEWS.includes(view as TicketView) ? (view as TicketView) : "all",
     status: TICKET_STATUSES.includes(status as TicketStatus) ? (status as TicketStatus) : "",
-    source: (TICKET_SOURCES as readonly string[]).includes(source) ? (source as TicketSource) : "",
+    source: /^[a-z][a-z0-9_]{1,40}$/.test(source) ? source : "",
     city: one(searchParams.city),
     category: one(searchParams.category),
     assignee: one(searchParams.assignee),
@@ -75,8 +75,21 @@ export type DashboardFilters = {
   assignee?: string;
   view?: "created" | "resolved" | "open";
   age?: string;
-  source: TicketSource | "";
+  source: string;
   status: TicketStatus | "";
+  requestType?: string;
+  topic?: string;
+  trackerCause?: string;
+  trackerAction?: string;
+  outcome?: string;
+  fawry?: string;
+  segment?: string;
+  channel?: string;
+  referringTeam?: string;
+  statusGroup?: string;
+  q?: string;
+  bucketFrom?: string;
+  bucketTo?: string;
   city: string;
   category: string;
   userType: string;
@@ -95,7 +108,7 @@ export function parseDashboardFilters(
   const from = one(searchParams.from);
   const to = one(searchParams.to);
   return {
-    source: (TICKET_SOURCES as readonly string[]).includes(source) ? (source as TicketSource) : "",
+    source: /^[a-z][a-z0-9_]{1,40}$/.test(source) ? source : "",
     status: TICKET_STATUSES.includes(status as TicketStatus) ? (status as TicketStatus) : "",
     city: one(searchParams.city),
     category: one(searchParams.category),
@@ -106,13 +119,24 @@ export function parseDashboardFilters(
     platform: one(searchParams.platform),
     assignee: one(searchParams.assignee),
     view: one(searchParams.view) === "open" ? "open" : one(searchParams.view) === "resolved" ? "resolved" : "created",
-    age: /^[0-3]$/.test(one(searchParams.age)) ? one(searchParams.age) : "",
+    age: /^(0-2|3-7|8-14|15)$/.test(one(searchParams.age)) ? one(searchParams.age) : "",
+    requestType: one(searchParams.requestType).slice(0, 160),
+    topic: one(searchParams.topic).slice(0, 160),
+    trackerCause: one(searchParams.trackerCause).slice(0, 160),
+    fawry: ["yes", "no", "__missing__"].includes(one(searchParams.fawry)) ? one(searchParams.fawry) : "",
+    segment: one(searchParams.segment).slice(0, 80),
+    channel: one(searchParams.channel).slice(0, 80),
+    referringTeam: one(searchParams.referringTeam).slice(0, 80),
+    statusGroup: ["followup", "resolved", "closed"].includes(one(searchParams.statusGroup)) ? one(searchParams.statusGroup) : "",
+    q: one(searchParams.q).slice(0, 80),
+    bucketFrom: DAY.test(one(searchParams.bucketFrom)) ? one(searchParams.bucketFrom) : "",
+    bucketTo: DAY.test(one(searchParams.bucketTo)) ? one(searchParams.bucketTo) : "",
   };
 }
 
 export function dashboardQuery(filters: DashboardFilters): string {
   const params = new URLSearchParams();
-  for (const key of ["cause", "platform", "assignee", "view", "age"] as const) {
+  for (const key of ["cause", "platform", "assignee", "view", "age", "requestType", "topic", "trackerCause", "fawry", "segment", "channel", "referringTeam", "statusGroup", "q", "bucketFrom", "bucketTo"] as const) {
     if (filters[key]) params.set(key, filters[key]);
   }
   if (filters.source) params.set("source", filters.source);

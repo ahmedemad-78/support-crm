@@ -57,7 +57,6 @@ export async function saveResolution(formData: FormData) {
   const category = String(formData.get("issueCategoryId") ?? "");
   const cause = String(formData.get("rootCauseId") ?? "");
   const actionTaken = String(formData.get("actionTaken") ?? "").trim();
-  const resolutionNotes = String(formData.get("resolutionNotes") ?? "").trim();
 
   const supabase = await createClient();
   const { error } = await supabase
@@ -66,11 +65,42 @@ export async function saveResolution(formData: FormData) {
       issue_category_id: category ? Number(category) : null,
       root_cause_id: cause ? Number(cause) : null,
       action_taken: actionTaken || null,
-      resolution_notes: resolutionNotes || null,
     })
     .eq("id", id);
 
   revalidatePath(`/tickets/${id}`);
+  revalidatePath("/dashboard");
+  redirect(ticketPath(id, error?.message));
+}
+
+export async function saveTracker(formData: FormData) {
+  const user = await supportAgent();
+  const id = String(formData.get("ticketId") ?? "");
+  if (!user) redirect(ticketPath(id, "Only Technical Support can update a ticket."));
+
+  const idOf = (name: string) => {
+    const raw = String(formData.get(name) ?? "");
+    return raw ? Number(raw) : null;
+  };
+  const textOf = (name: string) => String(formData.get(name) ?? "").trim() || null;
+
+  const supabase = await createClient();
+  const { error } = await supabase
+    .from("tickets")
+    .update({
+      request_type_id: idOf("requestTypeId"),
+      topic_id: idOf("topicId"),
+      tracker_cause_id: idOf("trackerCauseId"),
+      tracker_action_id: idOf("trackerActionId"),
+      outcome_id: idOf("outcomeId"),
+      tracker_notes: textOf("trackerNotes"),
+      resolution_notes: textOf("resolutionNotes"),
+      follow_up_notes: textOf("followUpNotes"),
+    })
+    .eq("id", id);
+
+  revalidatePath(`/tickets/${id}`);
+  revalidatePath(`/portal/my-tickets/${id}`);
   revalidatePath("/dashboard");
   redirect(ticketPath(id, error?.message));
 }
