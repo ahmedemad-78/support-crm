@@ -32,6 +32,12 @@ function mark(selected: boolean, active: boolean) {
   return active ? "on" : "dim";
 }
 
+function spotlight(state: "idle" | "on" | "dim") {
+  if (state === "dim") return { opacity: 0.14 };
+  if (state === "on") return { opacity: 1 };
+  return {};
+}
+
 export function useFillIn() {
   const [drawn, setDrawn] = useState(false);
   useEffect(() => {
@@ -77,9 +83,14 @@ export function VolumeChart({
   return (
     <div className="cs-volume">
       <div className="cs-legend">
-        {sources.map((source) => (
-          <span key={source}><i style={{ background: sourceColor(source) }} />{sourceLabel(source)}</span>
-        ))}
+        {sources.map((source) => {
+          const state = mark(Boolean(selectedSource), source === selectedSource);
+          return (
+            <span key={source} className={state === "idle" ? "" : `is-${state}`} style={spotlight(state)}>
+              <i style={{ background: sourceColor(source) }} />{sourceLabel(source)}
+            </span>
+          );
+        })}
       </div>
       <div className="cs-volume-scroll">
         <svg viewBox={`0 0 ${width} ${height}`} role="group" aria-label="Case volume by reported date and source">
@@ -94,11 +105,10 @@ export function VolumeChart({
           })}
           {buckets.map((bucket, index) => {
             const x = 44 + index * step;
-            const columnOn = !selectedFrom || bucket.from === selectedFrom;
             let cursor = base;
             return (
-              <g key={bucket.from} className={columnOn ? "" : "cs-svg-dim"}>
-                {selectedFrom === bucket.from && <rect x={x + 2} y="28" width={Math.max(8, step - 8)} height={base - 24} rx="8" fill="#e7f5f8" />}
+              <g key={bucket.from}>
+                {selectedFrom === bucket.from && <rect className="cs-column-on" x={x + 2} y="28" width={Math.max(8, step - 8)} height={base - 24} rx="8" />}
                 <rect x={x + 2} y="28" width={Math.max(8, step - 8)} height={base - 28} fill="transparent" role="button" tabIndex={0} aria-label={`${bucket.label}: ${bucket.total} cases`} onClick={() => onInterval(bucket.from, bucket.to)} onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); onInterval(bucket.from, bucket.to); } }} />
                 {bucket.parts.filter((part) => part.count > 0).map((part) => {
                   const barHeight = (part.count / max) * plot;
@@ -108,7 +118,7 @@ export function VolumeChart({
                     <rect
                       key={part.key}
                       className={`cs-rise cs-${state}${drawn ? " is-drawn" : ""}`}
-                      style={{ ...fillStyle(drawn, "y", index * 35), color: sourceColor(part.key) }}
+                      style={{ ...fillStyle(drawn, "y", index * 35), color: sourceColor(part.key), ...spotlight(state) }}
                       x={x + 4}
                       y={cursor}
                       width={Math.max(8, step - 12)}
@@ -176,7 +186,7 @@ export function RankChart({
       {rows.map((row, index) => {
         const state = mark(Boolean(selectedId), selectedId === row.id);
         return (
-          <button key={row.id} className={`cs-rank cs-${state}`} aria-pressed={state === "on"} onClick={() => onPick(row.id)}>
+          <button key={row.id} className={`cs-rank cs-${state}`} style={spotlight(state)} aria-pressed={state === "on"} onClick={() => onPick(row.id)}>
             <span className="cs-rank-name">{row.name}</span>
             <span className="cs-rank-track"><i className={`cs-rank-fill${drawn ? " is-drawn" : ""}`} style={{ width: `${(row.count / max) * 100}%`, background: color, ...fillStyle(drawn, "x", 80 + index * 90) }} /></span>
             <strong>{row.count}</strong>
@@ -227,7 +237,7 @@ export function SegmentChart({
                   <button
                     key={part.group}
                     className={`cs-segment-part cs-${state}${drawn ? " is-drawn" : ""}`}
-                    style={{ width: `${width}%`, background: STATUS_COLORS[part.group], ...fillStyle(drawn, "x", 100 + index * 80) }}
+                    style={{ width: `${width}%`, background: STATUS_COLORS[part.group], ...fillStyle(drawn, "x", 100 + index * 80), ...spotlight(state) }}
                     aria-label={`${row.segment}, ${STATUS_GROUP_LABEL[part.group]}: ${part.count}`}
                     onClick={() => onStack(row.segment, part.group)}
                   >

@@ -427,7 +427,7 @@ function AgeColumns({ ages, selected, onPick }: { ages: { id: string; label: str
   return (
     <div className="cs-ages">
       {ages.map((bucket, index) => (
-        <button type="button" key={bucket.id} className={selected === bucket.id ? "is-on" : selected ? "is-dim" : ""} aria-pressed={selected === bucket.id} onClick={() => onPick(bucket.id)}>
+          <button type="button" key={bucket.id} className={selected === bucket.id ? "is-on" : selected ? "is-dim" : ""} style={selected && selected !== bucket.id ? { opacity: 0.16 } : undefined} aria-pressed={selected === bucket.id} onClick={() => onPick(bucket.id)}>
           <i className={drawn ? "is-drawn" : ""} style={{ height: `${(bucket.count / max) * 100}%`, ...fillStyle(drawn, "y", index * 90) }} />
           <strong>{bucket.count}</strong>
           <span>{bucket.label}</span>
