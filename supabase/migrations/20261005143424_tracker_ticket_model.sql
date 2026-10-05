@@ -192,9 +192,13 @@ alter table public.tickets
   add column follow_up_notes text,
   add column is_historical boolean not null default false;
 
+-- Existing resolved rows have no issue category. The old guard would reject
+-- this backfill, and the new guard treats the flag as immutable.
+alter table public.tickets disable trigger tickets_before_update;
 update public.tickets
 set is_historical = true
 where coalesce(action_taken, '') like 'historical:%';
+alter table public.tickets enable trigger tickets_before_update;
 
 alter table public.tickets drop constraint if exists whatsapp_tickets_have_phone;
 alter table public.tickets drop constraint form_tickets_have_all_fields;
