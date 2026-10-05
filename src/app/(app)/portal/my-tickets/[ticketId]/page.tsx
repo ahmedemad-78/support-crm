@@ -25,7 +25,7 @@ export default async function PortalTicketPage({ params }: PageProps<"/portal/my
   const { data: ticket } = await supabase
     .from("tickets")
     .select(
-      "id, ticket_number, status, created_at, customer_name, customer_email, school_name, credentials_username, issue_date, end_user_type, platform, is_latest_version, app_version, device_type, page_screen, steps, issue_description, cities(name)",
+      "id, ticket_number, status, created_at, customer_name, customer_email, school_name, credentials_username, issue_date, end_user_type, platform, is_latest_version, app_version, device_type, page_screen, steps, issue_description, fawry_payment, resolution_notes, follow_up_notes, tracker_notes, cities(name), request_types(name), topics(name), tracker_causes(name), tracker_actions(name), outcomes(name)",
     )
     .eq("id", ticketId)
     .eq("created_by", user.id)
@@ -61,6 +61,14 @@ export default async function PortalTicketPage({ params }: PageProps<"/portal/my
     ["App version", `${ticket.app_version ?? "—"}${ticket.is_latest_version === false ? " (not latest)" : ""}`],
     ["Date of issue", ticket.issue_date ? formatDate(ticket.issue_date) : "—"],
     ["Page / screen", ticket.page_screen ?? "—"],
+    ["Fawry payment", ticket.fawry_payment === true ? "Yes" : ticket.fawry_payment === false ? "No" : "Not recorded"],
+  ];
+  const classification: [string, string][] = [
+    ["Request type", relationName(ticket.request_types)],
+    ["Topic", relationName(ticket.topics)],
+    ["Cause", relationName(ticket.tracker_causes)],
+    ["Action", relationName(ticket.tracker_actions)],
+    ["Outcome", relationName(ticket.outcomes)],
   ];
 
   const status = ticket.status as TicketStatus;
@@ -106,6 +114,19 @@ export default async function PortalTicketPage({ params }: PageProps<"/portal/my
             <p className="text-xs font-medium text-muted-foreground">Steps to reproduce</p>
             <p className="max-w-2xl text-sm leading-[22px] whitespace-pre-wrap">{ticket.steps}</p>
           </div>
+          <hr />
+          <h2 className="text-base font-semibold">Support update</h2>
+          <dl className="grid grid-cols-1 gap-x-6 gap-y-4 sm:grid-cols-2">
+            {classification.map(([label, value]) => (
+              <div key={label} className="flex flex-col gap-1">
+                <dt className="text-xs font-medium text-muted-foreground">{label}</dt>
+                <dd className="break-words text-sm">{value}</dd>
+              </div>
+            ))}
+          </dl>
+          <Note label="Technical Support response" value={ticket.resolution_notes} />
+          <Note label="Follow-up notes" value={ticket.follow_up_notes} />
+          <Note label="Tracker notes" value={ticket.tracker_notes} />
           {attachments && attachments.length > 0 && (
             <div className="flex flex-wrap gap-2.5">
               {attachments.map((a) => {
@@ -140,11 +161,26 @@ export default async function PortalTicketPage({ params }: PageProps<"/portal/my
           ))}
           {reached.size === 0 && <p className="text-sm text-muted-foreground">No updates yet.</p>}
           <p className="pt-1 text-xs leading-[18px] text-muted-foreground">
-            Agent names and internal notes stay with the Support team.
+            Assignee and internal notes stay with the Support team. The classification above is the tracker record for this ticket.
           </p>
         </aside>
       </div>
     </>
+  );
+}
+
+function relationName(value: unknown): string {
+  const row = Array.isArray(value) ? value[0] : value;
+  if (row && typeof row === "object" && "name" in row && typeof row.name === "string" && row.name) return row.name;
+  return "Not recorded";
+}
+
+function Note({ label, value }: { label: string; value: string | null }) {
+  return (
+    <div className="flex flex-col gap-1.5">
+      <p className="text-xs font-medium text-muted-foreground">{label}</p>
+      <p className="max-w-2xl text-sm leading-[22px] whitespace-pre-wrap">{value || "Not recorded"}</p>
+    </div>
   );
 }
 

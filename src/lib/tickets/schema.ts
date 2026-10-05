@@ -26,6 +26,7 @@ export const portalTicketSchema = z.object({
   end_user_type: z.enum(END_USER_TYPES, { error: "Choose the user type" }),
   platform: z.enum(PLATFORMS, { error: "Choose the platform" }),
   is_latest_version: yesNo("On the latest version?"),
+  fawry_payment: yesNo("Fawry payment"),
   app_version: optionalText(20),
   device_type: optionalText(80),
   page_screen: optionalText(160),
@@ -33,13 +34,18 @@ export const portalTicketSchema = z.object({
   issue_description: z.string().trim().min(5, "Describe the issue in a few words"),
 });
 
+export const supportTicketSchema = portalTicketSchema.extend({
+  source: z.string().trim().min(1, "Choose a source"),
+});
+
 export type PortalTicketInput = z.input<typeof portalTicketSchema>;
-export type PortalTicketFieldErrors = Partial<Record<keyof PortalTicketInput, string>>;
+export type SupportTicketInput = z.input<typeof supportTicketSchema>;
+export type PortalTicketFieldErrors = Partial<Record<keyof SupportTicketInput, string>>;
 
 export function fieldErrorsOf(error: z.ZodError): PortalTicketFieldErrors {
   const out: PortalTicketFieldErrors = {};
   for (const issue of error.issues) {
-    const key = issue.path[0] as keyof PortalTicketInput;
+    const key = issue.path[0] as keyof SupportTicketInput;
     if (key && !out[key]) out[key] = issue.message;
   }
   return out;

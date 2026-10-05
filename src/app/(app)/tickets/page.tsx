@@ -7,6 +7,7 @@ import { formatRelative } from "@/lib/format";
 import { createClient } from "@/lib/supabase/server";
 import {
   SOURCE_LABELS,
+  sourceLabel,
   STATUS_LABELS,
   TICKET_STATUSES,
   type TicketSource,
@@ -180,7 +181,7 @@ export default async function TicketsPage({
                         {city && <span className="block text-xs text-muted-foreground">{city}</span>}
                       </td>
                       <td className="max-w-[280px] truncate px-4 py-3.5">{ticket.issue_description}</td>
-                      <td className="px-4 py-3.5 text-muted-foreground">{SOURCE_LABELS[ticket.source as TicketSource]}</td>
+                      <td className="px-4 py-3.5 text-muted-foreground">{sourceLabel(ticket.source)}</td>
                       <td className="px-4 py-3.5">
                         <StatusBadge status={ticket.status as TicketStatus} />
                       </td>

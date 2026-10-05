@@ -8,7 +8,25 @@ export type AnalyticsTicket = DashboardTicket & {
   platform?: string;
   assigneeId?: string;
   assignee?: string;
+  requestType: string;
+  topic: string;
+  trackerCause: string;
+  trackerAction: string;
+  outcome: string;
+  fawry: string;
 };
+
+export function labeledCounts(tickets: AnalyticsTicket[], pick: (ticket: AnalyticsTicket) => string) {
+  const groups = new Map<string, number>();
+  for (const ticket of tickets) {
+    const label = pick(ticket);
+    const key = label || "__missing__";
+    groups.set(key, (groups.get(key) ?? 0) + 1);
+  }
+  return [...groups.entries()]
+    .map(([id, count]) => ({ id, name: id === "__missing__" ? "Not recorded" : id, count }))
+    .sort((a, b) => b.count - a.count || a.name.localeCompare(b.name));
+}
 export type View = "created" | "resolved" | "open";
 export const isOpen = (ticket: DashboardTicket) =>
   ["new", "in_progress", "awaiting_customer"].includes(ticket.status);
@@ -37,7 +55,13 @@ export function scopeTickets(
       (!filters.cause || (filters.cause === "__missing__" ? !t.cause : t.cause === filters.cause)) &&
       (!filters.platform || t.platform === filters.platform) &&
       (!filters.assignee || (filters.assignee === "__missing__" ? !t.assigneeId : t.assigneeId === filters.assignee)) &&
-      (!filters.userType || (filters.userType === "__missing__" ? !t.endUserType : t.endUserType === filters.userType)),
+      (!filters.userType || (filters.userType === "__missing__" ? !t.endUserType : t.endUserType === filters.userType)) &&
+      (!filters.requestType || (filters.requestType === "__missing__" ? !t.requestType : t.requestType === filters.requestType)) &&
+      (!filters.topic || (filters.topic === "__missing__" ? !t.topic : t.topic === filters.topic)) &&
+      (!filters.trackerCause || (filters.trackerCause === "__missing__" ? !t.trackerCause : t.trackerCause === filters.trackerCause)) &&
+      (!filters.trackerAction || (filters.trackerAction === "__missing__" ? !t.trackerAction : t.trackerAction === filters.trackerAction)) &&
+      (!filters.outcome || (filters.outcome === "__missing__" ? !t.outcome : t.outcome === filters.outcome)) &&
+      (!filters.fawry || (filters.fawry === "__missing__" ? !t.fawry : t.fawry === filters.fawry)),
   );
 }
 export function cohort(

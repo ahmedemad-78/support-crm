@@ -21,7 +21,7 @@ export const ROLE_LABELS: Record<Role, string> = {
   moderation: "Moderation",
   call_center: "Call Center",
   june_schools: "30 June Schools",
-  business_development: "Business Development",
+  business_development: "B2B Schools",
   manager: "Manager",
 };
 

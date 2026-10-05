@@ -50,6 +50,12 @@ export default async function DashboardPreview({ searchParams }: PageProps<"/log
       cityId: i % 2 ? "1" : "2",
       endUserType: i % 3 ? "student" : "parent",
       cause: unclassified ? "" : i % 4 ? ["App version", "Account setup", "Content publishing"][i % 3] : "",
+      requestType: unclassified ? "" : ["Inquiry", "Technical Issue", "Complaint"][i % 3],
+      topic: unclassified ? "" : ["Content Availability", "Subscription Payment", "Login / Verification"][i % 3],
+      trackerCause: unclassified ? "" : i % 4 ? "Content Delay" : "",
+      trackerAction: unclassified ? "" : "Answer Inquiry",
+      outcome: unclassified ? "" : status === "resolved" ? "Information Provided" : "",
+      fawry: i % 5 === 0 ? "" : i % 2 ? "yes" : "no",
     };
   });
   const user = {

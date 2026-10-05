@@ -13,7 +13,7 @@ export async function loadAnalytics() {
     let query = supabase
       .from("tickets")
       .select(
-        "id, ticket_number, issue_description, status, source, created_at, resolved_at, end_user_type, city_id, issue_category_id, platform, assignee_id, assignee:profiles!tickets_assignee_id_fkey(full_name), issue_categories(name), root_causes(name)",
+        "id, ticket_number, issue_description, status, source, created_at, resolved_at, end_user_type, city_id, issue_category_id, platform, assignee_id, fawry_payment, assignee:profiles!tickets_assignee_id_fkey(full_name), issue_categories(name), root_causes(name), request_types(name), topics(name), tracker_causes(name), tracker_actions(name), outcomes(name)",
       )
       .lte("created_at", asOf)
       .order("id")
@@ -47,6 +47,12 @@ export async function loadAnalytics() {
         platform: row.platform ?? "",
         assigneeId: row.assignee_id ?? "",
         assignee: (Array.isArray(row.assignee) ? row.assignee[0]?.full_name : (row.assignee as { full_name?: string } | null)?.full_name) ?? "",
+        requestType: nameOf(row.request_types),
+        topic: nameOf(row.topics),
+        trackerCause: nameOf(row.tracker_causes),
+        trackerAction: nameOf(row.tracker_actions),
+        outcome: nameOf(row.outcomes),
+        fawry: row.fawry_payment === true ? "yes" : row.fawry_payment === false ? "no" : "",
       });
     }
     cursor = data[data.length - 1].id;

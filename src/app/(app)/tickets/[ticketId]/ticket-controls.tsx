@@ -10,14 +10,12 @@ export function TicketControls({
   status,
   assigneeId,
   agents,
-  locked,
 }: {
   ticketId: string;
   ticketNumber: string;
   status: TicketStatus;
   assigneeId: string | null;
   agents: { id: string; full_name: string }[];
-  locked: boolean;
 }) {
   const [current, setCurrent] = useState(status);
 
@@ -29,7 +27,6 @@ export function TicketControls({
         <select
           name="assigneeId"
           defaultValue={assigneeId ?? ""}
-          disabled={locked}
           onChange={(event) => event.currentTarget.form?.requestSubmit()}
           className="bg-transparent font-medium outline-none"
         >
@@ -44,10 +41,9 @@ export function TicketControls({
         <select
           name="status"
           value={current}
-          disabled={locked}
           onChange={(event) => {
             const next = event.target.value as TicketStatus;
-            if (next === "closed" && !window.confirm(`Close ${ticketNumber}? Closed tickets can't be edited.`)) return;
+            if (next === "closed" && !window.confirm(`Mark ${ticketNumber} as Closed - No Response? Tracker fields stay optional.`)) return;
             setCurrent(next);
             event.currentTarget.form?.requestSubmit();
           }}

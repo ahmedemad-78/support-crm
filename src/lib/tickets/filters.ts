@@ -1,4 +1,4 @@
-import { END_USER_TYPES, TICKET_SOURCES, TICKET_STATUSES, type TicketSource, type TicketStatus } from "./constants";
+import { END_USER_TYPES, TICKET_STATUSES, type TicketStatus } from "./constants";
 
 export const TICKET_VIEWS = ["all", "new", "mine", "awaiting", "resolved"] as const;
 export type TicketView = (typeof TICKET_VIEWS)[number];
@@ -7,7 +7,7 @@ export const PAGE_SIZE = 8;
 export type TicketListFilters = {
   view: TicketView;
   status: TicketStatus | "";
-  source: TicketSource | "";
+  source: string;
   city: string;
   category: string;
   assignee: string;
@@ -32,7 +32,7 @@ export function parseTicketListFilters(
   return {
     view: TICKET_VIEWS.includes(view as TicketView) ? (view as TicketView) : "all",
     status: TICKET_STATUSES.includes(status as TicketStatus) ? (status as TicketStatus) : "",
-    source: (TICKET_SOURCES as readonly string[]).includes(source) ? (source as TicketSource) : "",
+    source: /^[a-z][a-z0-9_]{1,40}$/.test(source) ? source : "",
     city: one(searchParams.city),
     category: one(searchParams.category),
     assignee: one(searchParams.assignee),
@@ -75,8 +75,14 @@ export type DashboardFilters = {
   assignee?: string;
   view?: "created" | "resolved" | "open";
   age?: string;
-  source: TicketSource | "";
+  source: string;
   status: TicketStatus | "";
+  requestType?: string;
+  topic?: string;
+  trackerCause?: string;
+  trackerAction?: string;
+  outcome?: string;
+  fawry?: string;
   city: string;
   category: string;
   userType: string;
@@ -95,7 +101,7 @@ export function parseDashboardFilters(
   const from = one(searchParams.from);
   const to = one(searchParams.to);
   return {
-    source: (TICKET_SOURCES as readonly string[]).includes(source) ? (source as TicketSource) : "",
+    source: /^[a-z][a-z0-9_]{1,40}$/.test(source) ? source : "",
     status: TICKET_STATUSES.includes(status as TicketStatus) ? (status as TicketStatus) : "",
     city: one(searchParams.city),
     category: one(searchParams.category),

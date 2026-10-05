@@ -7,6 +7,8 @@ successful snapshot and display an error. Cursor pagination removes silent row c
 For large datasets, replace the full snapshot with server-side aggregation before
 scaling polling to many simultaneous users.
 
+- The default reporting period is every ticket, from the earliest Cairo creation date through today.
+- Form breakdowns (Fawry, city, user type) and tracker breakdowns (request type, topic, cause, action, outcome) describe the same period arrivals. Selecting one filters the ticket explorer only.
 - Received: tickets created within the selected Cairo calendar dates.
 - Resolved / closed headline: current terminal statuses among period arrivals, even if no resolution timestamp was recorded. Still open uses the same arrival population, so the three headline counts reconcile.
 - Recorded resolutions in the activity chart: currently resolved/closed tickets whose recorded resolution date falls
