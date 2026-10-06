@@ -10,9 +10,18 @@ export const STATUS_COLORS: Record<StatusGroup, string> = {
 export const CHANNEL_COLORS: Record<string, string> = {
   WhatsApp: "#159d49",
   Phone: "#1d4e3a",
-  "Support Form": "#6f8f7a",
-  Email: "#3e6d8c",
+  "Support Form": "#3d7ea6",
+  Email: "#6f8f7a",
   "Not specified": "#c5cfc8",
+};
+export const SOURCE_COLORS: Record<string, string> = {
+  call_center: "#1d4e3a",
+  whatsapp: "#159d49",
+  moderation: "#3d7ea6",
+  june_schools: "#5eae86",
+  business_development: "#c4841d",
+  marketing_team: "#6f8f7a",
+  google_play: "#b7c4bc",
 };
 export const FAWRY_COLORS: Record<string, string> = {
   yes: "#159d49",
@@ -26,6 +35,15 @@ export type VolumeLine = { id: string; label: string; color: string; values: num
 function mark(selected: boolean, active: boolean) {
   if (!selected) return "idle";
   return active ? "on" : "dim";
+}
+
+function inkOn(color: string) {
+  const hex = color.replace("#", "");
+  if (hex.length !== 6) return "#fff";
+  const red = Number.parseInt(hex.slice(0, 2), 16);
+  const green = Number.parseInt(hex.slice(2, 4), 16);
+  const blue = Number.parseInt(hex.slice(4, 6), 16);
+  return (red * 299 + green * 587 + blue * 114) / 1000 > 168 ? "#173126" : "#fff";
 }
 
 export function VolumeChart({
@@ -53,8 +71,9 @@ export function VolumeChart({
   const xAt = (index: number) => (buckets.length <= 1 ? pad.l + plotW / 2 : pad.l + index * step);
   const yAt = (value: number) => pad.t + (1 - value / max) * plotH;
   const labelEvery = Math.max(1, Math.ceil(buckets.length / 6));
+  const signature = `${buckets.map((bucket) => bucket.total).join(",")}|${lines.map((line) => `${line.id}:${line.values.join(",")}`).join(";")}`;
   return (
-    <div className="cs-volume">
+    <div className="cs-volume cs-draw" key={signature}>
       {lines.length > 1 && (
         <div className="cs-legend">
           {lines.map((line) => {
@@ -85,7 +104,7 @@ export function VolumeChart({
             return (
               <g key={line.id} className={`cs-line cs-${state}`}>
                 <polygon points={area} fill={line.color} opacity={state === "dim" ? 0.04 : 0.14} />
-                <polyline points={points} fill="none" stroke={line.color} strokeWidth={state === "on" ? 2.75 : 2} strokeLinejoin="round" strokeLinecap="round" />
+                <polyline points={points} pathLength={1} fill="none" stroke={line.color} strokeWidth={state === "on" ? 2.75 : 2} strokeLinejoin="round" strokeLinecap="round" />
               </g>
             );
           })}
@@ -150,8 +169,9 @@ export function FawryDonut({
   const radius = 42;
   const circumference = 2 * Math.PI * radius;
   let cursor = 0;
+  const signature = slices.map((slice) => slice.count).join(",");
   return (
-    <div className="cs-donut">
+    <div className="cs-donut cs-draw" key={signature}>
       <svg viewBox="0 0 120 120" role="img" aria-label={`Fawry payment, ${total} cases`}>
         <circle cx="60" cy="60" r={radius} fill="none" stroke="#eef2ef" strokeWidth="14" />
         {total > 0 && slices.map((slice) => {
@@ -219,8 +239,9 @@ export function BarList({
 }) {
   if (!rows.length) return <EmptyChart text="No cases match the current filters." />;
   const max = Math.max(1, ...rows.map((row) => row.count));
+  const signature = rows.map((row) => `${row.id}:${row.count}`).join("|");
   return (
-    <div className="cs-bars">
+    <div className="cs-bars cs-draw" key={signature}>
       {rows.map((row) => {
         const state = mark(Boolean(selectedId), selectedId === row.id);
         return (
@@ -239,10 +260,16 @@ export function CauseChart({
   rows,
   selectedId,
   onPick,
+  color = "#159d49",
+  otherColor = "#6f8f7a",
+  missingHint = "Data completeness, kept separate from recorded causes",
 }: {
   rows: RankRow[];
   selectedId: string;
   onPick: (id: string) => void;
+  color?: string;
+  otherColor?: string;
+  missingHint?: string;
 }) {
   const recorded = rows.filter((row) => row.id !== "__missing__" && row.id !== "__other__");
   const other = rows.find((row) => row.id === "__other__");
@@ -250,13 +277,13 @@ export function CauseChart({
   if (!recorded.length && !other && !missing) return <EmptyChart text="No cases match the current filters." />;
   return (
     <div className="cs-cause">
-      {recorded.length > 0 && <BarList rows={recorded} color="#159d49" selectedId={selectedId} onPick={onPick} />}
-      {other && <BarList rows={[other]} color="#6f8f7a" selectedId={selectedId} onPick={onPick} />}
+      {recorded.length > 0 && <BarList rows={recorded} color={color} selectedId={selectedId} onPick={onPick} />}
+      {other && <BarList rows={[other]} color={otherColor} selectedId={selectedId} onPick={onPick} />}
       {missing && (
         <button type="button" className={`cs-missing cs-${mark(Boolean(selectedId), selectedId === missing.id)}`} aria-pressed={selectedId === missing.id} onClick={() => onPick(missing.id)}>
           <span>Not recorded</span>
           <strong>{missing.count}</strong>
-          <small>Data completeness, kept separate from recorded causes</small>
+          <small>{missingHint}</small>
         </button>
       )}
     </div>
@@ -275,8 +302,9 @@ export function TopicList({
   const ranked = rows.filter((row) => row.id !== "__missing__" && row.id !== "__other__");
   const aside = rows.filter((row) => row.id === "__missing__" || row.id === "__other__");
   if (!ranked.length && !aside.length) return <EmptyChart text="No cases match the current filters." />;
+  const signature = rows.map((row) => `${row.id}:${row.count}`).join("|");
   return (
-    <div className="cs-topics">
+    <div className="cs-topics cs-draw" key={signature}>
       <ol>
         {ranked.map((row, index) => {
           const state = mark(Boolean(selectedId), selectedId === row.id);
@@ -324,8 +352,9 @@ export function SegmentChart({
   onStack: (segment: string, group: StatusGroup) => void;
 }) {
   const max = Math.max(1, ...rows.map((row) => row.total));
+  const signature = rows.map((row) => `${row.segment}:${row.total}:${row.parts.map((part) => part.count).join(",")}`).join("|");
   return (
-    <div className="cs-segments">
+    <div className="cs-segments cs-draw" key={signature}>
       {rows.map((row) => {
         const selectedHere = Boolean(selectedSegment || selectedGroup);
         return (
@@ -373,14 +402,15 @@ export function AgeStrip({
   onPick: (id: string) => void;
 }) {
   const total = ages.reduce((sum, age) => sum + age.count, 0);
+  const signature = ages.map((age) => age.count).join(",");
   return (
-    <div className="cs-age">
+    <div className="cs-age cs-draw" key={signature}>
       <div className="cs-age-bar" role="group" aria-label="Open cases by age since the reported date">
         {ages.map((age, index) => {
           const state = mark(Boolean(selected), selected === age.id);
           const share = total ? (age.count / total) * 100 : 25;
           return (
-            <button type="button" key={age.id} className={`cs-${state}`} style={{ flexGrow: Math.max(share, 8), background: AGE_COLORS[index] }} aria-pressed={state === "on"} onClick={() => onPick(age.id)}>
+            <button type="button" key={age.id} className={`cs-${state}${index >= 3 ? " is-ink" : ""}`} style={{ flexGrow: Math.max(share, 8), background: AGE_COLORS[index], color: index >= 3 ? "#fff" : "#173126" }} aria-pressed={state === "on"} onClick={() => onPick(age.id)}>
               <strong>{age.count}</strong>
               <span>{age.label}</span>
             </button>
@@ -388,6 +418,85 @@ export function AgeStrip({
         })}
       </div>
       <p>Case age counts calendar days since the reported date. It is not an SLA measure.</p>
+    </div>
+  );
+}
+
+export function ColumnChart({
+  rows,
+  colors,
+  selectedId,
+  onPick,
+}: {
+  rows: { id: string; name: string; count: number }[];
+  colors: Record<string, string>;
+  selectedId: string;
+  onPick: (id: string) => void;
+}) {
+  if (!rows.length) return <EmptyChart text="No cases match the current filters." />;
+  const max = Math.max(1, ...rows.map((row) => row.count));
+  const signature = rows.map((row) => `${row.id}:${row.count}`).join("|");
+  return (
+    <div className="cs-columns cs-draw" key={signature}>
+      {rows.map((row) => {
+        const state = mark(Boolean(selectedId), selectedId === row.id);
+        return (
+          <button type="button" key={row.id} className={`cs-column cs-${state}`} aria-pressed={state === "on"} onClick={() => onPick(row.id)}>
+            <strong>{row.count}</strong>
+            <span className="cs-column-track"><i style={{ height: `${Math.max((row.count / max) * 100, row.count ? 6 : 0)}%`, background: colors[row.id] ?? "#159d49" }} /></span>
+            <span>{row.name}</span>
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+export function SplitBar({
+  rows,
+  colors,
+  selectedId,
+  onPick,
+}: {
+  rows: RankRow[];
+  colors: Record<string, string>;
+  selectedId: string;
+  onPick: (id: string) => void;
+}) {
+  const visible = rows.filter((row) => row.count > 0 || row.id === selectedId);
+  const total = visible.reduce((sum, row) => sum + row.count, 0);
+  if (!visible.length) return <EmptyChart text="No cases match the current filters." />;
+  const signature = visible.map((row) => `${row.id}:${row.count}`).join("|");
+  return (
+    <div className="cs-split cs-draw" key={signature}>
+      <div className="cs-split-bar" role="group" aria-label="Share of cases">
+        {visible.map((row) => {
+          const state = mark(Boolean(selectedId), selectedId === row.id);
+          const share = total ? (row.count / total) * 100 : 0;
+          const background = colors[row.id] ?? "#159d49";
+          return (
+            <button type="button" key={row.id} className={`cs-${state}`} style={{ flexGrow: Math.max(share, 8), background, color: inkOn(background) }} aria-pressed={state === "on"} onClick={() => onPick(row.id)}>
+              <strong>{row.count}</strong>
+            </button>
+          );
+        })}
+      </div>
+      <ul>
+        {visible.map((row) => {
+          const state = mark(Boolean(selectedId), selectedId === row.id);
+          const share = total ? Math.round((row.count / total) * 100) : 0;
+          return (
+            <li key={row.id}>
+              <button type="button" className={`cs-${state}`} aria-pressed={state === "on"} onClick={() => onPick(row.id)}>
+                <i style={{ background: colors[row.id] ?? "#159d49" }} />
+                <span>{row.name}</span>
+                <strong>{row.count}</strong>
+                <em>{share}%</em>
+              </button>
+            </li>
+          );
+        })}
+      </ul>
     </div>
   );
 }
