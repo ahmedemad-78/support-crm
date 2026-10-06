@@ -1,163 +1,135 @@
 "use client";
-import { useEffect, useState, type ReactNode } from "react";
-import { sourceLabel } from "@/lib/tickets/constants";
+import { useState, type ReactNode } from "react";
 import { STATUS_GROUP_LABEL, type RankRow, type StatusGroup, type VolumeBucket } from "@/lib/tickets/overview";
 
-export const SOURCE_COLORS: Record<string, string> = {
-  whatsapp: "#0e7490",
-  call_center: "#2563eb",
-  moderation: "#7c3aed",
-  marketing_team: "#db2777",
-  business_development: "#0f766e",
-  june_schools: "#0284c7",
-  google_play: "#64748b",
-};
 export const STATUS_COLORS: Record<StatusGroup, string> = {
-  resolved: "#1f8a4d",
-  followup: "#e0922a",
-  closed: "#8b93a1",
+  resolved: "#159d49",
+  followup: "#b86e00",
+  closed: "#6b7280",
 };
-export const SEGMENT_COLORS: Record<string, string> = {
-  "B2B Schools": "#0f766e",
-  "30 June Schools": "#1d4ed8",
-  "Not specified": "#94a3b8",
+export const CHANNEL_COLORS: Record<string, string> = {
+  WhatsApp: "#159d49",
+  Phone: "#1d4e3a",
+  "Support Form": "#6f8f7a",
+  Email: "#3e6d8c",
+  "Not specified": "#c5cfc8",
 };
+export const FAWRY_COLORS: Record<string, string> = {
+  yes: "#159d49",
+  no: "#2a312e",
+  __missing__: "#d7ded9",
+};
+const AGE_COLORS = ["#cfead9", "#7dcea0", "#e0a045", "#b45309"];
 
-export function sourceColor(source: string) {
-  return SOURCE_COLORS[source] ?? "#475569";
-}
+export type VolumeLine = { id: string; label: string; color: string; values: number[] };
 
 function mark(selected: boolean, active: boolean) {
   if (!selected) return "idle";
   return active ? "on" : "dim";
 }
 
-function spotlight(state: "idle" | "on" | "dim") {
-  if (state === "dim") return { opacity: 0.14 };
-  if (state === "on") return { opacity: 1 };
-  return {};
-}
-
-export function useFillIn() {
-  const [drawn, setDrawn] = useState(false);
-  useEffect(() => {
-    const timer = window.setTimeout(() => setDrawn(true), 700);
-    return () => window.clearTimeout(timer);
-  }, []);
-  return drawn;
-}
-
-export function fillStyle(drawn: boolean, axis: "x" | "y", delayMs: number) {
-  return {
-    transform: drawn ? "scale(1)" : axis === "x" ? "scaleX(0)" : "scaleY(0)",
-    transformOrigin: axis === "x" ? "left center" : "center bottom",
-    transformBox: "fill-box" as const,
-    transition: drawn ? `transform 1.6s cubic-bezier(.16,1,.3,1) ${delayMs}ms` : "none",
-  };
-}
-
 export function VolumeChart({
   buckets,
-  sources,
-  selectedSource,
+  lines,
   selectedFrom,
-  onInterval,
-  onSegment,
+  selectedLine,
+  onPick,
 }: {
   buckets: VolumeBucket[];
-  sources: string[];
-  selectedSource: string;
+  lines: VolumeLine[];
   selectedFrom: string;
-  onInterval: (from: string, to: string) => void;
-  onSegment: (source: string, from: string, to: string) => void;
+  selectedLine: string;
+  onPick: (lineId: string, from: string, to: string) => void;
 }) {
-  const [tip, setTip] = useState<{ x: number; y: number; bucket: VolumeBucket } | null>(null);
-  const drawn = useFillIn();
+  const [tip, setTip] = useState<{ x: number; y: number; index: number } | null>(null);
   if (!buckets.length) return <EmptyChart text="Choose a valid reported-date range." />;
-  const max = Math.max(1, ...buckets.map((bucket) => bucket.total));
-  const width = Math.max(640, buckets.length * 28 + 48);
-  const height = 250;
-  const base = 206;
-  const plot = 168;
-  const step = (width - 56) / buckets.length;
+  const max = Math.max(1, ...lines.flatMap((line) => line.values));
+  const width = Math.max(560, buckets.length * (buckets.length > 48 ? 16 : 36));
+  const height = 240;
+  const pad = { l: 36, r: 12, t: 16, b: 32 };
+  const plotW = width - pad.l - pad.r;
+  const plotH = height - pad.t - pad.b;
+  const step = buckets.length <= 1 ? 0 : plotW / (buckets.length - 1);
+  const xAt = (index: number) => (buckets.length <= 1 ? pad.l + plotW / 2 : pad.l + index * step);
+  const yAt = (value: number) => pad.t + (1 - value / max) * plotH;
+  const labelEvery = Math.max(1, Math.ceil(buckets.length / 6));
   return (
     <div className="cs-volume">
-      <div className="cs-legend">
-        {sources.map((source) => {
-          const state = mark(Boolean(selectedSource), source === selectedSource);
-          return (
-            <span key={source} className={state === "idle" ? "" : `is-${state}`} style={spotlight(state)}>
-              <i style={{ background: sourceColor(source) }} />{sourceLabel(source)}
-            </span>
-          );
-        })}
-      </div>
-      <div className="cs-volume-scroll">
-        <svg viewBox={`0 0 ${width} ${height}`} role="group" aria-label="Case volume by reported date and source">
-          {[0, 0.5, 1].map((stepPoint) => {
-            const y = base - plot * stepPoint;
+      {lines.length > 1 && (
+        <div className="cs-legend">
+          {lines.map((line) => {
+            const state = mark(Boolean(selectedLine), selectedLine === line.id);
             return (
-              <g key={stepPoint}>
-                <line x1="40" x2={width - 8} y1={y} y2={y} stroke="#e6eef2" />
-                <text x="34" y={y + 4} textAnchor="end" className="cs-axis">{Math.round(max * stepPoint)}</text>
+              <button type="button" key={line.id} className={`is-${state}`} aria-pressed={state === "on"} onClick={() => onPick(line.id, "", "")}>
+                <i style={{ background: line.color }} />{line.label}
+              </button>
+            );
+          })}
+        </div>
+      )}
+      <div className="cs-volume-scroll">
+        <svg viewBox={`0 0 ${width} ${height}`} role="group" aria-label="Case volume by reported date">
+          {[0, 0.5, 1].map((point) => {
+            const y = yAt(max * point);
+            return (
+              <g key={point}>
+                <line x1={pad.l} x2={width - pad.r} y1={y} y2={y} stroke="#e7eeea" />
+                <text x={pad.l - 6} y={y + 3} textAnchor="end" className="cs-axis">{Math.round(max * point)}</text>
+              </g>
+            );
+          })}
+          {lines.map((line) => {
+            const points = line.values.map((value, index) => `${xAt(index)},${yAt(value)}`).join(" ");
+            const area = `${xAt(0)},${yAt(0)} ${points} ${xAt(line.values.length - 1)},${pad.t + plotH}`;
+            const state = mark(Boolean(selectedLine), selectedLine === line.id);
+            return (
+              <g key={line.id} className={`cs-line cs-${state}`}>
+                <polygon points={area} fill={line.color} opacity={state === "dim" ? 0.04 : 0.14} />
+                <polyline points={points} fill="none" stroke={line.color} strokeWidth={state === "on" ? 2.75 : 2} strokeLinejoin="round" strokeLinecap="round" />
               </g>
             );
           })}
           {buckets.map((bucket, index) => {
-            const x = 44 + index * step;
-            let cursor = base;
+            const active = selectedFrom === bucket.from;
             return (
               <g key={bucket.from}>
-                {selectedFrom === bucket.from && <rect className="cs-column-on" x={x + 2} y="28" width={Math.max(8, step - 8)} height={base - 24} rx="8" />}
-                <rect x={x + 2} y="28" width={Math.max(8, step - 8)} height={base - 28} fill="transparent" role="button" tabIndex={0} aria-label={`${bucket.label}: ${bucket.total} cases`} onClick={() => onInterval(bucket.from, bucket.to)} onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); onInterval(bucket.from, bucket.to); } }} />
-                {bucket.parts.filter((part) => part.count > 0).map((part) => {
-                  const barHeight = (part.count / max) * plot;
-                  cursor -= barHeight;
-                  const state = mark(Boolean(selectedSource || selectedFrom), (!selectedSource || part.key === selectedSource) && (!selectedFrom || bucket.from === selectedFrom));
+                {active && <line x1={xAt(index)} x2={xAt(index)} y1={pad.t} y2={pad.t + plotH} stroke="#159d49" strokeDasharray="3 3" />}
+                {lines.map((line) => {
+                  const chosen = active && (!selectedLine || selectedLine === line.id || line.id === "total");
+                  const dim = Boolean(selectedFrom || selectedLine) && !chosen && !(line.id === "total" && active);
                   return (
-                    <rect
-                      key={part.key}
-                      className={`cs-rise cs-${state}${drawn ? " is-drawn" : ""}`}
-                      style={{ ...fillStyle(drawn, "y", index * 35), color: sourceColor(part.key), ...spotlight(state) }}
-                      x={x + 4}
-                      y={cursor}
-                      width={Math.max(8, step - 12)}
-                      height={Math.max(part.count ? 2 : 0, barHeight)}
-                      rx="3"
-                      fill={sourceColor(part.key)}
+                    <circle
+                      key={line.id}
+                      cx={xAt(index)}
+                      cy={yAt(line.values[index] ?? 0)}
+                      r={chosen ? 4.5 : 3.5}
+                      fill={line.color}
+                      stroke="#fff"
+                      strokeWidth="1.5"
+                      opacity={dim ? 0.2 : 1}
                       role="button"
                       tabIndex={0}
-                      aria-pressed={state === "on"}
-                      aria-label={`${bucket.label}, ${sourceLabel(part.key)}: ${part.count} cases`}
-                      onMouseEnter={(event) => setTip({ x: event.clientX, y: event.clientY, bucket })}
+                      aria-pressed={chosen}
+                      aria-label={`${bucket.label}, ${line.label}: ${line.values[index] ?? 0} cases`}
+                      onMouseEnter={(event) => setTip({ x: event.clientX, y: event.clientY, index })}
                       onMouseLeave={() => setTip(null)}
-                      onClick={() => onSegment(part.key, bucket.from, bucket.to)}
-                      onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); onSegment(part.key, bucket.from, bucket.to); } }}
+                      onClick={() => onPick(line.id, bucket.from, bucket.to)}
+                      onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); onPick(line.id, bucket.from, bucket.to); } }}
                     />
                   );
                 })}
-                <text
-                  className="cs-axis cs-axis-btn"
-                  x={x + step / 2}
-                  y="228"
-                  textAnchor="middle"
-                  role="button"
-                  tabIndex={0}
-                  aria-pressed={selectedFrom === bucket.from && !selectedSource}
-                  onClick={() => onInterval(bucket.from, bucket.to)}
-                  onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); onInterval(bucket.from, bucket.to); } }}
-                >{index % Math.ceil(buckets.length / 8) === 0 ? bucket.label : ""}</text>
+                {index % labelEvery === 0 && <text className="cs-axis" x={xAt(index)} y={height - 8} textAnchor="middle">{bucket.label}</text>}
               </g>
             );
           })}
         </svg>
       </div>
       {tip && (
-        <div className="cs-float" style={{ left: tip.x + 14, top: tip.y + 14 }}>
-          <strong>{tip.bucket.label}</strong>
-          <p>{tip.bucket.total} cases</p>
-          {tip.bucket.parts.filter((part) => part.count).map((part) => (
-            <span key={part.key}><i style={{ background: sourceColor(part.key) }} />{sourceLabel(part.key)} <b>{part.count}</b></span>
+        <div className="cs-float" style={{ left: tip.x + 12, top: tip.y + 12 }}>
+          <strong>{buckets[tip.index]?.label}</strong>
+          <p>{buckets[tip.index]?.total} cases</p>
+          {lines.length > 1 && lines.map((line) => (
+            <span key={line.id}><i style={{ background: line.color }} />{line.label} <b>{line.values[tip.index] ?? 0}</b></span>
           ))}
         </div>
       )}
@@ -165,40 +137,173 @@ export function VolumeChart({
   );
 }
 
-export function RankChart({
+export function FawryDonut({
+  slices,
+  selectedId,
+  onPick,
+}: {
+  slices: { id: string; name: string; count: number }[];
+  selectedId: string;
+  onPick: (id: string) => void;
+}) {
+  const total = slices.reduce((sum, slice) => sum + slice.count, 0);
+  const radius = 42;
+  const circumference = 2 * Math.PI * radius;
+  let cursor = 0;
+  return (
+    <div className="cs-donut">
+      <svg viewBox="0 0 120 120" role="img" aria-label={`Fawry payment, ${total} cases`}>
+        <circle cx="60" cy="60" r={radius} fill="none" stroke="#eef2ef" strokeWidth="14" />
+        {total > 0 && slices.map((slice) => {
+          const length = (slice.count / total) * circumference;
+          const dash = `${length} ${circumference - length}`;
+          const offset = circumference - cursor;
+          cursor += length;
+          const state = mark(Boolean(selectedId), selectedId === slice.id);
+          return (
+            <circle
+              key={slice.id}
+              cx="60"
+              cy="60"
+              r={radius}
+              fill="none"
+              stroke={FAWRY_COLORS[slice.id] ?? "#d7ded9"}
+              strokeWidth={state === "on" ? 18 : 14}
+              strokeDasharray={dash}
+              strokeDashoffset={offset}
+              strokeLinecap="butt"
+              transform="rotate(-90 60 60)"
+              className={`cs-${state}`}
+              role="button"
+              tabIndex={0}
+              aria-pressed={state === "on"}
+              aria-label={`${slice.name}: ${slice.count} cases`}
+              onClick={() => onPick(slice.id)}
+              onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); onPick(slice.id); } }}
+            />
+          );
+        })}
+        <text x="60" y="56" textAnchor="middle" className="cs-donut-total">{total.toLocaleString()}</text>
+        <text x="60" y="72" textAnchor="middle" className="cs-donut-label">cases</text>
+      </svg>
+      <ul>
+        {slices.map((slice) => {
+          const state = mark(Boolean(selectedId), selectedId === slice.id);
+          const share = total ? Math.round((slice.count / total) * 100) : 0;
+          return (
+            <li key={slice.id}>
+              <button type="button" className={`cs-${state}`} aria-pressed={state === "on"} onClick={() => onPick(slice.id)}>
+                <i style={{ background: FAWRY_COLORS[slice.id] ?? "#d7ded9" }} />
+                <span>{slice.name}</span>
+                <strong>{slice.count}</strong>
+                <em>{share}%</em>
+              </button>
+            </li>
+          );
+        })}
+      </ul>
+    </div>
+  );
+}
+
+export function BarList({
   rows,
   color,
   selectedId,
   onPick,
-  showRequests = false,
 }: {
   rows: RankRow[];
   color: string;
   selectedId: string;
   onPick: (id: string) => void;
-  showRequests?: boolean;
 }) {
-  const max = Math.max(1, ...rows.map((row) => row.count));
-  const drawn = useFillIn();
   if (!rows.length) return <EmptyChart text="No cases match the current filters." />;
+  const max = Math.max(1, ...rows.map((row) => row.count));
   return (
-    <div className="cs-ranks">
-      {rows.map((row, index) => {
+    <div className="cs-bars">
+      {rows.map((row) => {
         const state = mark(Boolean(selectedId), selectedId === row.id);
         return (
-          <button key={row.id} className={`cs-rank cs-${state}`} style={spotlight(state)} aria-pressed={state === "on"} onClick={() => onPick(row.id)}>
-            <span className="cs-rank-name">{row.name}</span>
-            <span className="cs-rank-track"><i className={`cs-rank-fill${drawn ? " is-drawn" : ""}`} style={{ width: `${(row.count / max) * 100}%`, background: color, ...fillStyle(drawn, "x", 80 + index * 90) }} /></span>
+          <button type="button" key={row.id} className={`cs-bar cs-${state}`} aria-pressed={state === "on"} onClick={() => onPick(row.id)}>
+            <span>{row.name}</span>
+            <span className="cs-bar-track"><i style={{ width: `${(row.count / max) * 100}%`, background: color }} /></span>
             <strong>{row.count}</strong>
-            <span className="cs-pop">
-              <b>{row.name}</b>
-              <em>{row.count} cases · {Math.round(row.share * 100)}% of the current selection</em>
-              <em>{row.followup} still need follow-up</em>
-              {showRequests && row.requests.map((request) => <em key={request.name}>{request.name}: {request.count}</em>)}
-            </span>
           </button>
         );
       })}
+    </div>
+  );
+}
+
+export function CauseChart({
+  rows,
+  selectedId,
+  onPick,
+}: {
+  rows: RankRow[];
+  selectedId: string;
+  onPick: (id: string) => void;
+}) {
+  const recorded = rows.filter((row) => row.id !== "__missing__" && row.id !== "__other__");
+  const other = rows.find((row) => row.id === "__other__");
+  const missing = rows.find((row) => row.id === "__missing__");
+  if (!recorded.length && !other && !missing) return <EmptyChart text="No cases match the current filters." />;
+  return (
+    <div className="cs-cause">
+      {recorded.length > 0 && <BarList rows={recorded} color="#159d49" selectedId={selectedId} onPick={onPick} />}
+      {other && <BarList rows={[other]} color="#6f8f7a" selectedId={selectedId} onPick={onPick} />}
+      {missing && (
+        <button type="button" className={`cs-missing cs-${mark(Boolean(selectedId), selectedId === missing.id)}`} aria-pressed={selectedId === missing.id} onClick={() => onPick(missing.id)}>
+          <span>Not recorded</span>
+          <strong>{missing.count}</strong>
+          <small>Data completeness, kept separate from recorded causes</small>
+        </button>
+      )}
+    </div>
+  );
+}
+
+export function TopicList({
+  rows,
+  selectedId,
+  onPick,
+}: {
+  rows: RankRow[];
+  selectedId: string;
+  onPick: (id: string) => void;
+}) {
+  const ranked = rows.filter((row) => row.id !== "__missing__" && row.id !== "__other__");
+  const aside = rows.filter((row) => row.id === "__missing__" || row.id === "__other__");
+  if (!ranked.length && !aside.length) return <EmptyChart text="No cases match the current filters." />;
+  return (
+    <div className="cs-topics">
+      <ol>
+        {ranked.map((row, index) => {
+          const state = mark(Boolean(selectedId), selectedId === row.id);
+          return (
+            <li key={row.id}>
+              <button type="button" className={`cs-${state}`} aria-pressed={state === "on"} onClick={() => onPick(row.id)}>
+                <em>{index + 1}</em>
+                <span>{row.name}</span>
+                <strong>{row.count}</strong>
+                <small>{Math.round(row.share * 100)}%</small>
+                {row.followup > 0 && <i>{row.followup} need follow-up</i>}
+              </button>
+            </li>
+          );
+        })}
+      </ol>
+      {aside.length > 0 && (
+        <div className="cs-topic-aside">
+          {aside.map((row) => (
+            <button type="button" key={row.id} className={`cs-${mark(Boolean(selectedId), selectedId === row.id)}`} aria-pressed={selectedId === row.id} onClick={() => onPick(row.id)}>
+              <span>{row.id === "__missing__" ? "Not recorded" : row.name}</span>
+              <strong>{row.count}</strong>
+              <small>{Math.round(row.share * 100)}%</small>
+            </button>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
@@ -219,32 +324,32 @@ export function SegmentChart({
   onStack: (segment: string, group: StatusGroup) => void;
 }) {
   const max = Math.max(1, ...rows.map((row) => row.total));
-  const drawn = useFillIn();
   return (
     <div className="cs-segments">
-      {rows.map((row, index) => {
+      {rows.map((row) => {
         const selectedHere = Boolean(selectedSegment || selectedGroup);
         return (
-          <div key={row.segment} className="cs-segment" style={{ animationDelay: `${index * 50}ms` }}>
-            <button className={`cs-segment-name cs-${mark(Boolean(selectedSegment), selectedSegment === row.segment)}`} onClick={() => onSegment(row.segment)} aria-pressed={selectedSegment === row.segment}>
-              <i style={{ background: SEGMENT_COLORS[row.segment] ?? "#94a3b8" }} />{row.segment}
+          <div key={row.segment} className="cs-segment">
+            <button type="button" className={`cs-segment-name cs-${mark(Boolean(selectedSegment), selectedSegment === row.segment)}`} onClick={() => onSegment(row.segment)} aria-pressed={selectedSegment === row.segment}>
+              {row.segment}
             </button>
             <div className="cs-segment-track">
               {row.parts.filter((part) => part.count > 0).map((part) => {
                 const width = mode === "share" ? (row.total ? (part.count / row.total) * 100 : 0) : (part.count / max) * 100;
                 const state = mark(selectedHere, (!selectedSegment || selectedSegment === row.segment) && (!selectedGroup || selectedGroup === part.group));
+                const share = row.total ? Math.round((part.count / row.total) * 100) : 0;
                 return (
                   <button
                     key={part.group}
-                    className={`cs-segment-part cs-${state}${drawn ? " is-drawn" : ""}`}
-                    style={{ width: `${width}%`, background: STATUS_COLORS[part.group], ...fillStyle(drawn, "x", 100 + index * 80), ...spotlight(state) }}
-                    aria-label={`${row.segment}, ${STATUS_GROUP_LABEL[part.group]}: ${part.count}`}
+                    type="button"
+                    className={`cs-segment-part cs-${state}`}
+                    style={{ width: `${width}%`, background: STATUS_COLORS[part.group] }}
+                    aria-label={`${row.segment}, ${STATUS_GROUP_LABEL[part.group]}: ${part.count} cases, ${share}%`}
                     onClick={() => onStack(row.segment, part.group)}
                   >
                     <span className="cs-pop">
                       <b>{row.segment}</b>
-                      <em>{row.total} cases</em>
-                      <em>{STATUS_GROUP_LABEL[part.group]}: {part.count}{row.total ? ` · ${Math.round((part.count / row.total) * 100)}%` : ""}</em>
+                      <em>{STATUS_GROUP_LABEL[part.group]}: {part.count} · {share}%</em>
                     </span>
                   </button>
                 );
@@ -258,11 +363,40 @@ export function SegmentChart({
   );
 }
 
-export function Panel({ title, question, action, children }: { title: string; question: string; action?: ReactNode; children: ReactNode }) {
+export function AgeStrip({
+  ages,
+  selected,
+  onPick,
+}: {
+  ages: { id: string; label: string; count: number }[];
+  selected: string;
+  onPick: (id: string) => void;
+}) {
+  const total = ages.reduce((sum, age) => sum + age.count, 0);
+  return (
+    <div className="cs-age">
+      <div className="cs-age-bar" role="group" aria-label="Open cases by age since the reported date">
+        {ages.map((age, index) => {
+          const state = mark(Boolean(selected), selected === age.id);
+          const share = total ? (age.count / total) * 100 : 25;
+          return (
+            <button type="button" key={age.id} className={`cs-${state}`} style={{ flexGrow: Math.max(share, 8), background: AGE_COLORS[index] }} aria-pressed={state === "on"} onClick={() => onPick(age.id)}>
+              <strong>{age.count}</strong>
+              <span>{age.label}</span>
+            </button>
+          );
+        })}
+      </div>
+      <p>Case age counts calendar days since the reported date. It is not an SLA measure.</p>
+    </div>
+  );
+}
+
+export function Panel({ title, question, action, children }: { title: string; question?: string; action?: ReactNode; children: ReactNode }) {
   return (
     <section className="cs-panel">
       <header>
-        <div><h3>{title}</h3><p>{question}</p></div>
+        <div><h3>{title}</h3>{question && <p>{question}</p>}</div>
         {action}
       </header>
       {children}
@@ -271,5 +405,19 @@ export function Panel({ title, question, action, children }: { title: string; qu
 }
 
 export function EmptyChart({ text, onReset }: { text: string; onReset?: () => void }) {
-  return <div className="cs-empty"><p>{text}</p>{onReset && <button onClick={onReset}>Reset filters</button>}</div>;
+  return <div className="cs-empty"><p>{text}</p>{onReset && <button type="button" onClick={onReset}>Reset filters</button>}</div>;
+}
+
+export function Sparkline({ values }: { values: number[] }) {
+  if (values.length < 2) return null;
+  const max = Math.max(1, ...values);
+  const width = 88;
+  const height = 28;
+  const step = width / (values.length - 1);
+  const points = values.map((value, index) => `${index * step},${height - (value / max) * (height - 2) - 1}`).join(" ");
+  return (
+    <svg className="cs-spark" viewBox={`0 0 ${width} ${height}`} aria-hidden="true">
+      <polyline points={points} fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinejoin="round" strokeLinecap="round" />
+    </svg>
+  );
 }

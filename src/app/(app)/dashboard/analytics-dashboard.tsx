@@ -1,11 +1,11 @@
 "use client";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import Link from "next/link";
-import { ArrowDownToLine, ArrowUpRight, RefreshCw, X } from "lucide-react";
+import { ArrowDownToLine, ArrowUpRight, RefreshCw, SlidersHorizontal, X } from "lucide-react";
 import { sourceLabel, STATUS_LABELS, TICKET_STATUSES, type TicketStatus } from "@/lib/tickets/constants";
-import { cairoDate } from "@/lib/tickets/dashboard-model";
-import { dashboardQuery, type DashboardFilters } from "@/lib/tickets/filters";
-import { csvCell, isOpen, validDay, type AnalyticsTicket } from "@/lib/tickets/analytics";
+import { cairoDate, shiftDay } from "@/lib/tickets/dashboard-model";
+import { dashboardQuery, ticketListQuery, type DashboardFilters } from "@/lib/tickets/filters";
+import { csvCell, inPeriod, isOpen, validDay, type AnalyticsTicket } from "@/lib/tickets/analytics";
 import {
   AGE_BUCKETS,
   SEGMENT_ORDER,
@@ -28,7 +28,7 @@ import {
   type StatusGroup,
   type VolumeMode,
 } from "@/lib/tickets/overview";
-import { EmptyChart, fillStyle, Panel, RankChart, SegmentChart, STATUS_COLORS, useFillIn, VolumeChart } from "./overview-charts";
+import { AgeStrip, BarList, CauseChart, CHANNEL_COLORS, EmptyChart, FawryDonut, Panel, SegmentChart, Sparkline, STATUS_COLORS, TopicList, VolumeChart, type VolumeLine } from "./overview-charts";
 
 type Snapshot = { tickets: AnalyticsTicket[]; asOf: string };
 type Option = { id: string; name: string };
@@ -76,7 +76,6 @@ export function DashboardBoard({
     from: validDay(initialFilters.from) ? initialFilters.from : earliest,
     to: validDay(initialFilters.to) ? initialFilters.to : today,
   }));
-  const [more, setMore] = useState(false);
   const [page, setPage] = useState(1);
   const [error, setError] = useState("");
   const [refreshing, setRefreshing] = useState(false);
@@ -84,6 +83,9 @@ export function DashboardBoard({
   const [mode, setMode] = useState<VolumeMode | "">("");
   const [share, setShare] = useState(false);
   const [allTopics, setAllTopics] = useState(false);
+  const [allCauses, setAllCauses] = useState(false);
+  const [breakdown, setBreakdown] = useState(false);
+  const [drawer, setDrawer] = useState(false);
   const busy = useRef(false);
   const abort = useRef<AbortController | null>(null);
   const valid = validDay(filters.from) && validDay(filters.to) && filters.from <= filters.to;
@@ -112,12 +114,12 @@ export function DashboardBoard({
 
   const causeFrame = useMemo(() => snapshot.tickets.filter((ticket) => matchesOverview(ticket, queryOf([], []), ["cause"], today)), [snapshot.tickets, queryOf, today]);
   const topicFrame = useMemo(() => snapshot.tickets.filter((ticket) => matchesOverview(ticket, queryOf([], []), ["topic"], today)), [snapshot.tickets, queryOf, today]);
-  const causeRank = useMemo(() => rankValues(causeFrame, (ticket) => ticket.trackerCause, 6, "Other causes"), [causeFrame]);
+  const causeRank = useMemo(() => rankValues(causeFrame, (ticket) => ticket.trackerCause, allCauses ? 99 : 5, "Other causes"), [causeFrame, allCauses]);
   const topicRank = useMemo(() => rankValues(topicFrame, (ticket) => ticket.topic, allTopics ? 99 : 6, "Other topics"), [topicFrame, allTopics]);
-  const causeTops = useMemo(() => topNames(rankValues(causeFrame, (ticket) => ticket.trackerCause, 6, "Other causes")), [causeFrame]);
+  const causeTops = useMemo(() => topNames(rankValues(causeFrame, (ticket) => ticket.trackerCause, 5, "Other causes")), [causeFrame]);
   const topicTops = useMemo(() => topNames(rankValues(topicFrame, (ticket) => ticket.topic, 6, "Other topics")), [topicFrame]);
   const rows = useMemo(() => snapshot.tickets.filter((ticket) => matchesOverview(ticket, queryOf(causeTops, topicTops), [], today)), [snapshot.tickets, queryOf, causeTops, topicTops, today]);
-  const volumeFrame = useMemo(() => snapshot.tickets.filter((ticket) => matchesOverview(ticket, queryOf(causeTops, topicTops), ["source", "bucket"], today)), [snapshot.tickets, queryOf, causeTops, topicTops, today]);
+  const volumeFrame = useMemo(() => snapshot.tickets.filter((ticket) => matchesOverview(ticket, queryOf(causeTops, topicTops), breakdown ? ["source", "bucket", "channel"] : ["source", "bucket"], today)), [snapshot.tickets, queryOf, causeTops, topicTops, today, breakdown]);
   const segmentFrame = useMemo(() => snapshot.tickets.filter((ticket) => matchesOverview(ticket, queryOf(causeTops, topicTops), ["segment", "statusGroup"], today)), [snapshot.tickets, queryOf, causeTops, topicTops, today]);
   const stats = headline(rows);
   const sources = useMemo(() => {
@@ -127,6 +129,17 @@ export function DashboardBoard({
     return [...order.filter((source) => present.has(source)), ...[...present].filter((source) => !order.includes(source))];
   }, [volumeFrame, filters.source]);
   const buckets = useMemo(() => valid ? volumeBuckets(volumeFrame, filters.from, filters.to, volumeMode, sources) : [], [volumeFrame, filters.from, filters.to, volumeMode, sources, valid]);
+  const volumeLines = useMemo<VolumeLine[]>(() => {
+    if (!breakdown) return [{ id: "total", label: "All cases", color: "#159d49", values: buckets.map((bucket) => bucket.total) }];
+    const names = ["WhatsApp", "Phone", "Support Form", "Email", "Not specified"];
+    return names.map((name) => ({
+      id: name,
+      label: name,
+      color: CHANNEL_COLORS[name] ?? "#6f8f7a",
+      values: buckets.map((bucket) => volumeFrame.filter((ticket) => inPeriod(reportedDay(ticket), bucket.from, bucket.to) && contactChannel(ticket.source) === name).length),
+    })).filter((line) => line.values.some((value) => value > 0) || filters.channel === line.id);
+  }, [breakdown, buckets, volumeFrame, filters.channel]);
+  const spark = useMemo(() => valid ? volumeBuckets(rows, filters.from, filters.to, volumeMode, []).map((bucket) => bucket.total) : [], [rows, filters.from, filters.to, volumeMode, valid]);
   const segments = SEGMENT_ORDER.map((segment) => {
     const matching = segmentFrame.filter((ticket) => customerSegment(ticket.source) === segment);
     return {
@@ -236,7 +249,7 @@ export function DashboardBoard({
     filters.fawry ? { key: "fawry", label: filters.fawry === "__missing__" ? "Fawry not recorded" : `Fawry: ${filters.fawry === "yes" ? "Yes" : "No"}` } : null,
     filters.bucketFrom ? { key: "bucketFrom", label: `${filters.bucketFrom} – ${filters.bucketTo}` } : null,
     filters.age ? { key: "age", label: AGE_BUCKETS.find((bucket) => bucket.id === filters.age)?.label ?? filters.age } : null,
-    filters.q ? { key: "q", label: `Search: ${filters.q}` } : null,
+    filters.q ? { key: "q", label: `Dashboard filter: ${filters.q}` } : null,
   ].filter((chip): chip is { key: keyof DashboardFilters; label: string } => Boolean(chip));
 
   const channelRows = rankValues(rows, (ticket) => contactChannel(ticket.source), 8, "Other channels");
@@ -246,38 +259,66 @@ export function DashboardBoard({
     count: rows.filter((ticket) => isOpen(ticket) && ageBucketId(daysSinceReported(reportedDay(ticket), today) ?? 0) === bucket.id).length,
   }));
 
+  function applyPreset(id: "all" | "7" | "30" | "month") {
+    const from = id === "all" ? earliest : id === "7" ? shiftDay(today, -6) : id === "30" ? shiftDay(today, -29) : `${today.slice(0, 8)}01`;
+    patch({ from, to: today, bucketFrom: "", bucketTo: "" });
+  }
+  function pickVolume(lineId: string, from: string, to: string) {
+    if (!from) {
+      if (lineId !== "total") toggle("channel", lineId);
+      return;
+    }
+    const sameBucket = filters.bucketFrom === from && filters.bucketTo === to;
+    if (lineId === "total") {
+      patch({ bucketFrom: sameBucket ? "" : from, bucketTo: sameBucket ? "" : to });
+      return;
+    }
+    const same = sameBucket && filters.channel === lineId;
+    patch({ channel: same ? "" : lineId, bucketFrom: same ? "" : from, bucketTo: same ? "" : to });
+  }
+  const activePreset = filters.from === earliest && filters.to === today ? "all" : filters.from === shiftDay(today, -6) && filters.to === today ? "7" : filters.from === shiftDay(today, -29) && filters.to === today ? "30" : filters.from === `${today.slice(0, 8)}01` && filters.to === today ? "month" : "custom";
+  const listHref = `/tickets${ticketListQuery({ view: "all", status: filters.status, source: filters.source, city: "", category: "", assignee: "", range: "all", q: (filters.q ?? "").slice(0, 80), page: 1 })}`;
+  const updated = new Date(snapshot.asOf).toLocaleString("en-GB", { timeZone: "Africa/Cairo", hour: "2-digit", minute: "2-digit", day: "numeric", month: "short" });
+  function secondaryFilters() { return (
+    <>
+      <Select label="Customer segment" value={filters.segment ?? ""} options={SEGMENT_ORDER.map((name) => ({ id: name, name }))} onChange={(segment) => patch({ segment })} />
+      <Select label="Contact channel" value={filters.channel ?? ""} options={["WhatsApp", "Phone", "Support Form", "Email", "Not specified"].map((name) => ({ id: name, name }))} onChange={(channel) => patch({ channel })} />
+      <Select label="Status" value={filters.status} options={TICKET_STATUSES.map((status) => ({ id: status, name: STATUS_LABELS[status] }))} onChange={(status) => patch({ status: status as TicketStatus | "", statusGroup: "" })} />
+      <Select label="Topic" value={filters.topic ?? ""} options={topicRank.map((row) => ({ id: row.id, name: row.name }))} onChange={(topic) => patch({ topic })} />
+      <Select label="Root cause" value={filters.trackerCause ?? ""} options={causeRank.map((row) => ({ id: row.id, name: row.name }))} onChange={(trackerCause) => patch({ trackerCause })} />
+      <Select label="Referring team" value={filters.referringTeam ?? ""} options={["Moderation", "Marketing", "Not specified"].map((name) => ({ id: name, name }))} onChange={(referringTeam) => patch({ referringTeam })} />
+      <Select label="Request type" value={filters.requestType ?? ""} options={[...new Set(snapshot.tickets.map((ticket) => ticket.requestType).filter(Boolean)), "__missing__"].map((name) => ({ id: name, name: name === "__missing__" ? "Not recorded" : name }))} onChange={(requestType) => patch({ requestType })} />
+    </>
+  ); }
+
   return (
-    <div className="cs-board">
+    <div className={`cs-board${refreshing ? " is-refreshing" : ""}`} aria-busy={refreshing}>
       <header className="cs-title">
         <div>
-          <p>Customer Support</p>
-          <h2>Customer Support Overview</h2>
-          <span>Last updated {new Date(snapshot.asOf).toLocaleString("en-GB", { timeZone: "Africa/Cairo", hour: "2-digit", minute: "2-digit", day: "numeric", month: "short" })} · Reported dates {filters.from} – {filters.to}</span>
+          <h2>Dashboard</h2>
+          <span>Cases reported {filters.from} – {filters.to}. Updated {updated}{refreshing ? " · Updating" : ""}.</span>
         </div>
         <div className="cs-title-actions no-print">
-          <button type="button" onClick={() => void refresh()} disabled={refreshing || preview} aria-label="Refresh dashboard"><RefreshCw size={15} className={refreshing ? "animate-spin" : ""} /></button>
-          <button type="button" onClick={exportCsv}>Export filtered cases <ArrowDownToLine size={14} /></button>
+          <button type="button" onClick={() => void refresh()} disabled={refreshing || preview} aria-label="Refresh dashboard"><RefreshCw size={15} className={refreshing ? "animate-spin" : ""} /> Refresh</button>
+          <button type="button" onClick={exportCsv}>Export <ArrowDownToLine size={14} /></button>
         </div>
       </header>
 
       <div className="cs-filters no-print">
-        <label>Reported date<input type="date" value={filters.from} max={filters.to} onChange={(event) => patch({ from: event.target.value, bucketFrom: "", bucketTo: "" })} /></label>
-        <label>to<input type="date" value={filters.to} min={filters.from} onChange={(event) => patch({ to: event.target.value, bucketFrom: "", bucketTo: "" })} /></label>
-        <Select label="Customer segment" value={filters.segment ?? ""} options={SEGMENT_ORDER.map((name) => ({ id: name, name }))} onChange={(segment) => patch({ segment })} />
-        <Select label="Contact channel" value={filters.channel ?? ""} options={["WhatsApp", "Phone", "Support Form", "Email", "Not specified"].map((name) => ({ id: name, name }))} onChange={(channel) => patch({ channel })} />
-        <label className="cs-search">Search<input value={filters.q ?? ""} placeholder="Case, school, phone, email, text" onChange={(event) => patch({ q: event.target.value })} /></label>
-        <button type="button" aria-expanded={more} onClick={() => setMore((open) => !open)}>More filters</button>
-        <button type="button" onClick={reset}>Reset filters</button>
-      </div>
-      {more && (
-        <div className="cs-filters no-print">
-          <Select label="Status" value={filters.status} options={TICKET_STATUSES.map((status) => ({ id: status, name: STATUS_LABELS[status] }))} onChange={(status) => patch({ status: status as TicketStatus | "", statusGroup: "" })} />
-          <Select label="Topic" value={filters.topic ?? ""} options={topicRank.map((row) => ({ id: row.id, name: row.name }))} onChange={(topic) => patch({ topic })} />
-          <Select label="Root cause" value={filters.trackerCause ?? ""} options={causeRank.map((row) => ({ id: row.id, name: row.name }))} onChange={(trackerCause) => patch({ trackerCause })} />
-          <Select label="Referring team" value={filters.referringTeam ?? ""} options={["Moderation", "Marketing", "Not specified"].map((name) => ({ id: name, name }))} onChange={(referringTeam) => patch({ referringTeam })} />
-          <Select label="Request type" value={filters.requestType ?? ""} options={[...new Set(snapshot.tickets.map((ticket) => ticket.requestType).filter(Boolean)), "__missing__"].map((name) => ({ id: name, name: name === "__missing__" ? "Not recorded" : name }))} onChange={(requestType) => patch({ requestType })} />
+        <div className="cs-presets" role="group" aria-label="Reported date presets">
+          {([["all", "All"], ["7", "7 days"], ["30", "30 days"], ["month", "This month"]] as const).map(([id, label]) => (
+            <button type="button" key={id} aria-pressed={activePreset === id} onClick={() => applyPreset(id)}>{label}</button>
+          ))}
+          <span className={activePreset === "custom" ? "is-custom" : ""}>Custom</span>
         </div>
-      )}
+        <label>From<input type="date" value={filters.from} max={filters.to} onChange={(event) => patch({ from: event.target.value, bucketFrom: "", bucketTo: "" })} /></label>
+        <label>To<input type="date" value={filters.to} min={filters.from} onChange={(event) => patch({ to: event.target.value, bucketFrom: "", bucketTo: "" })} /></label>
+        <div className="cs-desktop-filters">{secondaryFilters()}</div>
+        <label className="cs-search">Filter this dashboard<input value={filters.q ?? ""} placeholder="Case, school, phone, or email" aria-label="Filter this dashboard" onChange={(event) => patch({ q: event.target.value })} /></label>
+        <button type="button" className="cs-drawer-open" onClick={() => setDrawer(true)}><SlidersHorizontal size={14} /> Filters</button>
+        <button type="button" onClick={reset}>Reset</button>
+      </div>
+      {drawer && <FilterDrawer onClose={() => setDrawer(false)}>{secondaryFilters()}</FilterDrawer>}
       {chips.length > 0 && (
         <div className="cs-chips no-print">
           {chips.map((chip) => (
@@ -289,7 +330,6 @@ export function DashboardBoard({
       )}
       {!valid && <p className="cs-alert" role="alert">Choose a reported-date range that starts on or before it ends.</p>}
       {error && <p className="cs-alert" role="alert">{error}</p>}
-      <p className="cs-scope"><strong>{stats.total.toLocaleString()}</strong> cases with a reported date from {filters.from} to {filters.to}</p>
       {unclassified > 0 && <p className="cs-notice">{unclassified} cases in this selection have no tracker topic or root cause yet. They stay in the totals and appear as Not recorded.</p>}
 
       <div className="cs-switch no-print" role="tablist" aria-label="Dashboard sections">
@@ -297,122 +337,64 @@ export function DashboardBoard({
         <button type="button" role="tab" aria-selected={surface === "analysis"} onClick={() => setSurface("analysis")}>Detailed analysis</button>
       </div>
 
-      <section className="cs-kpis">
-        <Kpi label="Total Cases" value={stats.total} detail="Distinct cases in this selection" selected={false} dim={Boolean(filters.status || filters.statusGroup)} onClick={() => pickGroup("")} />
-        <Kpi label="Needs Follow-up" value={stats.followup} detail={`${stats.fresh} new · ${stats.progress} in progress · ${stats.awaiting} awaiting reply`} selected={filters.statusGroup === "followup"} dim={Boolean(filters.statusGroup) && filters.statusGroup !== "followup"} tone="followup" onClick={() => pickGroup("followup")} />
-        <Kpi label="Resolved" value={stats.resolved} detail={`${Math.round(stats.resolvedShare * 100)}% of selected cases`} selected={filters.statusGroup === "resolved"} dim={Boolean(filters.statusGroup) && filters.statusGroup !== "resolved"} tone="resolved" onClick={() => pickGroup("resolved")} />
-        <Kpi label="Closed Without Response" value={stats.closed} detail="Separate from resolved cases" selected={filters.statusGroup === "closed"} dim={Boolean(filters.statusGroup) && filters.statusGroup !== "closed"} tone="closed" onClick={() => pickGroup("closed")} />
-      </section>
-
-      <section className="cs-fawry" aria-label="Fawry payment">
-        <span>Fawry payment</span>
-        {fawryRows.map((item) => (
-          <button key={item.id} type="button" className={filters.fawry === item.id ? "is-on" : filters.fawry ? "is-dim" : ""} aria-pressed={filters.fawry === item.id} onClick={() => toggle("fawry", item.id)}>
-            <b>{item.name}</b><strong>{item.count}</strong>
-          </button>
-        ))}
-      </section>
-
       {surface === "overview" ? (
         <>
+          <section className="cs-kpis">
+            <Kpi label="Total Cases" value={stats.total} detail="Reported in the selected period" selected={false} dim={Boolean(filters.status || filters.statusGroup)} spark={spark} onClick={() => pickGroup("")} />
+            <Kpi label="Needs Follow-up" value={stats.followup} detail="Current status within this period" selected={filters.statusGroup === "followup"} dim={Boolean(filters.statusGroup) && filters.statusGroup !== "followup"} tone="followup" onClick={() => pickGroup("followup")} />
+            <Kpi label="Resolved" value={stats.resolved} detail="Current status within this period" selected={filters.statusGroup === "resolved"} dim={Boolean(filters.statusGroup) && filters.statusGroup !== "resolved"} tone="resolved" onClick={() => pickGroup("resolved")} />
+            <Kpi label="Closed Without Response" value={stats.closed} detail="Current status within this period" selected={filters.statusGroup === "closed"} dim={Boolean(filters.statusGroup) && filters.statusGroup !== "closed"} tone="closed" onClick={() => pickGroup("closed")} />
+          </section>
+          <FollowUp followups={followups} page={currentPage} pages={pages} today={today} openAll={openAll} preview={preview} returnTo={returnTo} listHref={listHref} onPage={setPage} onReset={reset} />
           <div className="cs-row cs-row-volume">
             <Panel
               title="Case volume over time"
-              question="When are cases reported, and which source sends them?"
-              action={<div className="cs-modes">{(["day", "week", "month"] as VolumeMode[]).map((item) => <button type="button" key={item} aria-pressed={volumeMode === item} onClick={() => { setMode(item); patch({ bucketFrom: "", bucketTo: "" }); }}>{item === "day" ? "Daily" : item === "week" ? "Weekly" : "Monthly"}</button>)}</div>}
+              question="Reported cases in the selected period. A zero is a period with no cases."
+              action={<div className="cs-modes">
+                <button type="button" aria-pressed={!breakdown} onClick={() => setBreakdown(false)}>Total</button>
+                <button type="button" aria-pressed={breakdown} onClick={() => setBreakdown(true)}>By channel</button>
+                {(["day", "week", "month"] as VolumeMode[]).map((item) => <button type="button" key={item} aria-pressed={volumeMode === item} onClick={() => { setMode(item); patch({ bucketFrom: "", bucketTo: "" }); }}>{item === "day" ? "Daily" : item === "week" ? "Weekly" : "Monthly"}</button>)}
+              </div>}
             >
-              <VolumeChart
-                key={buckets.map((bucket) => bucket.total).join(",")}
-                buckets={buckets}
-                sources={sources}
-                selectedSource={filters.source}
-                selectedFrom={filters.bucketFrom ?? ""}
-                onInterval={(from, to) => {
-                  const same = filters.bucketFrom === from && filters.bucketTo === to && !filters.source;
-                  patch({ bucketFrom: same ? "" : from, bucketTo: same ? "" : to, source: "" });
-                }}
-                onSegment={(source, from, to) => {
-                  const same = filters.source === source && filters.bucketFrom === from && filters.bucketTo === to;
-                  patch({ source: same ? "" : source, bucketFrom: same ? "" : from, bucketTo: same ? "" : to });
-                }}
-              />
+              <VolumeChart buckets={buckets} lines={volumeLines} selectedFrom={filters.bucketFrom ?? ""} selectedLine={breakdown ? (filters.channel ?? "") : ""} onPick={pickVolume} />
             </Panel>
-            <Panel title="Root causes" question="What is causing these support issues?">
-              <RankChart key={causeRank.map((row) => row.count).join(",")} rows={causeRank} color="#0f766e" selectedId={filters.trackerCause ?? ""} onPick={(id) => toggle("trackerCause", id)} />
+            <Panel title="Fawry payment" question="Recorded on the case. Not recorded stays separate from No.">
+              <FawryDonut slices={fawryRows} selectedId={filters.fawry ?? ""} onPick={(id) => toggle("fawry", id)} />
             </Panel>
           </div>
           <div className="cs-row cs-row-even">
-            <Panel
-              title="Cases by customer segment"
-              question="How does workload and current status differ by customer group?"
-              action={<div className="cs-modes"><button type="button" aria-pressed={!share} onClick={() => setShare(false)}>Count</button><button type="button" aria-pressed={share} onClick={() => setShare(true)}>Percentage</button></div>}
-            >
-              <div className="cs-status-key"><span><i style={{ background: STATUS_COLORS.resolved }} />Resolved</span><span><i style={{ background: STATUS_COLORS.followup }} />Needs Follow-up</span><span><i style={{ background: STATUS_COLORS.closed }} />Closed Without Response</span></div>
-              <SegmentChart
-                key={segments.map((row) => row.total).join(",")}
-                rows={segments}
-                mode={share ? "share" : "count"}
-                selectedSegment={filters.segment ?? ""}
-                selectedGroup={filters.statusGroup ?? ""}
-                onSegment={(segment) => toggle("segment", segment)}
-                onStack={(segment, group) => {
-                  const same = filters.segment === segment && filters.statusGroup === group;
-                  patch({ status: "", segment: same ? "" : segment, statusGroup: same ? "" : group });
-                }}
-              />
+            <Panel title="Root causes" question="Top recorded causes. Not recorded is a completeness check." action={<button type="button" className="cs-text" onClick={() => setAllCauses((open) => !open)}>{allCauses ? "Show top five" : "View all"}</button>}>
+              <CauseChart rows={causeRank} selectedId={filters.trackerCause ?? ""} onPick={(id) => toggle("trackerCause", id)} />
             </Panel>
-            <Panel title="Most common topics" question="What are customers contacting support about?" action={<button type="button" className="cs-text" onClick={() => setAllTopics((open) => !open)}>{allTopics ? "Show top topics" : "View all topics"}</button>}>
-              <RankChart key={topicRank.map((row) => `${row.id}:${row.count}`).join(",")} rows={topicRank} color="#3730a3" selectedId={filters.topic ?? ""} showRequests onPick={(id) => toggle("topic", id)} />
+            <Panel title="Most common topics" question="Share of the cases in this chart." action={<button type="button" className="cs-text" onClick={() => setAllTopics((open) => !open)}>{allTopics ? "Show top topics" : "View all"}</button>}>
+              <TopicList rows={topicRank} selectedId={filters.topic ?? ""} onPick={(id) => toggle("topic", id)} />
             </Panel>
           </div>
-          <section className="cs-panel" id="follow-up">
-            <header>
-              <div><h3>Cases requiring follow-up</h3><p>{followups.length} open cases in this selection, oldest reported date first.</p></div>
-              {!preview && <Link href="/tickets">View all cases <ArrowUpRight size={14} /></Link>}
-            </header>
-            <div className="cs-table-scroll">
-              <table>
-                <thead>
-                  <tr><th>Case</th><th>Customer / school</th><th>Segment</th><th>Topic</th><th>Status</th><th>Reported</th><th>Days since reported</th><th>Assignee</th><th>Latest update</th></tr>
-                </thead>
-                <tbody>
-                  {followups.slice((currentPage - 1) * 8, currentPage * 8).map((ticket) => {
-                    const siblings = siblingCases(ticket, openAll);
-                    const days = daysSinceReported(reportedDay(ticket), today);
-                    return (
-                      <tr key={ticket.id}>
-                        <td>{preview ? ticket.number : <Link href={`/tickets/${ticket.id}?returnTo=${encodeURIComponent(returnTo)}`}>{ticket.number}</Link>}</td>
-                        <td>{ticket.customerName || "Not recorded"}{ticket.schoolName ? <small>{ticket.schoolName}</small> : null}{siblings.length > 0 && <small className="cs-sibling">Also open: {siblings.map((item) => item.number).join(", ")}</small>}</td>
-                        <td>{customerSegment(ticket.source)}</td>
-                        <td>{ticket.topic || "Not recorded"}</td>
-                        <td><em className={`cs-status cs-status-${statusGroup(ticket.status)}`}>{STATUS_LABELS[ticket.status]}</em></td>
-                        <td>{reportedDay(ticket)}</td>
-                        <td>{days == null ? "Not recorded" : days}</td>
-                        <td>{ticket.assignee || "Not assigned"}</td>
-                        <td>{ticket.updatedOn && ticket.updatedOn !== reportedDay(ticket) ? ticket.updatedOn : "Not recorded"}</td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-              {!followups.length && <EmptyChart text="No cases in this selection need follow-up." onReset={reset} />}
-            </div>
-            <footer>
-              <span>{followups.length ? (currentPage - 1) * 8 + 1 : 0}–{Math.min(currentPage * 8, followups.length)} of {followups.length}</span>
-              <div><button type="button" disabled={currentPage <= 1} onClick={() => setPage(currentPage - 1)}>Previous</button><button type="button" disabled={currentPage >= pages} onClick={() => setPage(currentPage + 1)}>Next</button></div>
-            </footer>
-          </section>
         </>
       ) : (
         <div className="cs-analysis">
-          <Panel title="Cases by contact channel" question="How did the case arrive?">
-            <RankChart rows={channelRows} color="#0e7490" selectedId={filters.channel ?? ""} onPick={(id) => toggle("channel", id)} />
+          <Panel title="Cases by customer segment" question="Not specified is kept when the source does not name a school group." action={<div className="cs-modes"><button type="button" aria-pressed={!share} onClick={() => setShare(false)}>Count</button><button type="button" aria-pressed={share} onClick={() => setShare(true)}>Percentage</button></div>}>
+            <div className="cs-status-key"><span><i style={{ background: STATUS_COLORS.resolved }} />Resolved</span><span><i style={{ background: STATUS_COLORS.followup }} />Needs Follow-up</span><span><i style={{ background: STATUS_COLORS.closed }} />Closed Without Response</span></div>
+            <SegmentChart
+              rows={segments}
+              mode={share ? "share" : "count"}
+              selectedSegment={filters.segment ?? ""}
+              selectedGroup={filters.statusGroup ?? ""}
+              onSegment={(segment) => toggle("segment", segment)}
+              onStack={(segment, group) => {
+                const same = filters.segment === segment && filters.statusGroup === group;
+                patch({ status: "", segment: same ? "" : segment, statusGroup: same ? "" : group });
+              }}
+            />
           </Panel>
-          <Panel title="Cases by referring team" question="Which team referred the case, when that is recorded?">
-            <RankChart rows={teamRows} color="#7c3aed" selectedId={filters.referringTeam ?? ""} onPick={(id) => toggle("referringTeam", id)} />
+          <Panel title="Contact channel" question="How the case arrived.">
+            <BarList rows={channelRows} color="#159d49" selectedId={filters.channel ?? ""} onPick={(id) => toggle("channel", id)} />
           </Panel>
-          <Panel title="Open cases by age" question="How long open cases have been waiting since the reported date. These are age groups.">
-            <AgeColumns ages={ages} selected={filters.age ?? ""} onPick={(id) => patch({ age: filters.age === id ? "" : id, statusGroup: "followup" })} />
+          <Panel title="Referring team" question="Recorded only when a team referred the case.">
+            <BarList rows={teamRows} color="#1d4e3a" selectedId={filters.referringTeam ?? ""} onPick={(id) => toggle("referringTeam", id)} />
+          </Panel>
+          <Panel title="Open cases by age" question="Calendar days since the reported date.">
+            <AgeStrip ages={ages} selected={filters.age ?? ""} onPick={(id) => patch({ age: filters.age === id ? "" : id, statusGroup: filters.age === id ? "" : "followup" })} />
           </Panel>
           <p className="cs-notice">Resolution time, grade and subject heatmaps, and reopened-case trends stay out of this view until those dates and fields are recorded on the case.</p>
         </div>
@@ -421,48 +403,89 @@ export function DashboardBoard({
   );
 }
 
-function AgeColumns({ ages, selected, onPick }: { ages: { id: string; label: string; count: number }[]; selected: string; onPick: (id: string) => void }) {
-  const drawn = useFillIn();
-  const max = Math.max(1, ...ages.map((item) => item.count));
+function FollowUp({ followups, page, pages, today, openAll, preview, returnTo, listHref, onPage, onReset }: { followups: AnalyticsTicket[]; page: number; pages: number; today: string; openAll: AnalyticsTicket[]; preview: boolean; returnTo: string; listHref: string; onPage: (page: number) => void; onReset: () => void }) {
+  const slice = followups.slice((page - 1) * 8, page * 8);
   return (
-    <div className="cs-ages">
-      {ages.map((bucket, index) => (
-          <button type="button" key={bucket.id} className={selected === bucket.id ? "is-on" : selected ? "is-dim" : ""} style={selected && selected !== bucket.id ? { opacity: 0.16 } : undefined} aria-pressed={selected === bucket.id} onClick={() => onPick(bucket.id)}>
-          <i className={drawn ? "is-drawn" : ""} style={{ height: `${(bucket.count / max) * 100}%`, ...fillStyle(drawn, "y", index * 90) }} />
-          <strong>{bucket.count}</strong>
-          <span>{bucket.label}</span>
-        </button>
-      ))}
-    </div>
+    <section className="cs-panel" id="follow-up">
+      <header>
+        <div><h3>Cases requiring follow-up</h3><p>{followups.length} open cases in this selection, oldest reported date first.</p></div>
+        {!preview && <Link href={listHref}>Ticket list <ArrowUpRight size={14} /></Link>}
+      </header>
+      <div className="cs-table-scroll">
+        <table className="cs-follow-table">
+          <thead>
+            <tr><th>Case</th><th>Customer</th><th>Status</th><th>Age</th><th>Assignee</th><th>Latest update</th></tr>
+          </thead>
+          <tbody>
+            {slice.map((ticket) => {
+              const days = daysSinceReported(reportedDay(ticket), today);
+              const old = (days ?? 0) >= 15;
+              const unassigned = !ticket.assignee;
+              const siblings = siblingCases(ticket, openAll);
+              return (
+                <tr key={ticket.id} className={old || unassigned ? "is-attention" : ""}>
+                  <td>{preview ? ticket.number : <Link href={`/tickets/${ticket.id}?returnTo=${encodeURIComponent(returnTo)}`}>{ticket.number}</Link>}<small>{ticket.subject || "No summary recorded"}</small></td>
+                  <td>{ticket.customerName || "Not recorded"}{ticket.schoolName ? <small>{ticket.schoolName}</small> : null}{siblings.length > 0 && <small className="cs-sibling">Also open: {siblings.map((item) => item.number).join(", ")}</small>}</td>
+                  <td><em className={`cs-status cs-status-${statusGroup(ticket.status)}`}>{STATUS_LABELS[ticket.status]}</em></td>
+                  <td>{days == null ? "Not recorded" : `${days} days`}{old && <small>Older case</small>}</td>
+                  <td>{unassigned ? <strong className="cs-unassigned">Not assigned</strong> : ticket.assignee}</td>
+                  <td>{ticket.updatedOn && ticket.updatedOn !== reportedDay(ticket) ? ticket.updatedOn : "Not recorded"}</td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+        <div className="cs-follow-cards">
+          {slice.map((ticket) => {
+            const days = daysSinceReported(reportedDay(ticket), today);
+            const old = (days ?? 0) >= 15;
+            return (
+              <article key={ticket.id} className={old || !ticket.assignee ? "is-attention" : ""}>
+                <strong>{preview ? ticket.number : <Link href={`/tickets/${ticket.id}?returnTo=${encodeURIComponent(returnTo)}`}>{ticket.number}</Link>}</strong>
+                <p>{ticket.subject || "No summary recorded"}</p>
+                <p>{ticket.customerName || "Not recorded"}{ticket.schoolName ? ` · ${ticket.schoolName}` : ""}</p>
+                <p><em className={`cs-status cs-status-${statusGroup(ticket.status)}`}>{STATUS_LABELS[ticket.status]}</em> {days == null ? "Age not recorded" : `${days} days`} · {ticket.assignee || "Not assigned"}</p>
+              </article>
+            );
+          })}
+        </div>
+        {!followups.length && <EmptyChart text="No cases in this selection need follow-up." onReset={onReset} />}
+      </div>
+      <footer>
+        <span>{followups.length ? (page - 1) * 8 + 1 : 0}–{Math.min(page * 8, followups.length)} of {followups.length}</span>
+        <div><button type="button" disabled={page <= 1} onClick={() => onPage(page - 1)}>Previous</button><button type="button" disabled={page >= pages} onClick={() => onPage(page + 1)}>Next</button></div>
+      </footer>
+    </section>
   );
 }
 
-function Kpi({ label, value, detail, selected, dim, tone, onClick }: { label: string; value: number; detail: string; selected: boolean; dim: boolean; tone?: StatusGroup; onClick: () => void }) {
+function Kpi({ label, value, detail, selected, dim, tone, spark, onClick }: { label: string; value: number; detail: string; selected: boolean; dim: boolean; tone?: StatusGroup; spark?: number[]; onClick: () => void }) {
   return (
     <button type="button" className={`cs-kpi ${selected ? "is-on" : ""} ${dim ? "is-dim" : ""} ${tone ? `cs-kpi-${tone}` : ""}`} aria-pressed={selected} onClick={onClick}>
       {selected && <em>Selected</em>}
       <span>{label}</span>
-      <strong><CountUp value={value} /></strong>
+      <strong>{value.toLocaleString()}</strong>
       <small>{detail}</small>
+      {spark && <Sparkline values={spark} />}
     </button>
   );
 }
 
-function CountUp({ value }: { value: number }) {
-  const [shown, setShown] = useState(0);
+function FilterDrawer({ onClose, children }: { onClose: () => void; children: ReactNode }) {
+  const ref = useRef<HTMLDialogElement>(null);
   useEffect(() => {
-    const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-    const start = performance.now();
-    let frame = 0;
-    const tick = (now: number) => {
-      const progress = reduce ? 1 : Math.min(1, (now - start) / 720);
-      setShown(Math.round(value * (1 - (1 - progress) ** 3)));
-      if (progress < 1) frame = requestAnimationFrame(tick);
-    };
-    frame = requestAnimationFrame(tick);
-    return () => cancelAnimationFrame(frame);
-  }, [value]);
-  return <>{shown.toLocaleString()}</>;
+    const node = ref.current;
+    if (!node) return;
+    node.showModal();
+    return () => { if (node.open) node.close(); };
+  }, []);
+  return (
+    <dialog ref={ref} className="cs-drawer" aria-label="Dashboard filters" onClose={onClose}>
+      <header><h3>Filters</h3><button type="button" onClick={onClose} aria-label="Close filters"><X size={16} /></button></header>
+      <div className="cs-filters">{children}</div>
+      <footer><button type="button" onClick={onClose}>Show results</button></footer>
+    </dialog>
+  );
 }
 
 function Select({ label, value, options, onChange }: { label: string; value: string; options: Option[]; onChange: (value: string) => void }) {
