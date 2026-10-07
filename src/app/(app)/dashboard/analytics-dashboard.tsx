@@ -281,7 +281,11 @@ export function DashboardBoard({
   const teamRows = rankValues(teamFrame, (ticket) => referringTeam(ticket.source), 8, "Other teams");
   const ages = AGE_BUCKETS.map((bucket) => ({
     ...bucket,
-    count: ageFrame.filter((ticket) => isOpen(ticket) && ageBucketId(daysSinceReported(reportedDay(ticket), today) ?? 0) === bucket.id).length,
+    count: ageFrame.filter((ticket) => {
+      if (!isOpen(ticket)) return false;
+      const days = daysSinceReported(reportedDay(ticket), today);
+      return days != null && ageBucketId(days) === bucket.id;
+    }).length,
   }));
   const openInView = rows.filter((ticket) => statusGroup(ticket.status) === "followup");
   const unassignedOpen = openInView.filter((ticket) => !ticket.assignee).length;
@@ -346,7 +350,7 @@ export function DashboardBoard({
           {([["all", "All"], ["7", "7 days"], ["30", "30 days"], ["month", "This month"]] as const).map(([id, label]) => (
             <button type="button" key={id} aria-pressed={activePreset === id} onClick={() => applyPreset(id)}>{label}</button>
           ))}
-          <span className={activePreset === "custom" ? "is-custom" : ""}>Custom</span>
+          {activePreset === "custom" && <span className="is-custom">Custom</span>}
         </div>
         <label>From<input type="date" value={filters.from} max={filters.to} onChange={(event) => patch({ from: event.target.value, bucketFrom: "", bucketTo: "" })} /></label>
         <label>To<input type="date" value={filters.to} min={filters.from} onChange={(event) => patch({ to: event.target.value, bucketFrom: "", bucketTo: "" })} /></label>

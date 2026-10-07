@@ -63,9 +63,12 @@ export function Sidebar({
       <Image
         src="/brand/logo.jpg"
         alt="Selah El Telmeez"
-        width={156}
-        height={62}
-        className="support-company-logo mx-2 mb-4 h-[62px] w-auto object-contain mix-blend-multiply"
+        width={1476}
+        height={570}
+        priority
+        sizes="180px"
+        className="support-company-logo mx-2 mb-4 h-[62px] w-auto self-start object-contain mix-blend-multiply"
+        style={{ width: "auto" }}
       />
 
       <div className="support-nav-brand mx-2 mb-5 flex items-center gap-2 border-t pt-5 text-sm font-semibold">
@@ -171,7 +174,7 @@ export function Sidebar({
       </aside>
       <div className="flex h-16 shrink-0 items-center justify-between border-b bg-background px-4 lg:hidden">
         <span className="flex items-center gap-2 text-sm font-semibold">
-          <Image src="/brand/logo.jpg" alt="Selah El Telmeez" width={98} height={40} className="h-10 w-auto object-contain mix-blend-multiply" />
+          <Image src="/brand/logo.jpg" alt="Selah El Telmeez" width={1476} height={570} priority sizes="120px" className="h-10 w-auto shrink-0 object-contain mix-blend-multiply" style={{ width: "auto" }} />
           <span className="sr-only">Support Center</span>
         </span>
         <Sheet open={open} onOpenChange={setOpen}>
