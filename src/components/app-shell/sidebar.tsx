@@ -18,7 +18,6 @@ import {
   LogOut,
   MessageCircle,
   Menu,
-  ChevronRight,
   PanelLeftClose,
   PanelLeftOpen,
   Headphones,
@@ -27,9 +26,8 @@ import {
   Users,
   type LucideIcon,
 } from "lucide-react";
-import { cn } from "@/lib/utils";
 import { ROLE_LABELS, type CurrentUser } from "@/lib/auth/roles";
-import type { NavIcon, NavSection } from "./nav";
+import { navItemActive, type NavIcon, type NavSection } from "./nav";
 
 const ICONS: Record<NavIcon, LucideIcon> = {
   inbox: MessageCircle,
@@ -59,7 +57,7 @@ export function Sidebar({
     .toUpperCase();
 
   const content = (
-    <div className="support-nav-content flex h-full flex-col gap-2 overflow-y-auto bg-sidebar px-4 py-5">
+    <div className="support-nav-content flex h-full flex-col gap-2 overflow-y-auto px-4 py-5">
       <Image
         src="/brand/logo.jpg"
         alt="Selah El Telmeez"
@@ -76,52 +74,41 @@ export function Sidebar({
         <span>Support Center</span>
       </div>
       <nav aria-label="Main navigation" className="flex flex-1 flex-col gap-5">
-        {sections.map((section) => (
-          <div key={section.heading} className="flex flex-col gap-1">
-            <p className="px-3 pt-2 pb-1.5 text-xs font-semibold tracking-wider text-muted-foreground uppercase">
+        {sections.map((section) => {
+          const hrefs = sections.flatMap((group) => group.items.map((entry) => entry.href));
+          return (
+          <div key={section.heading} className="flex flex-col gap-0.5">
+            <p className="px-3 pt-2 pb-1.5 text-xs font-semibold tracking-wider uppercase">
               {section.heading}
             </p>
             {section.items.map((item) => {
               const Icon = ICONS[item.icon];
-              const active =
-                pathname === item.href || pathname.startsWith(`${item.href}/`);
+              const active = navItemActive(pathname, item.href, hrefs);
               return (
                 <Link
                   key={item.href}
                   href={item.href}
-                  title={item.label}
+                  title={collapsed ? item.label : undefined}
                   aria-label={item.label}
                   aria-current={active ? "page" : undefined}
                   onClick={() => setOpen(false)}
-                  className={cn(
-                    "nav-link group flex h-11 items-center gap-2.5 rounded-xl px-3 text-sm font-medium",
-                    active
-                      ? "bg-sidebar-accent font-semibold text-sidebar-accent-foreground"
-                      : "text-muted-foreground hover:bg-white hover:text-foreground",
-                  )}
+                  className="nav-link group flex h-10 items-center gap-2.5 rounded-[10px] px-3 text-sm font-medium"
                 >
-                  <Icon
-                    className={cn(
-                      "size-[18px]",
-                      active ? "text-brand-action" : "text-muted-foreground",
-                    )}
-                  />
+                  <Icon className="size-[18px] shrink-0" />
                   <span className="support-nav-label min-w-0 flex-1 truncate">
                     {item.label}
                   </span>
                   {item.badge && (
-                    <span className="support-nav-badge rounded-full bg-brand-tint px-2 py-0.5 text-[11px] font-semibold text-brand-action">
+                    <span className="support-nav-badge rounded-full bg-[#e6f5ec] px-2 py-0.5 text-[11px] font-semibold text-brand-action">
                       {item.badge}
                     </span>
-                  )}
-                  {active && !item.badge && (
-                    <ChevronRight className="ml-auto size-3.5" />
                   )}
                 </Link>
               );
             })}
           </div>
-        ))}
+        );
+        })}
       </nav>
 
       <div className="flex items-center gap-2.5 border-t px-2 pt-5 pb-1.5">

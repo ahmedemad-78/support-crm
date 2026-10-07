@@ -4,6 +4,17 @@ export type NavIcon = "inbox" | "tickets" | "dashboard" | "users" | "settings" |
 export type NavItem = { href: string; label: string; icon: NavIcon; badge?: string };
 export type NavSection = { heading: string; items: NavItem[] };
 
+export function navItemActive(pathname: string, href: string, hrefs: string[]) {
+  if (pathname === href) return true;
+  if (!href || !pathname.startsWith(`${href}/`)) return false;
+  return !hrefs.some(
+    (other) =>
+      other !== href &&
+      other.startsWith(`${href}/`) &&
+      (pathname === other || pathname.startsWith(`${other}/`)),
+  );
+}
+
 export function navFor(user: CurrentUser): NavSection[] {
   switch (user.role) {
     case "support_agent": {
