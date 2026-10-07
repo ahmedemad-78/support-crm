@@ -333,7 +333,7 @@ export function DashboardBoard({
   ); }
 
   return (
-    <div className={`cs-board${refreshing ? " is-refreshing" : ""}`} aria-busy={refreshing}>
+    <div className={`cs-board${refreshing ? " is-refreshing" : ""}`} aria-busy={refreshing} translate="no">
       <header className="cs-title">
         <div>
           <h2>Dashboard</h2>
@@ -440,7 +440,7 @@ export function DashboardBoard({
         <Panel title="Contact channel" question="How the case arrived. Several sources can share one channel.">
           <SplitBar rows={channelRows} colors={CHANNEL_COLORS} selectedId={filters.channel ?? ""} onPick={(id) => toggle("channel", id)} />
         </Panel>
-        <Panel title="Referring team" question="Filled only when Moderation or Marketing referred the case.">
+        <Panel title="Referring team" question="Only Moderation and Marketing cases have a referring team.">
           <BarList rows={teamRows} color="#1d4e3a" selectedId={filters.referringTeam ?? ""} onPick={(id) => toggle("referringTeam", id)} />
         </Panel>
       </div>

@@ -352,17 +352,32 @@ export function SegmentChart({
   onStack: (segment: string, group: StatusGroup) => void;
 }) {
   const max = Math.max(1, ...rows.map((row) => row.total));
-  const signature = rows.map((row) => `${row.segment}:${row.total}:${row.parts.map((part) => part.count).join(",")}`).join("|");
+  const total = rows.reduce((sum, row) => sum + row.total, 0);
+  const grand = Math.max(1, total);
+  const floors = rows.map((row) => Math.floor((row.total / grand) * 100));
+  let remainder = total === 0 ? 0 : 100 - floors.reduce((sum, value) => sum + value, 0);
+  const shareBySegment = Object.fromEntries(rows.map((row, index) => [row.segment, floors[index]]));
+  rows
+    .map((row, index) => ({ segment: row.segment, fraction: (row.total / grand) * 100 - floors[index] }))
+    .sort((a, b) => b.fraction - a.fraction)
+    .forEach((row) => {
+      if (remainder > 0) {
+        shareBySegment[row.segment] += 1;
+        remainder -= 1;
+      }
+    });
+  const signature = `${mode}|` + rows.map((row) => `${row.segment}:${row.total}:${row.parts.map((part) => part.count).join(",")}`).join("|");
   return (
     <div className="cs-segments cs-draw" key={signature}>
       {rows.map((row) => {
         const selectedHere = Boolean(selectedSegment || selectedGroup);
+        const segmentShare = shareBySegment[row.segment];
         return (
           <div key={row.segment} className="cs-segment">
             <button type="button" className={`cs-segment-name cs-${mark(Boolean(selectedSegment), selectedSegment === row.segment)}`} onClick={() => onSegment(row.segment)} aria-pressed={selectedSegment === row.segment}>
               {row.segment}
             </button>
-            <div className="cs-segment-track">
+            <div className="cs-segment-track" style={mode === "share" ? { width: `${Math.max(segmentShare, row.total ? 6 : 0)}%` } : undefined}>
               {row.parts.filter((part) => part.count > 0).map((part) => {
                 const width = mode === "share" ? (row.total ? (part.count / row.total) * 100 : 0) : (part.count / max) * 100;
                 const state = mark(selectedHere, (!selectedSegment || selectedSegment === row.segment) && (!selectedGroup || selectedGroup === part.group));
@@ -384,7 +399,7 @@ export function SegmentChart({
                 );
               })}
             </div>
-            <strong>{row.total}</strong>
+            <strong>{mode === "share" ? `${segmentShare}%` : row.total}</strong>
           </div>
         );
       })}

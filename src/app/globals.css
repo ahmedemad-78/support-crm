@@ -177,7 +177,7 @@ tbody tr:focus-within { background-color: var(--brand-tint); }
 @media (min-width: 1024px) { .login-layout { grid-template-columns: 1fr 1fr; } }
 .support-nav-content .nav-link:hover { background: #e7f6ee; color: #173126; outline: 2px solid #159d49; outline-offset: -2px; }
 .support-nav-content .nav-link:hover svg { color: #0f7a39; }
-.support-nav-content .nav-link[aria-current="page"]:hover { background: #ffffff; color: #0f7a39; box-shadow: 0 1px 2px #17312614, 0 0 0 1px #cfe3d6; }
+.support-nav-content .nav-link[aria-current="page"]:hover { background: #0c6a31; color: #ffffff; outline: none; box-shadow: 0 1px 2px #17312624; }
 @media (max-width: 639px) {
   .workspace-main > .px-8 { padding-left: 1rem; padding-right: 1rem; }
 }
@@ -189,8 +189,9 @@ tbody tr:focus-within { background-color: var(--brand-tint); }
 .support-nav-brand, .support-nav-content > div:last-child { border-color:#c5d4cb; }
 .support-nav-content .nav-link { font-size:13px; height:40px; border-radius:10px; color:#31453a; }
 .support-nav-content .nav-link svg { color:#2f6b4a; }
-.support-nav-content .nav-link[aria-current="page"] { background:#ffffff; color:#0f7a39; font-weight:650; box-shadow:0 1px 2px #17312614, 0 0 0 1px #cfe3d6; }
-.support-nav-content .nav-link[aria-current="page"] svg { color:#0f7a39; }
+.support-nav-content .nav-link[aria-current="page"] { background:#0f7a39; color:#ffffff; font-weight:650; box-shadow:0 1px 2px #17312624; }
+.support-nav-content .nav-link[aria-current="page"] svg { color:#ffffff; }
+.support-nav-content .nav-link[aria-current="page"] .support-nav-badge { background:#ffffff; color:#0f7a39; }
 .support-nav-content nav > div > p { font-size:10px; letter-spacing:.12em; color:#5f7368; }
 .support-sidebar[data-collapsed=true] { width:76px; }
 .support-sidebar[data-collapsed=true] .support-nav-content { padding-inline:10px; }
@@ -413,7 +414,7 @@ tbody tr:focus-within { background-color: var(--brand-tint); }
 .cs-kpi-closed.is-on { box-shadow:inset 0 0 0 2px #6b7280; }
 .cs-kpi-resolved { color:#0f7a39; } .cs-kpi-followup { color:#8a5600; } .cs-kpi-closed { color:#4b5563; }
 .cs-spark { width:88px; height:28px; margin-top:4px; color:var(--cs-green); }
-.cs-row { display:grid; gap:12px; }
+.cs-row { display:grid; gap:12px; align-items:start; }
 .cs-row-volume { grid-template-columns:minmax(0,1.7fr) minmax(280px,.8fr); }
 .cs-row-even { grid-template-columns:1.1fr .9fr; }
 .cs-analysis { display:grid; grid-template-columns:1.2fr .8fr; gap:12px; }
@@ -462,13 +463,17 @@ tbody tr:focus-within { background-color: var(--brand-tint); }
 .cs-topics { padding:4px 12px 16px; }
 .cs-topics ol { margin:0; padding:0; list-style:none; }
 .cs-topics li button,.cs-topic-aside button { display:grid; grid-template-columns:28px minmax(0,1fr) auto auto; gap:10px; align-items:center; width:100%; border:0; border-bottom:1px solid #eef3f0; background:transparent; padding:12px 10px; text-align:left; line-height:1.35; transition:opacity .28s ease, background-color .28s ease, box-shadow .28s ease; }
+.cs-topic-aside button { grid-template-columns:minmax(0,1fr) auto auto; }
+.cs-topics li button span,.cs-topic-aside button span { min-width:0; }
+.cs-topics strong,.cs-topics small { white-space:nowrap; }
 .cs-topics em { color:var(--cs-muted); font-style:normal; font-size:12px; font-weight:700; }
 .cs-topics button.cs-on { background:#f3faf6; box-shadow:inset 3px 0 0 var(--cs-green); }
 .cs-topics button.cs-dim { opacity:.32; }
 .cs-topics i { grid-column:2 / -1; color:#8a5600; font-style:normal; font-size:11px; }
 .cs-topic-aside { margin-top:8px; }
 .cs-segments { display:grid; gap:14px; padding:8px 20px 20px; }
-.cs-segment { display:grid; grid-template-columns:148px minmax(0,1fr) 36px; gap:12px; align-items:center; }
+.cs-segment { display:grid; grid-template-columns:148px minmax(0,1fr) 52px; gap:12px; align-items:center; }
+.cs-segment > strong { text-align:right; font-variant-numeric:tabular-nums; }
 .cs-segment-name { border:0; background:transparent; text-align:left; font-size:12px; font-weight:700; }
 .cs-segment-name.cs-on { color:var(--cs-green-ink); }
 .cs-segment-name.cs-dim { opacity:.35; }
