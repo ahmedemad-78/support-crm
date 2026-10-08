@@ -141,7 +141,7 @@ export function Sidebar({
     <>
       <aside
         data-collapsed={collapsed}
-        className="support-sidebar sticky top-0 hidden h-svh shrink-0 border-r border-sidebar-border lg:block"
+        className="support-sidebar sticky top-0 z-30 hidden h-svh shrink-0 border-r border-sidebar-border lg:block"
       >
         <button
           type="button"

@@ -183,8 +183,8 @@ tbody tr:focus-within { background-color: var(--brand-tint); }
 }
 @keyframes enter { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
 @keyframes orbit-drift { from { transform: translateY(-20px); } to { transform: translateY(30px); } }
-.support-sidebar { width:236px; transition:width .2s; background:#d7e3dc; border-color:#c5d4cb; }
-.support-nav-collapse { position:absolute; top:23px; right:-11px; z-index:10; display:flex; align-items:center; justify-content:center; width:23px; height:23px; background:white; border:1px solid #c5d4cb; border-radius:6px; color:#5d7368; box-shadow:0 2px 4px #20352110; }
+.support-sidebar { width:236px; transition:width .2s; background:#d7e3dc; border-color:#c5d4cb; overflow:visible; }
+.support-nav-collapse { position:absolute; top:23px; right:-11px; z-index:2; display:flex; align-items:center; justify-content:center; width:23px; height:23px; background:white; border:1px solid #c5d4cb; border-radius:6px; color:#5d7368; box-shadow:0 2px 4px #20352110; }
 .support-nav-content { background:#d7e3dc; color:#173126; }
 .support-nav-brand, .support-nav-content > div:last-child { border-color:#c5d4cb; }
 .support-nav-content .nav-link { font-size:13px; height:40px; border-radius:10px; color:#31453a; }
