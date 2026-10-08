@@ -66,11 +66,10 @@ export function Sidebar({
         priority
         sizes="180px"
         className="support-company-logo mx-2 mb-4 h-[62px] w-auto self-start object-contain mix-blend-multiply"
-        style={{ width: "auto" }}
       />
 
       <div className="support-nav-brand mx-2 mb-5 flex items-center gap-2 border-t pt-5 text-sm font-semibold">
-        <Headphones className="size-4 shrink-0 text-brand-action" />
+        <Headphones className="size-[18px] shrink-0 text-brand-action" />
         <span>Support Center</span>
       </div>
       <nav aria-label="Main navigation" className="flex flex-1 flex-col gap-5">
