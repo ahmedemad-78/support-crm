@@ -4,7 +4,7 @@ import Link from "next/link";
 import { ArrowDownToLine, ArrowUpRight, RefreshCw, SlidersHorizontal, X } from "lucide-react";
 import { sourceLabel, STATUS_LABELS, TICKET_STATUSES, type TicketStatus } from "@/lib/tickets/constants";
 import { cairoDate, shiftDay } from "@/lib/tickets/dashboard-model";
-import { dashboardQuery, ticketListQuery, type DashboardFilters } from "@/lib/tickets/filters";
+import { dashboardListHref, dashboardQuery, type DashboardFilters } from "@/lib/tickets/filters";
 import { csvCell, inPeriod, isOpen, validDay, type AnalyticsTicket } from "@/lib/tickets/analytics";
 import {
   AGE_BUCKETS,
@@ -318,7 +318,7 @@ export function DashboardBoard({
     patch({ channel: same ? "" : lineId, bucketFrom: same ? "" : from, bucketTo: same ? "" : to });
   }
   const activePreset = filters.from === earliest && filters.to === today ? "all" : filters.from === shiftDay(today, -6) && filters.to === today ? "7" : filters.from === shiftDay(today, -29) && filters.to === today ? "30" : filters.from === `${today.slice(0, 8)}01` && filters.to === today ? "month" : "custom";
-  const listHref = `/tickets${ticketListQuery({ view: "all", status: filters.status, source: filters.source, city: "", category: "", assignee: "", range: "all", q: (filters.q ?? "").slice(0, 80), page: 1 })}`;
+  const listHref = dashboardListHref(filters, "followup");
   const updated = new Date(snapshot.asOf).toLocaleString("en-GB", { timeZone: "Africa/Cairo", hour: "2-digit", minute: "2-digit", day: "numeric", month: "short" });
   function secondaryFilters() { return (
     <>
@@ -455,7 +455,7 @@ function FollowUp({ followups, page, pages, today, openAll, preview, returnTo, l
     <section className="cs-panel" id="follow-up">
       <header>
         <div><h3>Cases requiring follow-up</h3><p>{followups.length} open cases in this selection, oldest reported date first.</p></div>
-        {!preview && <Link href={listHref}>Ticket list <ArrowUpRight size={14} /></Link>}
+        {!preview && <Link href={listHref}>Open these cases <ArrowUpRight size={14} /></Link>}
       </header>
       <div className="cs-table-scroll">
         <table className="cs-follow-table">
@@ -475,7 +475,7 @@ function FollowUp({ followups, page, pages, today, openAll, preview, returnTo, l
                   <td><em className={`cs-status cs-status-${statusGroup(ticket.status)}`}>{STATUS_LABELS[ticket.status]}</em></td>
                   <td>{days == null ? "Not recorded" : `${days} days`}{old && <small>Older case</small>}</td>
                   <td>{unassigned ? <strong className="cs-unassigned">Not assigned</strong> : ticket.assignee}</td>
-                  <td>{ticket.updatedOn && ticket.updatedOn !== reportedDay(ticket) ? ticket.updatedOn : "Not recorded"}</td>
+                  <td>{ticket.updatedOn ? <time dateTime={ticket.updatedAt || ticket.updatedOn}>{ticket.updatedOn}</time> : "Not recorded"}</td>
                 </tr>
               );
             })}

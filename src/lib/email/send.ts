@@ -1,9 +1,9 @@
 import "server-only";
 import type { ConnectionOptions } from "node:tls";
 import { createTransport } from "nodemailer";
+import { MISSING_MAIL_CONFIG } from "@/lib/email/messages";
 
-export const MISSING_MAIL_CONFIG =
-  "Set SMTP_HOST, SMTP_USER, and SMTP_PASSWORD (Gmail or Outlook) or RESEND_API_KEY";
+export { MISSING_MAIL_CONFIG };
 
 const RESEND_FROM = "Support Center <onboarding@resend.dev>";
 

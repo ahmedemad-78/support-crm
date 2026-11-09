@@ -1,6 +1,6 @@
 import { shiftDay } from "./dashboard-model";
-import { inPeriod, validDay, type AnalyticsTicket } from "./analytics";
-import type { TicketStatus } from "./constants";
+import { csvCell, inPeriod, validDay, type AnalyticsTicket } from "./analytics";
+import { sourceLabel, STATUS_LABELS, type TicketStatus } from "./constants";
 
 export type StatusGroup = "followup" | "resolved" | "closed";
 export type VolumeMode = "day" | "week" | "month";
@@ -274,4 +274,90 @@ export function siblingCases(ticket: AnalyticsTicket, openTickets: AnalyticsTick
   const keys = new Set(identityKeys(ticket));
   if (!keys.size) return [];
   return openTickets.filter((other) => other.id !== ticket.id && identityKeys(other).some((key) => keys.has(key)));
+}
+
+export type PopulationFilters = {
+  from: string;
+  to: string;
+  source: string;
+  status: string;
+  segment?: string;
+  channel?: string;
+  referringTeam?: string;
+  statusGroup?: string;
+  topic?: string;
+  trackerCause?: string;
+  requestType?: string;
+  fawry?: string;
+  q?: string;
+  bucketFrom?: string;
+  bucketTo?: string;
+  age?: string;
+};
+
+export function dashboardPopulation(tickets: AnalyticsTicket[], filters: PopulationFilters, today: string) {
+  const bare = toOverviewQuery(filters, [], []);
+  const causeFrame = tickets.filter((ticket) => matchesOverview(ticket, bare, ["cause"], today));
+  const topicFrame = tickets.filter((ticket) => matchesOverview(ticket, bare, ["topic"], today));
+  const query = toOverviewQuery(
+    filters,
+    topNames(rankValues(causeFrame, (ticket) => ticket.trackerCause, 5, "Other causes")),
+    topNames(rankValues(topicFrame, (ticket) => ticket.topic, 6, "Other topics")),
+  );
+  return tickets.filter((ticket) => matchesOverview(ticket, query, [], today));
+}
+
+function toOverviewQuery(filters: PopulationFilters, topCauses: string[], topTopics: string[]): OverviewQuery {
+  return {
+    from: filters.from,
+    to: filters.to,
+    source: filters.source,
+    segment: filters.segment ?? "",
+    channel: filters.channel ?? "",
+    referringTeam: filters.referringTeam ?? "",
+    status: filters.status,
+    statusGroup: filters.statusGroup ?? "",
+    topic: filters.topic ?? "",
+    trackerCause: filters.trackerCause ?? "",
+    requestType: filters.requestType ?? "",
+    fawry: filters.fawry ?? "",
+    q: filters.q ?? "",
+    bucketFrom: filters.bucketFrom ?? "",
+    bucketTo: filters.bucketTo ?? "",
+    age: filters.age ?? "",
+    topCauses,
+    topTopics,
+  };
+}
+
+export function casesCsv(tickets: AnalyticsTicket[]) {
+  const header = [
+    "Case", "Customer", "School", "Phone", "Email", "Reported date", "Source", "Segment", "Channel", "Referring team",
+    "Status", "Request type", "Topic", "Root cause", "Action", "Outcome", "Fawry", "Assignee", "Description",
+  ];
+  const lines = [
+    header,
+    ...tickets.map((ticket) => [
+      ticket.number,
+      ticket.customerName ?? "",
+      ticket.schoolName ?? "",
+      ticket.customerPhone ?? "",
+      ticket.customerEmail ?? "",
+      reportedDay(ticket),
+      sourceLabel(ticket.source),
+      customerSegment(ticket.source),
+      contactChannel(ticket.source),
+      referringTeam(ticket.source),
+      STATUS_LABELS[ticket.status],
+      ticket.requestType,
+      ticket.topic,
+      ticket.trackerCause,
+      ticket.trackerAction,
+      ticket.outcome,
+      ticket.fawry === "yes" ? "Yes" : ticket.fawry === "no" ? "No" : "",
+      ticket.assignee ?? "",
+      ticket.subject,
+    ]),
+  ];
+  return `\ufeff${lines.map((line) => line.map((value) => csvCell(value)).join(",")).join("\r\n")}`;
 }

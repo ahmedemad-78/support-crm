@@ -13,6 +13,7 @@ import {
   STATUS_LABELS,
   type TicketStatus,
 } from "@/lib/tickets/constants";
+import { safeAppReturn } from "@/lib/tickets/filters";
 import { addTicketNote, saveResolution, saveTracker } from "../actions";
 import { CopyTicketNumber, CredentialsValue, TicketControls } from "./ticket-controls";
 
@@ -23,7 +24,7 @@ export default async function AgentTicketPage({
   const user = await requireUser(["support_agent", "manager"]);
   const { ticketId } = await params;
   const { error: errorMessage, returnTo } = await searchParams;
-  const backHref = typeof returnTo === "string" && returnTo.startsWith("/dashboard") && !returnTo.startsWith("//") ? returnTo : "/tickets";
+  const backHref = safeAppReturn(typeof returnTo === "string" ? returnTo : undefined) ?? "/tickets";
   const supabase = await createClient();
 
   const { data: ticket } = await supabase
@@ -122,6 +123,7 @@ export default async function AgentTicketPage({
               status={status}
               assigneeId={ticket.assignee_id}
               agents={agents.data ?? []}
+              returnTo={backHref === "/tickets" ? "" : backHref}
             />
           ) : (
             <p className="text-sm text-muted-foreground">{STATUS_LABELS[status]} · read-only</p>
@@ -206,6 +208,7 @@ export default async function AgentTicketPage({
             {canEdit && (
               <form action={addTicketNote} className="mt-4 flex flex-col gap-2">
                 <input type="hidden" name="ticketId" value={ticket.id} />
+                {backHref !== "/tickets" && <input type="hidden" name="returnTo" value={backHref} />}
                 <textarea
                   name="body"
                   required
@@ -227,6 +230,7 @@ export default async function AgentTicketPage({
             <p className="mt-1 text-xs text-muted-foreground">Visible to the person who opened the ticket, the manager, and Technical Support.</p>
             <form action={saveTracker} className="mt-4 flex flex-col gap-3">
               <input type="hidden" name="ticketId" value={ticket.id} />
+              {backHref !== "/tickets" && <input type="hidden" name="returnTo" value={backHref} />}
               <TrackerSelect label="Request type" name="requestTypeId" value={ticket.request_type_id} options={requestTypes.data ?? []} disabled={!canEdit} />
               <TrackerSelect label="Topic" name="topicId" value={ticket.topic_id} options={topics.data ?? []} disabled={!canEdit} />
               <TrackerSelect label="Cause" name="trackerCauseId" value={ticket.tracker_cause_id} options={trackerCauses.data ?? []} disabled={!canEdit} />
@@ -253,6 +257,7 @@ export default async function AgentTicketPage({
             <h3 className="text-base font-semibold">Technical classification</h3>
             <form action={saveResolution} className="mt-4 flex flex-col gap-3">
               <input type="hidden" name="ticketId" value={ticket.id} />
+              {backHref !== "/tickets" && <input type="hidden" name="returnTo" value={backHref} />}
               <TrackerSelect label="Issue category" name="issueCategoryId" value={ticket.issue_category_id} options={categories.data ?? []} disabled={!canEdit} />
               <TrackerSelect label="Root cause" name="rootCauseId" value={ticket.root_cause_id} options={causes.data ?? []} disabled={!canEdit} />
               <Field label="Action taken">

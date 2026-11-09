@@ -1,5 +1,6 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
+import { skipsBrowserSession } from "@/lib/http/session-boundary";
 
 const PUBLIC_PATHS = ["/login"];
 
@@ -27,6 +28,8 @@ export async function proxy(request: NextRequest) {
       },
     },
   );
+
+  if (skipsBrowserSession(request.nextUrl.pathname)) return supabaseResponse;
 
   const { data } = await supabase.auth.getClaims();
   const isSignedIn = Boolean(data?.claims?.sub);

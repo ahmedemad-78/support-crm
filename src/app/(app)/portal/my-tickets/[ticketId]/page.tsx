@@ -25,7 +25,7 @@ export default async function PortalTicketPage({ params }: PageProps<"/portal/my
   const { data: ticket } = await supabase
     .from("tickets")
     .select(
-      "id, ticket_number, status, created_at, customer_name, customer_email, school_name, credentials_username, issue_date, end_user_type, platform, is_latest_version, app_version, device_type, page_screen, steps, issue_description, fawry_payment, resolution_notes, follow_up_notes, tracker_notes, cities(name), request_types(name), topics(name), tracker_causes(name), tracker_actions(name), outcomes(name)",
+      "id, ticket_number, status, created_at, customer_name, customer_email, customer_phone, school_name, credentials_username, issue_date, end_user_type, platform, is_latest_version, app_version, device_type, page_screen, steps, issue_description, fawry_payment, resolution_notes, follow_up_notes, tracker_notes, cities(name), request_types(name), topics(name), tracker_causes(name), tracker_actions(name), outcomes(name)",
     )
     .eq("id", ticketId)
     .eq("created_by", user.id)
@@ -52,6 +52,7 @@ export default async function PortalTicketPage({ params }: PageProps<"/portal/my
   const fields: [string, string][] = [
     ["Customer name", ticket.customer_name],
     ["Email", ticket.customer_email ?? "—"],
+    ["Phone", ticket.customer_phone ?? "—"],
     ["User type", ticket.end_user_type ? END_USER_TYPE_LABELS[ticket.end_user_type as keyof typeof END_USER_TYPE_LABELS] : "—"],
     ["User name", ticket.credentials_username ?? "—"],
     ["School", ticket.school_name ?? "—"],

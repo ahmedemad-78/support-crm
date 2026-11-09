@@ -120,6 +120,15 @@ export function NewTicketForm({
         <div className="grid grid-cols-1 gap-x-5 gap-y-4 sm:grid-cols-2">
           <TextField name="customer_name" label="Name" error={err("customer_name")} />
           <TextField name="customer_email" label="Email" type="email" error={err("customer_email")} />
+          <TextField
+            name="customer_phone"
+            label="Phone"
+            optional
+            inputMode="tel"
+            autoComplete="tel"
+            placeholder="e.g. 0100 123 4567"
+            error={err("customer_phone")}
+          />
           <SelectField name="end_user_type" label="User type" error={err("end_user_type")}>
             {END_USER_TYPES.map((t) => (
               <option key={t} value={t}>

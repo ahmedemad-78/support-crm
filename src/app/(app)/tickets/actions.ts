@@ -6,6 +6,7 @@ import { getCurrentUser } from "@/lib/auth/session";
 import { createClient } from "@/lib/supabase/server";
 import { deliverPendingEmails } from "@/lib/email/deliver";
 import { TICKET_STATUSES, type TicketStatus } from "@/lib/tickets/constants";
+import { safeAppReturn } from "@/lib/tickets/filters";
 
 async function supportAgent() {
   const user = await getCurrentUser();
@@ -13,8 +14,22 @@ async function supportAgent() {
   return user;
 }
 
-function ticketPath(id: string, error?: string) {
-  return error ? `/tickets/${id}?error=${encodeURIComponent(error)}` : `/tickets/${id}`;
+function ticketPath(id: string, error?: string, returnTo?: string | null) {
+  const params = new URLSearchParams();
+  if (error) params.set("error", error);
+  if (returnTo) params.set("returnTo", returnTo);
+  const query = params.toString();
+  return query ? `/tickets/${id}?${query}` : `/tickets/${id}`;
+}
+
+function requestedReturn(formData: FormData) {
+  return safeAppReturn(String(formData.get("returnTo") ?? ""));
+}
+
+function updateResult(result: { data: { id: string }[] | null; error: { message: string } | null }) {
+  if (result.error) return result.error.message;
+  if (!result.data?.length) return "This case was not updated. It may no longer exist, or this account cannot change it.";
+  return undefined;
 }
 
 export async function updateTicketHeader(formData: FormData) {
@@ -27,15 +42,16 @@ export async function updateTicketHeader(formData: FormData) {
   if (!TICKET_STATUSES.includes(status as TicketStatus)) redirect(ticketPath(id, "Pick a valid status."));
 
   const supabase = await createClient();
-  const { error } = await supabase
+  const failure = updateResult(await supabase
     .from("tickets")
     .update({
       status,
       assignee_id: assignee || null,
     })
-    .eq("id", id);
+    .eq("id", id)
+    .select("id"));
 
-  if (!error) {
+  if (!failure) {
     try {
       await deliverPendingEmails();
     } catch {
@@ -46,7 +62,7 @@ export async function updateTicketHeader(formData: FormData) {
   revalidatePath("/tickets");
   revalidatePath(`/tickets/${id}`);
   revalidatePath("/dashboard");
-  redirect(ticketPath(id, error?.message));
+  redirect(ticketPath(id, failure, requestedReturn(formData)));
 }
 
 export async function saveResolution(formData: FormData) {
@@ -59,18 +75,19 @@ export async function saveResolution(formData: FormData) {
   const actionTaken = String(formData.get("actionTaken") ?? "").trim();
 
   const supabase = await createClient();
-  const { error } = await supabase
+  const failure = updateResult(await supabase
     .from("tickets")
     .update({
       issue_category_id: category ? Number(category) : null,
       root_cause_id: cause ? Number(cause) : null,
       action_taken: actionTaken || null,
     })
-    .eq("id", id);
+    .eq("id", id)
+    .select("id"));
 
   revalidatePath(`/tickets/${id}`);
   revalidatePath("/dashboard");
-  redirect(ticketPath(id, error?.message));
+  redirect(ticketPath(id, failure, requestedReturn(formData)));
 }
 
 export async function saveTracker(formData: FormData) {
@@ -85,7 +102,7 @@ export async function saveTracker(formData: FormData) {
   const textOf = (name: string) => String(formData.get(name) ?? "").trim() || null;
 
   const supabase = await createClient();
-  const { error } = await supabase
+  const failure = updateResult(await supabase
     .from("tickets")
     .update({
       request_type_id: idOf("requestTypeId"),
@@ -97,12 +114,13 @@ export async function saveTracker(formData: FormData) {
       resolution_notes: textOf("resolutionNotes"),
       follow_up_notes: textOf("followUpNotes"),
     })
-    .eq("id", id);
+    .eq("id", id)
+    .select("id"));
 
   revalidatePath(`/tickets/${id}`);
   revalidatePath(`/portal/my-tickets/${id}`);
   revalidatePath("/dashboard");
-  redirect(ticketPath(id, error?.message));
+  redirect(ticketPath(id, failure, requestedReturn(formData)));
 }
 
 export async function addTicketNote(formData: FormData) {
@@ -121,5 +139,5 @@ export async function addTicketNote(formData: FormData) {
   });
 
   revalidatePath(`/tickets/${id}`);
-  redirect(ticketPath(id, error?.message));
+  redirect(ticketPath(id, error?.message, requestedReturn(formData)));
 }

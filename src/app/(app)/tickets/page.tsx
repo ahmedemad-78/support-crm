@@ -15,12 +15,18 @@ import {
 } from "@/lib/tickets/constants";
 import {
   PAGE_SIZE,
+  parseDashboardFilters,
   parseTicketListFilters,
   rangeStart,
+  safeAppReturn,
   ticketListQuery,
   type TicketListFilters,
   type TicketView,
 } from "@/lib/tickets/filters";
+import { cairoDate } from "@/lib/tickets/dashboard-model";
+import { loadAnalytics } from "@/lib/tickets/load-analytics";
+import { dashboardPopulation, reportedDay, statusGroup } from "@/lib/tickets/overview";
+import type { AnalyticsTicket } from "@/lib/tickets/analytics";
 
 const VIEW_LABELS: Record<TicketView, string> = {
   all: "All tickets",
@@ -34,7 +40,11 @@ export default async function TicketsPage({
   searchParams,
 }: PageProps<"/tickets">) {
   const user = await requireUser(["support_agent", "manager"]);
-  const filters = parseTicketListFilters(await searchParams);
+  const rawParams = await searchParams;
+  const filters = parseTicketListFilters(rawParams);
+  const dashboardFilters = parseDashboardFilters(rawParams);
+  const scopeValue = Array.isArray(rawParams.scope) ? rawParams.scope[0] : rawParams.scope;
+  const scope = scopeValue === "followup" || scopeValue === "dashboard" ? scopeValue : "";
   const supabase = await createClient();
 
   const [cities, categories, agents] = await Promise.all([
@@ -47,34 +57,79 @@ export default async function TicketsPage({
   }
 
   const db = supabase as unknown as { from: (table: string) => TicketQuery };
-
-  const viewCounts = await Promise.all(
-    (Object.keys(VIEW_LABELS) as TicketView[]).map(async (view) => {
-      const { count, error } = await applyFilters(db, "id", { ...filters, view, page: 1 }, user.id, true);
-      if (error) throw error;
-      return [view, count ?? 0] as const;
-    }),
-  );
-  const counts = Object.fromEntries(viewCounts) as Record<TicketView, number>;
-
+  const extras = scopeParams(rawParams, scope);
+  const listHref = (next: Partial<TicketListFilters>) =>
+    `/tickets${ticketListQuery({ ...filters, ...next }, extras)}`;
+  const returnTo = safeAppReturn(listHref({})) ?? "/tickets";
   const from = (filters.page - 1) * PAGE_SIZE;
-  const { data: tickets, count, error } = await applyFilters(
-    db,
-    "id, ticket_number, issue_description, customer_name, source, status, created_at, cities(name), assignee:profiles!tickets_assignee_id_fkey(full_name)",
-    filters,
-    user.id,
-    false,
-    from,
-  );
-  if (error) throw error;
+  const preserved = preservedFields(filters, extras);
 
-  const total = count ?? 0;
+  let tickets: TicketRow[] = [];
+  let total = 0;
+  let counts: Record<TicketView, number>;
+
+  if (scope) {
+    const loaded = await loadAnalytics();
+    const today = cairoDate(loaded.asOf);
+    let population = dashboardPopulation(loaded.tickets, dashboardFilters, today);
+    if (scope === "followup") population = population.filter((ticket) => statusGroup(ticket.status) === "followup");
+    population = population.filter((ticket) => listDimension(ticket, filters));
+    counts = Object.fromEntries(
+      (Object.keys(VIEW_LABELS) as TicketView[]).map((view) => [
+        view,
+        population.filter((ticket) => inListView(ticket, view, user.id)).length,
+      ]),
+    ) as Record<TicketView, number>;
+    const viewRows = population
+      .filter((ticket) => inListView(ticket, filters.view, user.id))
+      .sort((a, b) =>
+        scope === "followup"
+          ? reportedDay(a).localeCompare(reportedDay(b)) || a.number.localeCompare(b.number)
+          : b.createdAt.localeCompare(a.createdAt),
+      );
+    total = viewRows.length;
+    const cityNames = new Map((cities.data ?? []).map((city) => [String(city.id), city.name]));
+    tickets = viewRows.slice(from, from + PAGE_SIZE).map((ticket) => ({
+      id: ticket.id,
+      ticket_number: ticket.number,
+      issue_description: ticket.subject,
+      customer_name: ticket.customerName || "Not recorded",
+      source: ticket.source,
+      status: ticket.status,
+      created_at: ticket.createdAt,
+      cities: ticket.cityId ? { name: cityNames.get(ticket.cityId) ?? "" } : null,
+      assignee: ticket.assignee ? { full_name: ticket.assignee } : null,
+    }));
+  } else {
+    const viewCounts = await Promise.all(
+      (Object.keys(VIEW_LABELS) as TicketView[]).map(async (view) => {
+        const { count, error } = await applyFilters(db, "id", { ...filters, view, page: 1 }, user.id, true);
+        if (error) throw error;
+        return [view, count ?? 0] as const;
+      }),
+    );
+    counts = Object.fromEntries(viewCounts) as Record<TicketView, number>;
+    const { data, count, error } = await applyFilters(
+      db,
+      "id, ticket_number, issue_description, customer_name, source, status, created_at, cities(name), assignee:profiles!tickets_assignee_id_fkey(full_name)",
+      filters,
+      user.id,
+      false,
+      from,
+    );
+    if (error) throw error;
+    tickets = data ?? [];
+    total = count ?? 0;
+  }
   const start = total === 0 ? 0 : from + 1;
   const end = Math.min(from + PAGE_SIZE, total);
   const pages = Math.max(1, Math.ceil(total / PAGE_SIZE));
 
   return (
-    <AgentFrame title="Tickets">
+    <AgentFrame
+      title="Tickets"
+      ticketSearch={{ q: filters.q, hidden: preserved }}
+    >
       <div className="flex flex-1 flex-col gap-4 px-5 py-5 sm:px-8">
         <div className="flex flex-col gap-3">
           <div className="flex flex-wrap gap-1">
@@ -83,7 +138,7 @@ export default async function TicketsPage({
               return (
                 <Link
                   key={view}
-                  href={`/tickets${ticketListQuery({ ...filters, view, page: 1 })}`}
+                  href={listHref({ view, page: 1 })}
                   className={
                     active
                       ? "inline-flex h-9 items-center gap-2 rounded-lg bg-background px-3 text-sm font-semibold shadow-sm"
@@ -100,6 +155,9 @@ export default async function TicketsPage({
           <form method="get" className="flex flex-wrap items-center gap-2">
             {filters.view !== "all" && <input type="hidden" name="view" value={filters.view} />}
             {filters.q && <input type="hidden" name="q" value={filters.q} />}
+            {Object.entries(extras).map(([name, value]) => (
+              <input key={name} type="hidden" name={name} value={value} />
+            ))}
             <FilterSelect name="status" label="Status" value={filters.status}>
               <option value="">Status</option>
               {TICKET_STATUSES.map((status) => (
@@ -131,12 +189,18 @@ export default async function TicketsPage({
                 <option key={agent.id} value={agent.id}>{agent.full_name}</option>
               ))}
             </FilterSelect>
-            <FilterSelect name="range" label="Date range" value={filters.range}>
-              <option value="7">Last 7 days</option>
-              <option value="30">Last 30 days</option>
-              <option value="90">Last 90 days</option>
-              <option value="all">All time</option>
-            </FilterSelect>
+            {scope ? (
+              <span className="inline-flex h-9 items-center rounded-lg border bg-background px-3 text-sm text-muted-foreground">
+                Reported {dashboardFilters.from || "…"} – {dashboardFilters.to || "…"}
+              </span>
+            ) : (
+              <FilterSelect name="range" label="Date range" value={filters.range}>
+                <option value="7">Last 7 days</option>
+                <option value="30">Last 30 days</option>
+                <option value="90">Last 90 days</option>
+                <option value="all">All time</option>
+              </FilterSelect>
+            )}
             <button type="submit" className="h-9 rounded-lg bg-brand-action px-3 text-sm font-semibold text-white">
               Apply
             </button>
@@ -145,8 +209,16 @@ export default async function TicketsPage({
               Clear
             </Link>
           </form>
+          {scope && (
+            <p className="text-sm text-muted-foreground">
+              Showing the dashboard selection{dashboardFilters.from && dashboardFilters.to ? `, reported ${dashboardFilters.from} to ${dashboardFilters.to}` : ""}. {total} {total === 1 ? "case" : "cases"}.
+            </p>
+          )}
           <form action="/tickets" className="flex h-9 items-center gap-2 rounded-lg border bg-background px-3 sm:hidden">
             <Search className="size-4 text-muted-foreground" />
+            {Object.entries(preserved).map(([name, value]) => (
+              <input key={name} type="hidden" name={name} value={value} />
+            ))}
             <input name="q" defaultValue={filters.q} placeholder="Search by ticket ID, name, phone…" className="w-full bg-transparent text-sm outline-none" />
           </form>
         </div>
@@ -172,7 +244,7 @@ export default async function TicketsPage({
                   return (
                     <tr key={ticket.id} className="border-t hover:bg-muted/60">
                       <td className="px-4 py-3.5">
-                        <Link href={`/tickets/${ticket.id}`} className="font-mono text-[13px] font-medium text-brand-action hover:underline">
+                        <Link href={`/tickets/${ticket.id}?returnTo=${encodeURIComponent(returnTo)}`} className="font-mono text-[13px] font-medium text-brand-action hover:underline">
                           {ticket.ticket_number}
                         </Link>
                       </td>
@@ -199,10 +271,10 @@ export default async function TicketsPage({
           <div className="flex items-center justify-between border-t px-4 py-3 text-sm text-muted-foreground">
             <p>Showing {start}–{end} of {total} tickets</p>
             <div className="flex gap-2">
-              <PageLink href={filters.page > 1 ? `/tickets${ticketListQuery({ ...filters, page: filters.page - 1 })}` : null}>
+              <PageLink href={filters.page > 1 ? listHref({ page: filters.page - 1 }) : null}>
                 Previous
               </PageLink>
-              <PageLink href={filters.page < pages ? `/tickets${ticketListQuery({ ...filters, page: filters.page + 1 })}` : null}>
+              <PageLink href={filters.page < pages ? listHref({ page: filters.page + 1 }) : null}>
                 Next
               </PageLink>
             </div>
@@ -250,6 +322,52 @@ function relationName(value: unknown): string {
   return "";
 }
 
+const SCOPE_KEYS = [
+  "from", "to", "segment", "channel", "referringTeam", "statusGroup", "topic", "trackerCause",
+  "requestType", "fawry", "bucketFrom", "bucketTo", "age", "userType",
+] as const;
+
+function scopeParams(
+  raw: Record<string, string | string[] | undefined>,
+  scope: string,
+) {
+  if (!scope) return {};
+  const extras: Record<string, string> = { scope };
+  for (const key of SCOPE_KEYS) {
+    const value = Array.isArray(raw[key]) ? raw[key][0] : raw[key];
+    if (value) extras[key] = value;
+  }
+  return extras;
+}
+
+function preservedFields(filters: TicketListFilters, extras: Record<string, string>) {
+  const hidden: Record<string, string> = { ...extras };
+  if (filters.view !== "all") hidden.view = filters.view;
+  if (filters.status) hidden.status = filters.status;
+  if (filters.source) hidden.source = filters.source;
+  if (filters.city) hidden.city = filters.city;
+  if (filters.category) hidden.category = filters.category;
+  if (filters.assignee) hidden.assignee = filters.assignee;
+  if (!extras.scope && filters.range !== "30") hidden.range = filters.range;
+  return hidden;
+}
+
+function inListView(ticket: AnalyticsTicket, view: TicketView, userId: string) {
+  if (view === "new") return ticket.status === "new";
+  if (view === "mine") return ticket.assigneeId === userId;
+  if (view === "awaiting") return ticket.status === "awaiting_customer";
+  if (view === "resolved") return ticket.status === "resolved";
+  return true;
+}
+
+function listDimension(ticket: AnalyticsTicket, filters: TicketListFilters) {
+  if (filters.city && ticket.cityId !== filters.city) return false;
+  if (filters.category && ticket.categoryId !== filters.category) return false;
+  if (filters.assignee === "unassigned") return !ticket.assigneeId;
+  if (filters.assignee && ticket.assigneeId !== filters.assignee) return false;
+  return true;
+}
+
 type TicketQuery = {
   select: (columns: string, options: { count: "exact"; head?: boolean }) => TicketQuery;
   eq: (column: string, value: string) => TicketQuery;
@@ -279,10 +397,8 @@ function applyFilters(
   if (filters.category) next = next.eq("issue_category_id", filters.category);
   if (filters.assignee === "unassigned") next = next.is("assignee_id", null);
   else if (filters.assignee) next = next.eq("assignee_id", filters.assignee);
-  if (!filters.q) {
-    const start = rangeStart(filters.range);
-    if (start) next = next.gte("created_at", start);
-  }
+  const start = rangeStart(filters.range);
+  if (start) next = next.gte("created_at", start);
   if (filters.q) {
     const term = filters.q.replace(/[%_,]/g, "");
     next = next.or(`ticket_number.ilike.%${term}%,customer_name.ilike.%${term}%,customer_phone.ilike.%${term}%`);

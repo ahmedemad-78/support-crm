@@ -5,9 +5,11 @@ import { UserNotifications } from "./user-notifications";
 export async function AgentFrame({
   title,
   children,
+  ticketSearch,
 }: {
   title: string;
   children: React.ReactNode;
+  ticketSearch?: { q: string; hidden: Record<string, string> };
 }) {
   await requireUser(["support_agent", "manager"]);
 
@@ -25,10 +27,15 @@ export async function AgentFrame({
           className="ml-auto hidden h-9 w-full max-w-sm items-center gap-2 rounded-lg border bg-muted px-3 sm:flex"
         >
           <Search className="size-4 shrink-0 text-muted-foreground" />
+          {ticketSearch &&
+            Object.entries(ticketSearch.hidden).map(([name, value]) => (
+              <input key={name} type="hidden" name={name} value={value} />
+            ))}
           <input
             name="q"
             aria-label="Search tickets"
             placeholder="Search by ticket ID, name, phone…"
+            defaultValue={ticketSearch?.q ?? ""}
             className="w-full bg-transparent text-sm outline-none placeholder:text-muted-foreground"
           />
         </form>

@@ -10,18 +10,21 @@ export function TicketControls({
   status,
   assigneeId,
   agents,
+  returnTo = "",
 }: {
   ticketId: string;
   ticketNumber: string;
   status: TicketStatus;
   assigneeId: string | null;
   agents: { id: string; full_name: string }[];
+  returnTo?: string;
 }) {
   const [current, setCurrent] = useState(status);
 
   return (
     <form action={updateTicketHeader} className="flex flex-wrap items-center gap-2">
       <input type="hidden" name="ticketId" value={ticketId} />
+      {returnTo && <input type="hidden" name="returnTo" value={returnTo} />}
       <label className="flex h-9 items-center gap-2 rounded-lg border bg-background px-3 text-sm">
         <span className="text-muted-foreground">Assignee</span>
         <select

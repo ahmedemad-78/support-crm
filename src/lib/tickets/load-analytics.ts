@@ -59,6 +59,7 @@ export async function loadAnalytics() {
         customerPhone: row.customer_phone ?? "",
         schoolName: row.school_name ?? "",
         updatedOn: row.updated_at ? cairoDate(row.updated_at) : "",
+        updatedAt: row.updated_at ?? "",
       });
     }
     cursor = data[data.length - 1].id;
