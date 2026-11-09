@@ -1,8 +1,9 @@
 import "server-only";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { deliverOutbox, isDispatchable, SENT_UNACKNOWLEDGED, type OutboxJob } from "@/lib/email/outbox";
+import { MISSING_MAIL_CONFIG } from "@/lib/email/messages";
 import {
   MailNotConfiguredError,
-  MISSING_MAIL_CONFIG,
   outboxFailurePatch,
   publicMailError,
   sendOutbound,
@@ -23,75 +24,87 @@ function escapeHtml(value: string) {
     .replaceAll('"', "&quot;");
 }
 
-type OutboxRow = {
-  id: string;
-  to_address: string;
-  subject: string;
-  body_text: string;
-  ticket_path: string;
-  attempts: number;
-};
-
-function messageHtml(row: OutboxRow) {
+function messageHtml(row: OutboxJob) {
   const status = row.subject.replace(/^.* is now /, "");
   const summary = escapeHtml(row.body_text).replaceAll("\n", "<br />");
   const link = `${appOrigin()}${row.ticket_path}`;
   return `<p>Ticket status is now <strong>${escapeHtml(status)}</strong>.</p><p><strong>Problem</strong><br />${summary}</p><p><a href="${link}">Open the ticket</a></p>`;
 }
 
-function messageText(row: OutboxRow) {
+function messageText(row: OutboxJob) {
   const status = row.subject.replace(/^.* is now /, "");
   return `Ticket status is now ${status}.\n\nProblem\n${row.body_text}\n\nOpen the ticket: ${appOrigin()}${row.ticket_path}`;
 }
 
 export async function deliverPendingEmails() {
   const admin = createAdminClient();
-  const now = new Date().toISOString();
+  const now = new Date();
   const { data, error } = await admin
     .from("email_outbox")
-    .select("id, to_address, subject, body_text, ticket_path, attempts")
+    .select("id, to_address, subject, body_text, ticket_path, attempts, last_error, created_at")
     .eq("status", "pending")
-    .lte("next_attempt_at", now)
+    .lte("next_attempt_at", now.toISOString())
     .order("created_at", { ascending: true })
-    .limit(20);
+    .limit(100);
   if (error) throw error;
-  const rows = (data ?? []) as OutboxRow[];
-  if (rows.length === 0) return { sent: 0 };
+  const rows = ((data ?? []) as OutboxJob[]).filter(isDispatchable).slice(0, 20);
 
-  if (!smtpConfigured() && !process.env.RESEND_API_KEY) {
-    await admin
-      .from("email_outbox")
-      .update({ last_error: MISSING_MAIL_CONFIG })
-      .in(
-        "id",
-        rows.map((row) => row.id),
-      );
-    return { sent: 0 };
-  }
-
-  let sent = 0;
-  for (const row of rows) {
-    try {
+  return deliverOutbox({
+    now,
+    rows,
+    configured: smtpConfigured() || Boolean(process.env.RESEND_API_KEY),
+    claim: async (row, until) => {
+      const { data: claimed, error: claimError } = await admin
+        .from("email_outbox")
+        .update({ next_attempt_at: until })
+        .eq("id", row.id)
+        .eq("status", "pending")
+        .lte("next_attempt_at", now.toISOString())
+        .select("id");
+      if (claimError) throw claimError;
+      return (claimed?.length ?? 0) > 0;
+    },
+    send: async (row) => {
       await sendOutbound({
         to: row.to_address,
         subject: row.subject,
         html: messageHtml(row),
         text: messageText(row),
       });
-      sent += 1;
-      await admin
+    },
+    acknowledge: async (id) => {
+      const { data: saved, error: saveError } = await admin
         .from("email_outbox")
         .update({ status: "sent", sent_at: new Date().toISOString(), last_error: null })
-        .eq("id", row.id);
-    } catch (error) {
-      const message = publicMailError(error);
+        .eq("id", id)
+        .eq("status", "pending")
+        .select("id");
+      return !saveError && (saved?.length ?? 0) > 0;
+    },
+    markMissing: async (ids) => {
+      const { error: markError } = await admin
+        .from("email_outbox")
+        .update({ last_error: MISSING_MAIL_CONFIG })
+        .in("id", ids);
+      if (markError) throw markError;
+    },
+    markUnacknowledged: async (id) => {
+      await admin
+        .from("email_outbox")
+        .update({
+          last_error: SENT_UNACKNOWLEDGED,
+          next_attempt_at: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString(),
+        })
+        .eq("id", id)
+        .eq("status", "pending");
+    },
+    markFailed: async (row, failure) => {
+      const message = publicMailError(failure);
       const patch =
-        error instanceof MailNotConfiguredError
+        failure instanceof MailNotConfiguredError
           ? { last_error: MISSING_MAIL_CONFIG }
           : outboxFailurePatch(row.attempts, message);
       await admin.from("email_outbox").update(patch).eq("id", row.id);
-    }
-  }
-
-  return { sent };
+    },
+  });
 }
