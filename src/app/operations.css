@@ -32,7 +32,7 @@ body { font-variant-numeric:tabular-nums; }
 .login-case-path span:first-child { padding-left:0; }.login-case-path span:last-child { border:0; }
 .login-story-footer { display:flex; justify-content:space-between; align-items:end; font-size:12px; line-height:1.7; color:#c4d3bd; }
 .login-story-footer img { mix-blend-mode:screen; }
-.cs-board.cs-board { --cs-ink:#20382e; --cs-green:#176744; --cs-green-ink:#176744; --cs-muted:#617068; --cs-line:#dce2da; background:#f6f5f0; max-width:1640px; padding:32px clamp(18px,3vw,44px) 48px; gap:22px; }
+.cs-board.cs-board { --cs-ink:#20382e; --cs-green:#176744; --cs-green-ink:#176744; --cs-muted:#617068; --cs-line:#dce2da; background:#f6f5f0; max-width:1640px; padding:24px clamp(18px,3vw,44px) 40px; gap:16px; }
 .cs-title.cs-title { align-items:end; padding-bottom:22px; border-bottom:1px solid #cbd5ca; }
 .cs-title.cs-title h2 { font-size:34px; font-weight:500; letter-spacing:-.05em; }
 .cs-report-label { display:block; margin-bottom:8px; font:10px var(--font-plex-mono),monospace; letter-spacing:.14em; color:#617068; }
@@ -41,14 +41,14 @@ body { font-variant-numeric:tabular-nums; }
 .cs-title-actions button:last-child { background:#203f2f; color:white; border-color:#203f2f; }
 .cs-board .cs-filters { border-radius:6px; background:#eeefe8; box-shadow:none; }
 .cs-board .cs-desktop-filters { display:none; }.cs-board .cs-drawer-open { display:inline-flex; }.cs-section-heading { padding-top:12px; border-top:1px solid #d4ddd2; }.cs-section-heading h2 { font-size:23px; font-weight:500; letter-spacing:-.035em; }.cs-section-heading .cs-report-label { margin-bottom:6px; }
-.cs-result-scope { display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:8px; font-size:12px; color:#617068; }.cs-result-scope strong { color:#20382e; font-weight:600; }.cs-result-scope a { display:inline-flex; align-items:center; gap:6px; color:#176744; font-weight:500; }.cs-result-scope a:hover { text-decoration:underline; text-underline-offset:3px; }
+.cs-result-scope { display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:8px; font-size:12px; color:#617068; }.cs-result-scope strong { color:#20382e; font-weight:600; }.cs-result-scope a { display:inline-flex; align-items:center; gap:6px; color:#176744; font-weight:500; }.cs-result-scope a:hover { text-decoration:underline; text-underline-offset:3px; }.cs-scope-actions { display:flex; align-items:center; gap:16px; }.cs-scope-actions > button { color:#617068; font-size:11px; padding:4px 0; text-decoration:underline; text-underline-offset:3px; }
 .conversation-workspace { max-width:1150px; width:100%; padding:32px; margin-inline:auto; display:flex; flex-direction:column; gap:28px; }.connection-state { display:inline-flex; align-items:center; gap:7px; border:1px solid #cfd8cd; border-radius:4px; background:#fff; padding:8px 12px; font-size:12px; color:#617068; white-space:nowrap; }.conversation-offline { display:grid; grid-template-columns:150px 1fr; gap:32px; align-items:center; padding:48px; border-block:1px solid #cfd8cd; background:#edf0e6; }.conversation-symbol { display:flex; align-items:center; justify-content:center; width:130px; height:130px; border:1px solid #bccdb5; color:#28553c; }.conversation-offline h3 { font-size:25px; font-weight:500; letter-spacing:-.035em; }.conversation-offline p { max-width:52ch; margin-top:10px; font-size:14px; line-height:1.8; color:#617068; }
 @media(max-width:640px) { .conversation-workspace { padding:22px 16px; }.conversation-offline { padding:24px; grid-template-columns:1fr; gap:22px; }.conversation-symbol { width:72px; height:72px; } }
 .cs-board .cs-presets { border-radius:4px; }
 .cs-board .cs-presets button,.cs-board .cs-modes button { border-radius:3px; }
 .cs-board .cs-filters input,.cs-board .cs-filters select { background:#fff; border-radius:4px; min-height:35px; }
 .cs-kpis.cs-kpis { gap:0; border:1px solid #d4ddd2; border-radius:6px; overflow:hidden; background:#fff; }
-.cs-kpi.cs-kpi { min-height:164px; border:0; border-right:1px solid #d4ddd2; border-radius:0; padding:20px; box-shadow:none; background:transparent; gap:8px; }
+.cs-kpi.cs-kpi { min-height:144px; border:0; border-right:1px solid #d4ddd2; border-radius:0; padding:16px 20px; box-shadow:none; background:transparent; gap:6px; }
 .cs-kpi.cs-kpi:last-child { border-right:0; }.cs-kpi.cs-kpi:first-child { background:#eaf0e4; }
 .cs-kpi.cs-kpi strong { font-size:44px; font-weight:500; letter-spacing:-.055em; }
 .cs-kpi.cs-kpi span { padding-right:0; font-size:12px; font-weight:500; }.cs-kpi.cs-kpi small { font-size:10px; }

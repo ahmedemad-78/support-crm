@@ -360,7 +360,6 @@ export function DashboardBoard({
         <div className="cs-desktop-filters">{secondaryFilters()}</div>
         <label className="cs-search">Filter this dashboard<input value={filters.q ?? ""} placeholder="Case, school, phone, or email" aria-label="Filter this dashboard" onChange={(event) => patch({ q: event.target.value })} /></label>
         <button type="button" className="cs-drawer-open" onClick={() => setDrawer(true)}><SlidersHorizontal size={14} /> Filters{chips.length > 0 ? ` (${chips.length})` : ""}</button>
-        <button type="button" onClick={reset}>Reset</button>
       </div>
       {drawer && <FilterDrawer onClose={() => setDrawer(false)}>{secondaryFilters()}</FilterDrawer>}
       {chips.length > 0 && (
@@ -372,7 +371,7 @@ export function DashboardBoard({
           ))}
         </div>
       )}
-      <div className="cs-result-scope" role="status" aria-live="polite"><span><strong>{rows.length.toLocaleString()}</strong> {rows.length === 1 ? "case matches" : "cases match"} this report{chips.length ? ` · ${chips.length} active ${chips.length === 1 ? "filter" : "filters"}` : " · all statuses"}</span>{!preview && <Link href={dashboardListHref(filters, "dashboard")}>View matching cases <ArrowUpRight size={13} /></Link>}</div>
+      <div className="cs-result-scope"><span role="status" aria-live="polite"><strong>{rows.length.toLocaleString()}</strong> {rows.length === 1 ? "case matches" : "cases match"} this report{chips.length ? ` · ${chips.length} active ${chips.length === 1 ? "filter" : "filters"}` : " · all statuses"}</span><div className="cs-scope-actions no-print"><button type="button" onClick={reset}>Reset</button>{!preview && <Link href={dashboardListHref(filters, "dashboard")}>View matching cases <ArrowUpRight size={13} /></Link>}</div></div>
       {!valid && <p className="cs-alert" role="alert">Choose a reported-date range that starts on or before it ends.</p>}
       {error && <p className="cs-alert" role="alert">{error}</p>}
 
@@ -386,13 +385,6 @@ export function DashboardBoard({
         <div><p>{openAll.length} open {openAll.length === 1 ? "case" : "cases"} across the workspace</p><span>Current backlog across all reported dates, independent of the report filters.</span></div>
         {!preview && <Link href="/tickets?scope=followup">Review open work <ArrowUpRight size={14} /></Link>}
       </aside>
-      {insights.length > 0 && (
-        <section className="cs-insights" aria-label="What this selection shows">
-          {insights.map((item) => (
-            <button type="button" key={item.id} className={item.tone === "warn" ? "is-warn" : ""} aria-pressed={item.id === "source" ? filters.source === topSource?.[0] : item.id === "cause" ? filters.trackerCause === topCause?.[0] : item.id === "age" ? filters.age === "15" : item.id === "class" ? filters.topic === "__missing__" && filters.trackerCause === "__missing__" : undefined} onClick={item.onClick}>{item.text}</button>
-          ))}
-        </section>
-      )}
       <div className="cs-row cs-row-volume">
         <Panel
           title="Case arrivals"
@@ -412,6 +404,14 @@ export function DashboardBoard({
       </div>
       <FollowUp followups={followups} page={currentPage} pages={pages} today={today} openAll={openAll} preview={preview} returnTo={returnTo} listHref={listHref} onPage={setPage} onReset={reset} />
       <div className="cs-section-heading"><span className="cs-report-label">02 / UNDERSTAND THE WORK</span><h2>Patterns behind the cases.</h2></div>
+      {insights.length > 0 && (
+        <section className="cs-insights" aria-label="What this selection shows">
+          {insights.map((item) => (
+            <button type="button" key={item.id} className={item.tone === "warn" ? "is-warn" : ""} aria-pressed={item.id === "source" ? filters.source === topSource?.[0] : item.id === "cause" ? filters.trackerCause === topCause?.[0] : item.id === "age" ? filters.age === "15" : item.id === "class" ? filters.topic === "__missing__" && filters.trackerCause === "__missing__" : undefined} onClick={item.onClick}>{item.text}</button>
+          ))}
+        </section>
+      )}
+
       <div className="cs-row cs-row-even">
         <Panel title="Where cases come from" question={`Compare all sources within the other filters · ${sourceFrame.length} cases.`}>
           <ColumnChart rows={sourceRows} colors={SOURCE_COLORS} selectedId={filters.source} onPick={(id) => toggle("source", id)} />
