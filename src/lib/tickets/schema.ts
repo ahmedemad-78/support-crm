@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { validDay } from "./analytics";
 import { END_USER_TYPES, PLATFORMS } from "./constants";
 
 const required = (label: string) => z.string().trim().min(1, `${label} is required`);
@@ -16,11 +17,21 @@ function todayInCairo() {
 export const portalTicketSchema = z.object({
   customer_name: z.string().trim().min(2, "Name needs at least 2 characters"),
   customer_email: z.email("Email needs a domain — try name@example.com"),
+  customer_phone: z
+    .string()
+    .trim()
+    .max(40)
+    .optional()
+    .transform((value) => value || null)
+    .refine(
+      (value) => value == null || /^\+?[0-9][0-9\s().-]{5,31}$/.test(value),
+      "Enter the phone number, or leave it blank",
+    ),
   school_name: optionalText(160),
   credentials_username: required("User name"),
   issue_date: z
     .string()
-    .regex(/^\d{4}-\d{2}-\d{2}$/, "Pick the date of issue")
+    .refine(validDay, "Pick a real date")
     .refine((d) => d <= todayInCairo(), "Date of issue can't be in the future"),
   city_id: z.coerce.number({ error: "Choose a city" }).int().positive("Choose a city"),
   end_user_type: z.enum(END_USER_TYPES, { error: "Choose the user type" }),

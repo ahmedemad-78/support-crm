@@ -1,4 +1,5 @@
 import { END_USER_TYPES, TICKET_STATUSES, type TicketStatus } from "./constants";
+import { validDay } from "./analytics";
 
 export const TICKET_VIEWS = ["all", "new", "mine", "awaiting", "resolved"] as const;
 export type TicketView = (typeof TICKET_VIEWS)[number];
@@ -97,8 +98,6 @@ export type DashboardFilters = {
   to: string;
 };
 
-const DAY = /^\d{4}-\d{2}-\d{2}$/;
-
 export function parseDashboardFilters(
   searchParams: Record<string, string | string[] | undefined>,
 ): DashboardFilters {
@@ -113,8 +112,8 @@ export function parseDashboardFilters(
     city: one(searchParams.city),
     category: one(searchParams.category),
     userType: userType === "__missing__" || (END_USER_TYPES as readonly string[]).includes(userType) ? userType : "",
-    from: DAY.test(from) ? from : "",
-    to: DAY.test(to) ? to : "",
+    from: validDay(from) ? from : "",
+    to: validDay(to) ? to : "",
     cause: one(searchParams.cause).slice(0, 200),
     platform: one(searchParams.platform),
     assignee: one(searchParams.assignee),
@@ -129,8 +128,8 @@ export function parseDashboardFilters(
     referringTeam: one(searchParams.referringTeam).slice(0, 80),
     statusGroup: ["followup", "resolved", "closed"].includes(one(searchParams.statusGroup)) ? one(searchParams.statusGroup) : "",
     q: one(searchParams.q).slice(0, 80),
-    bucketFrom: DAY.test(one(searchParams.bucketFrom)) ? one(searchParams.bucketFrom) : "",
-    bucketTo: DAY.test(one(searchParams.bucketTo)) ? one(searchParams.bucketTo) : "",
+    bucketFrom: validDay(one(searchParams.bucketFrom)) ? one(searchParams.bucketFrom) : "",
+    bucketTo: validDay(one(searchParams.bucketTo)) ? one(searchParams.bucketTo) : "",
   };
 }
 
@@ -148,4 +147,19 @@ export function dashboardQuery(filters: DashboardFilters): string {
   if (filters.to) params.set("to", filters.to);
   const query = params.toString();
   return query ? `?${query}` : "";
+}
+
+export function dashboardListHref(filters: DashboardFilters, scope: "followup" | "dashboard") {
+  const params = new URLSearchParams(dashboardQuery(filters).replace(/^\?/, ""));
+  params.delete("view");
+  params.set("scope", scope);
+  return `/tickets?${params.toString()}`;
+}
+
+/** In-app return targets only. Rejects protocol-relative and external URLs. */
+export function safeAppReturn(value: string | undefined) {
+  if (!value) return null;
+  if (!value.startsWith("/tickets") && !value.startsWith("/dashboard")) return null;
+  if (value.startsWith("//") || value.includes("://") || value.includes("\\") || /[\u0000-\u001f]/.test(value)) return null;
+  return value;
 }
