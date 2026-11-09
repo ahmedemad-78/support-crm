@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useState, useSyncExternalStore, useTransition } from "react";
 import { Archive, Check, Pencil, Plus, RotateCcw, X } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -76,6 +76,15 @@ const LISTS: { table: ListTable; label: string; hint: string; addLabel: string }
 
 type SourceItem = { code: string; name: string; is_active: boolean; bound_role: string | null };
 
+const settingsMobileQuery = "(max-width: 760px)";
+function subscribeSettingsLayout(onChange: () => void) {
+  const media = window.matchMedia(settingsMobileQuery);
+  media.addEventListener("change", onChange);
+  return () => media.removeEventListener("change", onChange);
+}
+const settingsIsMobile = () => window.matchMedia(settingsMobileQuery).matches;
+const settingsServerLayout = () => false;
+
 export function SettingsTabs({
   lists,
   sources,
@@ -85,8 +94,9 @@ export function SettingsTabs({
   sources: SourceItem[];
   notificationEmails: string[];
 }) {
+  const mobile = useSyncExternalStore(subscribeSettingsLayout, settingsIsMobile, settingsServerLayout);
   return (
-    <Tabs defaultValue="sources" orientation="vertical" className="settings-workspace gap-4 px-5 py-6 sm:px-8">
+    <Tabs defaultValue="sources" orientation={mobile ? "horizontal" : "vertical"} className="settings-workspace gap-4 px-5 py-6 sm:px-8">
       <TabsList variant="line" className="settings-navigation h-auto max-w-full justify-start gap-y-2" aria-label="Settings sections">
         <TabsTrigger value="sources">
           Sources
