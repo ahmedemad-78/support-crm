@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { updateTicketHeader } from "../actions";
 import { STATUS_LABELS, TICKET_STATUSES, type TicketStatus } from "@/lib/tickets/constants";
+import { SaveButton } from "@/components/tickets/save-button";
 
 export function TicketControls({
   ticketId,
@@ -11,6 +12,7 @@ export function TicketControls({
   assigneeId,
   agents,
   returnTo = "",
+  updatedAt,
 }: {
   ticketId: string;
   ticketNumber: string;
@@ -18,19 +20,20 @@ export function TicketControls({
   assigneeId: string | null;
   agents: { id: string; full_name: string }[];
   returnTo?: string;
+  updatedAt: string;
 }) {
   const [current, setCurrent] = useState(status);
 
   return (
     <form action={updateTicketHeader} className="flex flex-wrap items-center gap-2">
       <input type="hidden" name="ticketId" value={ticketId} />
+      <input type="hidden" name="updatedAt" value={updatedAt} />
       {returnTo && <input type="hidden" name="returnTo" value={returnTo} />}
       <label className="flex h-9 items-center gap-2 rounded-lg border bg-background px-3 text-sm">
         <span className="text-muted-foreground">Assignee</span>
         <select
           name="assigneeId"
           defaultValue={assigneeId ?? ""}
-          onChange={(event) => event.currentTarget.form?.requestSubmit()}
           className="bg-transparent font-medium outline-none"
         >
           <option value="">Unassigned</option>
@@ -48,7 +51,6 @@ export function TicketControls({
             const next = event.target.value as TicketStatus;
             if (next === "closed" && !window.confirm(`Mark ${ticketNumber} as Closed - No Response? Tracker fields stay optional.`)) return;
             setCurrent(next);
-            event.currentTarget.form?.requestSubmit();
           }}
           className="bg-transparent font-semibold outline-none"
         >
@@ -57,6 +59,7 @@ export function TicketControls({
           ))}
         </select>
       </label>
+      <SaveButton>Save status & owner</SaveButton>
     </form>
   );
 }

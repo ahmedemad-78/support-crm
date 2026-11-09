@@ -7,6 +7,9 @@ export async function loadAnalytics() {
   const supabase = await createClient();
   const asOf = new Date().toISOString();
   const tickets: AnalyticsTicket[] = [];
+  const { data: sources, error: sourceError } = await supabase.from("ticket_sources").select("code, name");
+  if (sourceError) throw sourceError;
+  const sourceNames = new Map((sources ?? []).map((source) => [source.code, source.name]));
   // Deterministic cursor pagination, no silent 10k/5k cut-off or offset drift.
   let cursor: string | undefined;
   for (;;) {
@@ -35,6 +38,7 @@ export async function loadAnalytics() {
         subject: row.issue_description,
         status: row.status,
         source: row.source,
+        sourceName: sourceNames.get(row.source),
         createdOn: cairoDate(row.created_at),
         createdAt: row.created_at,
         resolvedAt: row.resolved_at,

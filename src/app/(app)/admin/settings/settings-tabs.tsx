@@ -86,8 +86,8 @@ export function SettingsTabs({
   notificationEmails: string[];
 }) {
   return (
-    <Tabs defaultValue="sources" className="gap-4 bg-background px-8 py-5">
-      <TabsList variant="line" className="h-auto max-w-full flex-wrap justify-start gap-y-2">
+    <Tabs defaultValue="sources" orientation="vertical" className="settings-workspace gap-4 px-5 py-6 sm:px-8">
+      <TabsList variant="line" className="settings-navigation h-auto max-w-full justify-start gap-y-2" aria-label="Settings sections">
         <TabsTrigger value="sources">
           Sources
           <span className="rounded-full bg-muted px-1.5 text-xs text-muted-foreground">

@@ -9,7 +9,8 @@ import { TICKET_SOURCES, TICKET_STATUSES } from "@/lib/tickets/constants";
 // Development-only, synthetic fixture. Never reads Supabase or real ticket data.
 export default async function DashboardPreview({ searchParams }: PageProps<"/login/preview">) {
   if (process.env.NODE_ENV !== "development") notFound();
-  const unclassified = (await searchParams).scenario === "unclassified";
+  const scenario = (await searchParams).scenario;
+  const unclassified = scenario === "unclassified";
   const asOf = new Date().toISOString();
   const now = Date.parse(asOf);
   const categories = [
@@ -26,7 +27,7 @@ export default async function DashboardPreview({ searchParams }: PageProps<"/log
     "App closes when opening a lesson",
     "Payment confirmation is missing",
   ];
-  const tickets: AnalyticsTicket[] = Array.from({ length: unclassified ? 47 : 96 }, (_, i) => {
+  const tickets: AnalyticsTicket[] = Array.from({ length: scenario === "empty" ? 0 : unclassified ? 47 : 96 }, (_, i) => {
     const createdAt = new Date(
       now - ((i * 13) % 400) * 86400000 - (i % 15) * 3600000,
     ).toISOString();

@@ -1,16 +1,14 @@
 import Link from "next/link";
-import { Search, X } from "lucide-react";
+import { Plus, Search, X } from "lucide-react";
 import { AgentFrame } from "@/components/app-shell/agent-frame";
 import { StatusBadge } from "@/components/tickets/status-badge";
 import { requireUser } from "@/lib/auth/session";
 import { formatRelative } from "@/lib/format";
 import { createClient } from "@/lib/supabase/server";
 import {
-  SOURCE_LABELS,
   sourceLabel,
   STATUS_LABELS,
   TICKET_STATUSES,
-  type TicketSource,
   type TicketStatus,
 } from "@/lib/tickets/constants";
 import {
@@ -47,12 +45,13 @@ export default async function TicketsPage({
   const scope = scopeValue === "followup" || scopeValue === "dashboard" ? scopeValue : "";
   const supabase = await createClient();
 
-  const [cities, categories, agents] = await Promise.all([
+  const [cities, categories, agents, sourceOptions] = await Promise.all([
     supabase.from("cities").select("id, name").eq("is_active", true).order("sort_order").order("name"),
     supabase.from("issue_categories").select("id, name").eq("is_active", true).order("name"),
     supabase.from("profiles").select("id, full_name").eq("role", "support_agent").eq("is_active", true).order("full_name"),
+    supabase.from("ticket_sources").select("code, name, is_active").order("name"),
   ]);
-  for (const result of [cities, categories, agents]) {
+  for (const result of [cities, categories, agents, sourceOptions]) {
     if (result.error) throw result.error;
   }
 
@@ -130,9 +129,10 @@ export default async function TicketsPage({
       title="Tickets"
       ticketSearch={{ q: filters.q, hidden: preserved }}
     >
-      <div className="flex flex-1 flex-col gap-4 px-5 py-5 sm:px-8">
+      <div className="queue-workspace flex flex-1 flex-col gap-4 px-5 py-5 sm:px-8">
+        <div className="queue-heading"><div><span className="cs-report-label">WORKSPACE / CASE QUEUE</span><h2>Every case. A next step.</h2><p>{total} {total === 1 ? "case" : "cases"} in this view. Filter the queue or pick up where you left off.</p></div>{user.role === "support_agent" && <Link className="queue-create" href="/tickets/new"><Plus size={16} /> Create case</Link>}</div>
         <div className="flex flex-col gap-3">
-          <div className="flex flex-wrap gap-1">
+          <div className="queue-views flex flex-wrap gap-1">
             {(Object.keys(VIEW_LABELS) as TicketView[]).map((view) => {
               const active = filters.view === view;
               return (
@@ -166,8 +166,8 @@ export default async function TicketsPage({
             </FilterSelect>
             <FilterSelect name="source" label="Source" value={filters.source}>
               <option value="">Source</option>
-              {(Object.keys(SOURCE_LABELS) as TicketSource[]).map((source) => (
-                <option key={source} value={source}>{SOURCE_LABELS[source]}</option>
+              {(sourceOptions.data ?? []).map((source) => (
+                <option key={source.code} value={source.code}>{source.name}{source.is_active ? "" : " (archived)"}</option>
               ))}
             </FilterSelect>
             <FilterSelect name="city" label="City" value={filters.city}>
@@ -224,7 +224,7 @@ export default async function TicketsPage({
         </div>
 
         <div className="overflow-hidden rounded-xl border bg-background">
-          <div className="overflow-x-auto">
+          <div className="queue-table overflow-x-auto">
             <table className="w-full min-w-[880px] text-sm">
               <thead className="bg-muted text-left text-xs font-semibold tracking-wide text-muted-foreground uppercase">
                 <tr>
@@ -244,7 +244,7 @@ export default async function TicketsPage({
                   return (
                     <tr key={ticket.id} className="border-t hover:bg-muted/60">
                       <td className="px-4 py-3.5">
-                        <Link href={`/tickets/${ticket.id}?returnTo=${encodeURIComponent(returnTo)}`} className="font-mono text-[13px] font-medium text-brand-action hover:underline">
+                        <Link href={`/tickets/${ticket.id}?returnTo=${encodeURIComponent(returnTo)}`} className="whitespace-nowrap font-mono text-[13px] font-medium text-brand-action hover:underline">
                           {ticket.ticket_number}
                         </Link>
                       </td>
@@ -253,7 +253,7 @@ export default async function TicketsPage({
                         {city && <span className="block text-xs text-muted-foreground">{city}</span>}
                       </td>
                       <td className="max-w-[280px] truncate px-4 py-3.5">{ticket.issue_description}</td>
-                      <td className="px-4 py-3.5 text-muted-foreground">{sourceLabel(ticket.source)}</td>
+                      <td className="px-4 py-3.5 text-muted-foreground">{sourceOptions.data?.find((source) => source.code === ticket.source)?.name ?? sourceLabel(ticket.source)}</td>
                       <td className="px-4 py-3.5">
                         <StatusBadge status={ticket.status as TicketStatus} />
                       </td>
@@ -265,6 +265,7 @@ export default async function TicketsPage({
               </tbody>
             </table>
           </div>
+          <div className="queue-mobile-cases">{tickets.map((ticket) => <article key={ticket.id}><div><Link href={`/tickets/${ticket.id}?returnTo=${encodeURIComponent(returnTo)}`} className="font-mono text-xs font-semibold text-brand-action">{ticket.ticket_number}</Link><StatusBadge status={ticket.status as TicketStatus} /></div><Link href={`/tickets/${ticket.id}?returnTo=${encodeURIComponent(returnTo)}`} className="queue-mobile-title" dir="auto">{ticket.issue_description}</Link><p dir="auto">{ticket.customer_name}</p><footer><span>{relationName(ticket.assignee) || "Unassigned"}</span><span>{formatRelative(ticket.created_at)}</span></footer></article>)}</div>
           {total === 0 && (
             <p className="px-4 py-16 text-center text-sm text-muted-foreground">No tickets match these filters.</p>
           )}

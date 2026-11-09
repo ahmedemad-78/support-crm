@@ -28,7 +28,7 @@ import {
   type StatusGroup,
   type VolumeMode,
 } from "@/lib/tickets/overview";
-import { AgeStrip, BarList, CauseChart, CHANNEL_COLORS, ColumnChart, EmptyChart, FawryDonut, Panel, SegmentChart, SOURCE_COLORS, Sparkline, SplitBar, STATUS_COLORS, TopicList, VolumeChart, type VolumeLine } from "./overview-charts";
+import { AgeStrip, BarList, CauseChart, CHANNEL_COLORS, ColumnChart, EmptyChart, FawryDonut, Panel, SegmentChart, SOURCE_COLORS, Sparkline, SplitBar, STATUS_COLORS, TopicList, VolumeChart, VolumePulse, type VolumeLine } from "./overview-charts";
 
 type Snapshot = { tickets: AnalyticsTicket[]; asOf: string };
 type Option = { id: string; name: string };
@@ -75,6 +75,7 @@ export function DashboardBoard({
   preview?: boolean;
 }) {
   const [snapshot, setSnapshot] = useState(initialSnapshot);
+  const sourceNames = useMemo(() => new Map<string, string>(snapshot.tickets.map((ticket) => [ticket.source, ticket.sourceName || sourceLabel(ticket.source)])), [snapshot.tickets]);
   const today = cairoDate(snapshot.asOf);
   const earliest = snapshot.tickets.reduce((day, ticket) => {
     const reported = reportedDay(ticket);
@@ -94,6 +95,7 @@ export function DashboardBoard({
   const [allTopics, setAllTopics] = useState(false);
   const [allCauses, setAllCauses] = useState(false);
   const [breakdown, setBreakdown] = useState(false);
+  const [volumeView, setVolumeView] = useState<"pulse" | "trend">("pulse");
   const [drawer, setDrawer] = useState(false);
   const busy = useRef(false);
   const abort = useRef<AbortController | null>(null);
@@ -177,9 +179,9 @@ export function DashboardBoard({
     if (filters.source) counts.set(filters.source, counts.get(filters.source) ?? 0);
     return [...counts.entries()]
       .filter(([id, count]) => count > 0 || id === filters.source)
-      .map(([id, count]) => ({ id, name: sourceLabel(id), count }))
+      .map(([id, count]) => ({ id, name: sourceNames.get(id) || sourceLabel(id), count }))
       .sort((a, b) => b.count - a.count || a.name.localeCompare(b.name));
-  }, [sourceFrame, filters.source]);
+  }, [sourceFrame, filters.source, sourceNames]);
   const requestRank = useMemo(() => rankValues(requestFrame, (ticket) => ticket.requestType, 8, "Other request types"), [requestFrame]);
   const openAll = snapshot.tickets.filter(isOpen);
   const followups = rows
@@ -249,7 +251,7 @@ export function DashboardBoard({
       "Status", "Request type", "Topic", "Root cause", "Action", "Outcome", "Fawry", "Assignee", "Description",
     ], ...rows.map((ticket) => [
       ticket.number, ticket.customerName ?? "", ticket.schoolName ?? "", ticket.customerPhone ?? "", ticket.customerEmail ?? "",
-      reportedDay(ticket), sourceLabel(ticket.source), customerSegment(ticket.source), contactChannel(ticket.source), referringTeam(ticket.source),
+      reportedDay(ticket), ticket.sourceName || sourceLabel(ticket.source), customerSegment(ticket.source), contactChannel(ticket.source), referringTeam(ticket.source),
       STATUS_LABELS[ticket.status], ticket.requestType, ticket.topic, ticket.trackerCause, ticket.trackerAction, ticket.outcome,
       ticket.fawry === "yes" ? "Yes" : ticket.fawry === "no" ? "No" : "", ticket.assignee ?? "", ticket.subject,
     ])];
@@ -262,7 +264,7 @@ export function DashboardBoard({
   }
 
   const chips: { key: keyof DashboardFilters; label: string }[] = [
-    filters.source ? { key: "source", label: sourceLabel(filters.source) } : null,
+    filters.source ? { key: "source", label: sourceNames.get(filters.source) || sourceLabel(filters.source) } : null,
     filters.segment ? { key: "segment", label: filters.segment } : null,
     filters.channel ? { key: "channel", label: filters.channel } : null,
     filters.referringTeam ? { key: "referringTeam", label: filters.referringTeam } : null,
@@ -296,7 +298,7 @@ export function DashboardBoard({
     unassignedOpen > 0 ? { id: "assignee", tone: "warn" as const, text: `${unassignedOpen} open ${unassignedOpen === 1 ? "case has" : "cases have"} no assignee.`, onClick: () => document.getElementById("follow-up")?.scrollIntoView({ behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth", block: "start" }) } : null,
     oldOpen > 0 ? { id: "age", tone: "warn" as const, text: `${oldOpen} open ${oldOpen === 1 ? "case was" : "cases were"} reported 15 or more days ago.`, onClick: () => { const on = filters.age === "15" && filters.statusGroup === "followup"; patch({ age: on ? "" : "15", status: "", statusGroup: on ? "" : "followup" }); } } : null,
     unclassified > 0 ? { id: "class", tone: "plain" as const, text: `${unclassified} ${unclassified === 1 ? "case has" : "cases have"} neither a topic nor a root cause.`, onClick: () => { const on = filters.topic === "__missing__" && filters.trackerCause === "__missing__"; patch({ topic: on ? "" : "__missing__", trackerCause: on ? "" : "__missing__" }); } } : null,
-    topSource ? { id: "source", tone: "plain" as const, text: `${sourceLabel(topSource[0])} is the largest source, with ${topSource[1]} ${topSource[1] === 1 ? "case" : "cases"}.`, onClick: () => toggle("source", topSource[0]) } : null,
+    topSource ? { id: "source", tone: "plain" as const, text: `${sourceNames.get(topSource[0]) || sourceLabel(topSource[0])} is the largest source, with ${topSource[1]} ${topSource[1] === 1 ? "case" : "cases"}.`, onClick: () => toggle("source", topSource[0]) } : null,
     topCause ? { id: "cause", tone: "plain" as const, text: `${topCause[0]} is the most common recorded cause, with ${topCause[1]} ${topCause[1] === 1 ? "case" : "cases"}.`, onClick: () => toggle("trackerCause", topCause[0]) } : null,
   ].filter((item): item is { id: string; tone: "warn" | "plain"; text: string; onClick: () => void } => Boolean(item));
 
@@ -336,7 +338,8 @@ export function DashboardBoard({
     <div className={`cs-board${refreshing ? " is-refreshing" : ""}`} aria-busy={refreshing} translate="no">
       <header className="cs-title">
         <div>
-          <h2>Dashboard</h2>
+          <p className="cs-report-label">OPERATIONS / SUPPORT INTELLIGENCE</p>
+          <h2>The support picture.</h2>
           <span>Cases reported {filters.from} – {filters.to}. Updated {updated}{refreshing ? " · Updating" : ""}.</span>
         </div>
         <div className="cs-title-actions no-print">
@@ -356,7 +359,7 @@ export function DashboardBoard({
         <label>To<input type="date" value={filters.to} min={filters.from} onChange={(event) => patch({ to: event.target.value, bucketFrom: "", bucketTo: "" })} /></label>
         <div className="cs-desktop-filters">{secondaryFilters()}</div>
         <label className="cs-search">Filter this dashboard<input value={filters.q ?? ""} placeholder="Case, school, phone, or email" aria-label="Filter this dashboard" onChange={(event) => patch({ q: event.target.value })} /></label>
-        <button type="button" className="cs-drawer-open" onClick={() => setDrawer(true)}><SlidersHorizontal size={14} /> Filters</button>
+        <button type="button" className="cs-drawer-open" onClick={() => setDrawer(true)}><SlidersHorizontal size={14} /> Filters{chips.length > 0 ? ` (${chips.length})` : ""}</button>
         <button type="button" onClick={reset}>Reset</button>
       </div>
       {drawer && <FilterDrawer onClose={() => setDrawer(false)}>{secondaryFilters()}</FilterDrawer>}
@@ -369,15 +372,20 @@ export function DashboardBoard({
           ))}
         </div>
       )}
+      <div className="cs-result-scope" role="status" aria-live="polite"><span><strong>{rows.length.toLocaleString()}</strong> {rows.length === 1 ? "case matches" : "cases match"} this report{chips.length ? ` · ${chips.length} active ${chips.length === 1 ? "filter" : "filters"}` : " · all statuses"}</span>{!preview && <Link href={dashboardListHref(filters, "dashboard")}>View matching cases <ArrowUpRight size={13} /></Link>}</div>
       {!valid && <p className="cs-alert" role="alert">Choose a reported-date range that starts on or before it ends.</p>}
       {error && <p className="cs-alert" role="alert">{error}</p>}
 
       <section className="cs-kpis">
         <Kpi label="Total Cases" value={stats.total} detail="Reported in the selected period" selected={false} dim={Boolean(filters.status || filters.statusGroup)} spark={spark} onClick={() => pickGroup("")} />
-        <Kpi label="Needs Follow-up" value={stats.followup} detail="Current status within this period" selected={filters.statusGroup === "followup"} dim={Boolean(filters.statusGroup) && filters.statusGroup !== "followup"} tone="followup" onClick={() => pickGroup("followup")} />
-        <Kpi label="Resolved" value={stats.resolved} detail="Current status within this period" selected={filters.statusGroup === "resolved"} dim={Boolean(filters.statusGroup) && filters.statusGroup !== "resolved"} tone="resolved" onClick={() => pickGroup("resolved")} />
-        <Kpi label="Closed Without Response" value={stats.closed} detail="Current status within this period" selected={filters.statusGroup === "closed"} dim={Boolean(filters.statusGroup) && filters.statusGroup !== "closed"} tone="closed" onClick={() => pickGroup("closed")} />
+        <Kpi label="Needs follow-up" value={stats.followup} total={stats.total} detail="Current status of selected arrivals" selected={filters.statusGroup === "followup"} dim={Boolean(filters.statusGroup) && filters.statusGroup !== "followup"} tone="followup" onClick={() => pickGroup("followup")} />
+        <Kpi label="Resolved" value={stats.resolved} total={stats.total} detail="Current status of selected arrivals" selected={filters.statusGroup === "resolved"} dim={Boolean(filters.statusGroup) && filters.statusGroup !== "resolved"} tone="resolved" onClick={() => pickGroup("resolved")} />
+        <Kpi label="Closed without response" value={stats.closed} total={stats.total} detail="Current status of selected arrivals" selected={filters.statusGroup === "closed"} dim={Boolean(filters.statusGroup) && filters.statusGroup !== "closed"} tone="closed" onClick={() => pickGroup("closed")} />
       </section>
+      <aside className="cs-backlog" aria-label="Current open workload">
+        <div><p>{openAll.length} open {openAll.length === 1 ? "case" : "cases"} across the workspace</p><span>Current backlog across all reported dates, independent of the report filters.</span></div>
+        {!preview && <Link href="/tickets?scope=followup">Review open work <ArrowUpRight size={14} /></Link>}
+      </aside>
       {insights.length > 0 && (
         <section className="cs-insights" aria-label="What this selection shows">
           {insights.map((item) => (
@@ -387,26 +395,29 @@ export function DashboardBoard({
       )}
       <div className="cs-row cs-row-volume">
         <Panel
-          title="Case volume over time"
-          question="Reported cases in the selected period. A zero is a period with no cases."
-          action={<div className="cs-modes">
-            <button type="button" aria-pressed={!breakdown} onClick={() => setBreakdown(false)}>Total</button>
-            <button type="button" aria-pressed={breakdown} onClick={() => setBreakdown(true)}>By channel</button>
-            {(["day", "week", "month"] as VolumeMode[]).map((item) => <button type="button" key={item} aria-pressed={volumeMode === item} onClick={() => { setMode(item); patch({ bucketFrom: "", bucketTo: "" }); }}>{item === "day" ? "Daily" : item === "week" ? "Weekly" : "Monthly"}</button>)}
-          </div>}
+          title="Case arrivals"
+          question="Reported-date activity. Select an interval to inspect its cases."
         >
-          <VolumeChart buckets={buckets} lines={volumeLines} selectedFrom={filters.bucketFrom ?? ""} selectedLine={breakdown ? (filters.channel ?? "") : ""} onPick={pickVolume} />
+          <div className="cs-plot-controls no-print"><div className="cs-modes" role="group" aria-label="Activity visualization">
+            <button type="button" aria-pressed={volumeView === "pulse"} onClick={() => { setVolumeView("pulse"); setBreakdown(false); }}>Activity map</button>
+            <button type="button" aria-pressed={volumeView === "trend"} onClick={() => setVolumeView("trend")}>Trend</button>
+          </div><div className="cs-modes" role="group" aria-label="Reported date interval">
+            {(["day", "week", "month"] as VolumeMode[]).map((item) => <button type="button" key={item} aria-pressed={volumeMode === item} onClick={() => { setMode(item); patch({ bucketFrom: "", bucketTo: "" }); }}>{item === "day" ? "Daily" : item === "week" ? "Weekly" : "Monthly"}</button>)}
+          </div>{volumeView === "trend" && <div className="cs-modes" role="group" aria-label="Series breakdown"><button type="button" aria-pressed={!breakdown} onClick={() => setBreakdown(false)}>Total</button><button type="button" aria-pressed={breakdown} onClick={() => setBreakdown(true)}>By channel</button></div>}</div>
+          {volumeView === "pulse" ? <VolumePulse buckets={buckets} selectedFrom={filters.bucketFrom ?? ""} onPick={pickVolume} /> : <VolumeChart buckets={buckets} lines={volumeLines} selectedFrom={filters.bucketFrom ?? ""} selectedLine={breakdown ? (filters.channel ?? "") : ""} onPick={pickVolume} />}
         </Panel>
-        <Panel title="Fawry payment" question="Recorded on the case. Not recorded stays separate from No.">
+        <Panel title="Fawry on record" question="The case's Yes / No flag, not payment success or revenue.">
           <FawryDonut slices={fawryRows} selectedId={filters.fawry ?? ""} onPick={(id) => toggle("fawry", id)} />
         </Panel>
       </div>
+      <FollowUp followups={followups} page={currentPage} pages={pages} today={today} openAll={openAll} preview={preview} returnTo={returnTo} listHref={listHref} onPage={setPage} onReset={reset} />
+      <div className="cs-section-heading"><span className="cs-report-label">02 / UNDERSTAND THE WORK</span><h2>Patterns behind the cases.</h2></div>
       <div className="cs-row cs-row-even">
-        <Panel title="Where cases come from" question="Each case keeps the source it was opened with.">
+        <Panel title="Where cases come from" question={`Compare all sources within the other filters · ${sourceFrame.length} cases.`}>
           <ColumnChart rows={sourceRows} colors={SOURCE_COLORS} selectedId={filters.source} onPick={(id) => toggle("source", id)} />
         </Panel>
         <Panel title="Request types" question="Recorded types stay visible. Not recorded is kept beside them.">
-          <CauseChart rows={requestRank} color="#1f6f8b" otherColor="#8aa4b3" missingHint="No request type on the case. Kept separate from the recorded split." selectedId={filters.requestType ?? ""} onPick={(id) => toggle("requestType", id)} />
+          <SplitBar rows={requestRank} colors={{ Inquiry: "#285c46", "Technical Issue": "#477d91", Complaint: "#a16b22", __missing__: "#d6ddd4", __other__: "#7f8e81" }} selectedId={filters.requestType ?? ""} onPick={(id) => toggle("requestType", id)} />
         </Panel>
       </div>
       <div className="cs-row cs-row-even">
@@ -418,7 +429,7 @@ export function DashboardBoard({
         </Panel>
       </div>
       <div className="cs-row cs-row-even">
-        <Panel title="Cases by customer segment" question="Not specified is kept when the source does not name a school group." action={<div className="cs-modes"><button type="button" aria-pressed={!share} onClick={() => setShare(false)}>Count</button><button type="button" aria-pressed={share} onClick={() => setShare(true)}>Percentage</button></div>}>
+        <Panel title="Cases by customer segment" question="School groups identified by source. Other segments remain unspecified." action={<div className="cs-modes"><button type="button" aria-pressed={!share} onClick={() => setShare(false)}>Count</button><button type="button" aria-pressed={share} onClick={() => setShare(true)}>Percentage</button></div>}>
           <div className="cs-status-key"><span><i style={{ background: STATUS_COLORS.resolved }} />Resolved</span><span><i style={{ background: STATUS_COLORS.followup }} />Needs Follow-up</span><span><i style={{ background: STATUS_COLORS.closed }} />Closed Without Response</span></div>
           <SegmentChart
             rows={segments}
@@ -437,14 +448,13 @@ export function DashboardBoard({
         </Panel>
       </div>
       <div className="cs-row cs-row-even">
-        <Panel title="Contact channel" question="How the case arrived. Several sources can share one channel.">
+        <Panel title="Contact channel" question="Channel inferred from the recorded source; not captured independently.">
           <SplitBar rows={channelRows} colors={CHANNEL_COLORS} selectedId={filters.channel ?? ""} onPick={(id) => toggle("channel", id)} />
         </Panel>
         <Panel title="Referring team" question="Only Moderation and Marketing cases have a referring team.">
           <BarList rows={teamRows} color="#1d4e3a" selectedId={filters.referringTeam ?? ""} onPick={(id) => toggle("referringTeam", id)} />
         </Panel>
       </div>
-      <FollowUp followups={followups} page={currentPage} pages={pages} today={today} openAll={openAll} preview={preview} returnTo={returnTo} listHref={listHref} onPage={setPage} onReset={reset} />
     </div>
   );
 }
@@ -505,7 +515,8 @@ function FollowUp({ followups, page, pages, today, openAll, preview, returnTo, l
   );
 }
 
-function Kpi({ label, value, detail, selected, dim, tone, spark, onClick }: { label: string; value: number; detail: string; selected: boolean; dim: boolean; tone?: StatusGroup; spark?: number[]; onClick: () => void }) {
+function Kpi({ label, value, total, detail, selected, dim, tone, spark, onClick }: { label: string; value: number; total?: number; detail: string; selected: boolean; dim: boolean; tone?: StatusGroup; spark?: number[]; onClick: () => void }) {
+  const percentage = total ? Math.round(value / total * 100) : 0;
   return (
     <button type="button" className={`cs-kpi ${selected ? "is-on" : ""} ${dim ? "is-dim" : ""} ${tone ? `cs-kpi-${tone}` : ""}`} aria-pressed={selected} onClick={onClick}>
       {selected && <em>Selected</em>}
@@ -513,6 +524,7 @@ function Kpi({ label, value, detail, selected, dim, tone, spark, onClick }: { la
       <strong>{value.toLocaleString()}</strong>
       <small>{detail}</small>
       {spark && <Sparkline values={spark} />}
+      {total !== undefined && <div className="cs-kpi-visual" aria-label={`${percentage}% of selected cases`}><div className="cs-kpi-track"><i style={{ width: `${percentage}%` }} /></div><b>{percentage}%</b></div>}
     </button>
   );
 }
@@ -526,7 +538,7 @@ function FilterDrawer({ onClose, children }: { onClose: () => void; children: Re
     return () => { if (node.open) node.close(); };
   }, []);
   return (
-    <dialog ref={ref} className="cs-drawer" aria-label="Dashboard filters" onClose={onClose}>
+    <dialog ref={ref} className="cs-drawer" aria-label="Dashboard filters" onClose={() => { if (!ref.current?.open) onClose(); }}>
       <header><h3>Filters</h3><button type="button" onClick={onClose} aria-label="Close filters"><X size={16} /></button></header>
       <div className="cs-filters">{children}</div>
       <footer><button type="button" onClick={onClose}>Show results</button></footer>

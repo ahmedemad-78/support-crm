@@ -5,6 +5,7 @@ export type AnalyticsTicket = DashboardTicket & {
   id: string;
   number: string;
   subject: string;
+  sourceName?: string;
   platform?: string;
   assigneeId?: string;
   assignee?: string;

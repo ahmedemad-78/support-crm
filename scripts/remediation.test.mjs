@@ -4,8 +4,9 @@ import { mkdirSync, readFileSync, writeFileSync, rmSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { createRequire } from "node:module";
 import ts from "typescript";
+import { fileURLToPath } from "node:url";
 
-const root = new URL("..", import.meta.url).pathname;
+const root = fileURLToPath(new URL("..", import.meta.url));
 const directory = join(root, ".remediation-test");
 const files = [
   "src/lib/http/session-boundary.ts",

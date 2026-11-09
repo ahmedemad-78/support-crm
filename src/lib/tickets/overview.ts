@@ -344,7 +344,7 @@ export function casesCsv(tickets: AnalyticsTicket[]) {
       ticket.customerPhone ?? "",
       ticket.customerEmail ?? "",
       reportedDay(ticket),
-      sourceLabel(ticket.source),
+      ticket.sourceName || sourceLabel(ticket.source),
       customerSegment(ticket.source),
       contactChannel(ticket.source),
       referringTeam(ticket.source),

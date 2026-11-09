@@ -27,6 +27,7 @@ export async function signIn(_prev: SignInState, formData: FormData): Promise<Si
     return { error: parsed.error.issues[0]?.message, email };
   }
 
+  try {
   const lock = await getLockStatus(parsed.data.email);
   if (lock.locked) {
     return { lockedUntil: lock.unlocksAt.toISOString(), email };
@@ -52,5 +53,8 @@ export async function signIn(_prev: SignInState, formData: FormData): Promise<Si
   }
 
   await recordAttempt(parsed.data.email, true);
+  } catch {
+    return { error: "Sign-in is temporarily unavailable. Please try again in a moment.", email };
+  }
   redirect("/");
 }

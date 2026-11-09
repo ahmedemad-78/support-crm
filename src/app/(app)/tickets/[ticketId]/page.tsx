@@ -16,6 +16,8 @@ import {
 import { safeAppReturn } from "@/lib/tickets/filters";
 import { addTicketNote, saveResolution, saveTracker } from "../actions";
 import { CopyTicketNumber, CredentialsValue, TicketControls } from "./ticket-controls";
+import { StatusBadge } from "@/components/tickets/status-badge";
+import { SaveButton } from "@/components/tickets/save-button";
 
 export default async function AgentTicketPage({
   params,
@@ -23,14 +25,14 @@ export default async function AgentTicketPage({
 }: PageProps<"/tickets/[ticketId]">) {
   const user = await requireUser(["support_agent", "manager"]);
   const { ticketId } = await params;
-  const { error: errorMessage, returnTo } = await searchParams;
+  const { error: errorMessage, returnTo, saved } = await searchParams;
   const backHref = safeAppReturn(typeof returnTo === "string" ? returnTo : undefined) ?? "/tickets";
   const supabase = await createClient();
 
   const { data: ticket } = await supabase
     .from("tickets")
     .select(
-      `id, ticket_number, status, source, created_at, customer_name, customer_email, customer_phone, school_name,
+      `id, ticket_number, status, source, created_at, updated_at, customer_name, customer_email, customer_phone, school_name,
        credentials_username, issue_date, end_user_type, platform, is_latest_version, app_version,
        device_type, page_screen, steps, issue_description, assignee_id, issue_category_id, root_cause_id,
        action_taken, resolution_notes, follow_up_notes, tracker_notes, fawry_payment,
@@ -75,6 +77,7 @@ export default async function AgentTicketPage({
   const urlByPath = new Map(signed.data?.map((file) => [file.path, file.signedUrl]));
 
   const status = ticket.status as TicketStatus;
+  const { data: ticketSource } = await supabase.from("ticket_sources").select("name").eq("code", ticket.source).maybeSingle();
   const canEdit = user.role === "support_agent";
   const city = nameOf(ticket.cities);
   const creator = nameOf(ticket.creator);
@@ -96,7 +99,8 @@ export default async function AgentTicketPage({
   ];
 
   return (
-    <AgentFrame title="Ticket details">
+    <AgentFrame title="Case file">
+      <div className="case-file">
       <div className="flex flex-col gap-4 border-b bg-background px-5 py-4 sm:px-8">
         <nav className="flex items-center gap-1.5 text-[13px]">
           <Link href={backHref} className="font-medium text-muted-foreground hover:text-foreground">{backHref.startsWith("/dashboard") ? "Support analytics" : "Tickets"}</Link>
@@ -106,11 +110,12 @@ export default async function AgentTicketPage({
         </nav>
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div className="min-w-0 flex-1">
-            <h2 className="text-2xl font-semibold tracking-tight">{ticket.issue_description}</h2>
+            <div className="mb-3 flex flex-wrap items-center gap-3"><span className="cs-report-label mb-0">CASE FILE / {ticket.ticket_number}</span><StatusBadge status={status} /></div>
+            <h2 className="max-w-3xl text-2xl font-medium tracking-tight" dir="auto">{ticket.issue_description.length > 140 ? `${ticket.issue_description.slice(0, 137)}…` : ticket.issue_description}</h2>
             <p className="mt-2 flex flex-wrap items-center gap-3 text-[13px] text-muted-foreground">
               <span className="inline-flex items-center gap-1.5">
                 <Shield className="size-3.5 text-status-awaiting" />
-                {sourceLabel(ticket.source)}
+                {ticketSource?.name || sourceLabel(ticket.source)}
                 {creator ? ` · by ${creator}` : ""}
               </span>
               <span>Created {formatDateTime(ticket.created_at)}</span>
@@ -118,12 +123,14 @@ export default async function AgentTicketPage({
           </div>
           {user.role === "support_agent" ? (
             <TicketControls
+              key={ticket.updated_at}
               ticketId={ticket.id}
               ticketNumber={ticket.ticket_number}
               status={status}
               assigneeId={ticket.assignee_id}
               agents={agents.data ?? []}
               returnTo={backHref === "/tickets" ? "" : backHref}
+              updatedAt={ticket.updated_at}
             />
           ) : (
             <p className="text-sm text-muted-foreground">{STATUS_LABELS[status]} · read-only</p>
@@ -134,6 +141,7 @@ export default async function AgentTicketPage({
             {errorMessage}
           </p>
         )}
+        {saved === "1" && !errorMessage && <p role="status" className="rounded-md border border-green-200 bg-green-50 px-3 py-2 text-sm text-green-900">Changes saved.</p>}
         <p className="text-sm text-muted-foreground">
           Request type, topic, cause, action, and outcome are required before Resolved. Closed - No Response does not require them. Classification can be corrected after the ticket is closed.
         </p>
@@ -147,7 +155,7 @@ export default async function AgentTicketPage({
               {fields.map(([label, value]) => (
                 <div key={label} className="flex flex-col gap-1">
                   <dt className="text-xs font-medium text-muted-foreground">{label}</dt>
-                  <dd className="text-sm">{value}</dd>
+                  <dd className="text-sm break-words" dir="auto">{value}</dd>
                 </div>
               ))}
               <div className="flex flex-col gap-1">
@@ -193,7 +201,7 @@ export default async function AgentTicketPage({
 
           <section className="rounded-xl border bg-background p-6">
             <h3 className="text-base font-semibold">Internal notes</h3>
-            <p className="mt-1 text-xs text-muted-foreground">Only the Support team can see these.</p>
+            <p className="mt-1 text-xs text-muted-foreground">Visible to Technical Support and Managers. Hidden from reporting teams.</p>
             <ul className="mt-4 flex flex-col gap-3">
               {(notes.data ?? []).map((note) => (
                 <li key={note.id} className="rounded-lg bg-muted px-3 py-2.5">
@@ -216,9 +224,7 @@ export default async function AgentTicketPage({
                   placeholder="Add an internal note"
                   className="rounded-lg border bg-background px-3 py-2 text-sm outline-none"
                 />
-                <button type="submit" className="h-9 self-start rounded-lg bg-brand-action px-3 text-sm font-semibold text-white">
-                  Add note
-                </button>
+                <SaveButton>Add internal note</SaveButton>
               </form>
             )}
           </section>
@@ -228,8 +234,9 @@ export default async function AgentTicketPage({
           <section className="rounded-xl border bg-background p-5">
             <h3 className="text-base font-semibold">Customer Support Tracker</h3>
             <p className="mt-1 text-xs text-muted-foreground">Visible to the person who opened the ticket, the manager, and Technical Support.</p>
-            <form action={saveTracker} className="mt-4 flex flex-col gap-3">
+            <form key={`tracker-${ticket.updated_at}`} action={saveTracker} className="mt-4 flex flex-col gap-3">
               <input type="hidden" name="ticketId" value={ticket.id} />
+              <input type="hidden" name="updatedAt" value={ticket.updated_at} />
               {backHref !== "/tickets" && <input type="hidden" name="returnTo" value={backHref} />}
               <TrackerSelect label="Request type" name="requestTypeId" value={ticket.request_type_id} options={requestTypes.data ?? []} disabled={!canEdit} />
               <TrackerSelect label="Topic" name="topicId" value={ticket.topic_id} options={topics.data ?? []} disabled={!canEdit} />
@@ -246,17 +253,16 @@ export default async function AgentTicketPage({
                 <textarea name="trackerNotes" defaultValue={ticket.tracker_notes ?? ""} disabled={!canEdit} rows={3} className="rounded-lg border bg-background px-3 py-2 text-sm" />
               </Field>
               {canEdit && (
-                <button type="submit" className="h-9 rounded-lg bg-brand-action text-sm font-semibold text-white">
-                  Save tracker
-                </button>
+                <SaveButton>Save tracker</SaveButton>
               )}
             </form>
           </section>
 
           <section className="rounded-xl border bg-background p-5">
             <h3 className="text-base font-semibold">Technical classification</h3>
-            <form action={saveResolution} className="mt-4 flex flex-col gap-3">
+            <form key={`classification-${ticket.updated_at}`} action={saveResolution} className="mt-4 flex flex-col gap-3">
               <input type="hidden" name="ticketId" value={ticket.id} />
+              <input type="hidden" name="updatedAt" value={ticket.updated_at} />
               {backHref !== "/tickets" && <input type="hidden" name="returnTo" value={backHref} />}
               <TrackerSelect label="Issue category" name="issueCategoryId" value={ticket.issue_category_id} options={categories.data ?? []} disabled={!canEdit} />
               <TrackerSelect label="Root cause" name="rootCauseId" value={ticket.root_cause_id} options={causes.data ?? []} disabled={!canEdit} />
@@ -264,9 +270,7 @@ export default async function AgentTicketPage({
                 <textarea name="actionTaken" defaultValue={ticket.action_taken ?? ""} disabled={!canEdit} rows={3} className="rounded-lg border bg-background px-3 py-2 text-sm" />
               </Field>
               {canEdit && (
-                <button type="submit" className="h-9 rounded-lg bg-brand-action text-sm font-semibold text-white">
-                  Save changes
-                </button>
+                <SaveButton>Save classification</SaveButton>
               )}
             </form>
           </section>
@@ -288,6 +292,7 @@ export default async function AgentTicketPage({
             </ol>
           </section>
         </div>
+      </div>
       </div>
     </AgentFrame>
   );

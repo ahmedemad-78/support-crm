@@ -22,10 +22,10 @@ export function navFor(user: CurrentUser): NavSection[] {
         {
           heading: "Support",
           items: [
-            { href: "/dashboard", label: "Dashboard", icon: "dashboard" },
-            { href: "/inbox", label: "Inbox", icon: "inbox" },
-            { href: "/tickets/new", label: "New ticket", icon: "new-ticket" },
-            { href: "/tickets", label: "Tickets", icon: "tickets" },
+            { href: "/tickets", label: "Case queue", icon: "tickets" },
+            { href: "/dashboard", label: "Analytics", icon: "dashboard" },
+            { href: "/tickets/new", label: "Create case", icon: "new-ticket" },
+            { href: "/inbox", label: "Conversations", icon: "inbox", badge: "Offline" },
           ],
         },
       ];

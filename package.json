@@ -9,6 +9,8 @@
     "lint": "eslint",
     "typecheck": "next typegen && tsc --noEmit",
     "test:analytics": "node --test scripts/analytics.test.mjs",
+    "test:remediation": "node --test scripts/remediation.test.mjs",
+    "test:workflow": "node --test scripts/workflow.test.mjs",
     "create-admin": "node --env-file=.env.local scripts/create-admin.mjs"
   },
   "dependencies": {

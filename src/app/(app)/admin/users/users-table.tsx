@@ -86,6 +86,7 @@ export function UsersTable({ rows, currentUserId }: { rows: UserRow[]; currentUs
               <th className="w-60 px-4 py-3">Role</th>
               <th className="w-32 px-4 py-3">Status</th>
               <th className="w-36 px-4 py-3">Last sign-in</th>
+              <th className="px-4 py-3"><span className="sr-only">Actions</span></th>
             </tr>
           </thead>
           <tbody>
@@ -134,11 +135,12 @@ export function UsersTable({ rows, currentUserId }: { rows: UserRow[]; currentUs
                   <StatusCell row={row} />
                 </td>
                 <td className="px-4 py-3 text-muted-foreground">{formatLastSignIn(row.lastSignInAt)}</td>
+                <td className="px-4 py-3"><button type="button" className="rounded-md border px-3 py-2 text-xs font-medium text-brand-action hover:bg-brand-tint" aria-label={`Edit account for ${row.fullName}`} onClick={(event) => { event.stopPropagation(); setSelectedId(row.id); }}>Edit</button></td>
               </tr>
             ))}
             {visible.length === 0 && (
               <tr>
-                <td colSpan={4} className="px-4 py-10 text-center text-muted-foreground">
+                <td colSpan={5} className="px-4 py-10 text-center text-muted-foreground">
                   No users match &ldquo;{query}&rdquo;.
                 </td>
               </tr>

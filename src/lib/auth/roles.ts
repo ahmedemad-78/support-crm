@@ -45,7 +45,7 @@ export type CurrentUser = {
 export function homePathFor(user: Pick<CurrentUser, "role">): string {
   switch (user.role) {
     case "support_agent":
-      return "/inbox";
+      return "/tickets";
     case "manager":
       return "/dashboard";
     default:

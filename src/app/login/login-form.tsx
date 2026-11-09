@@ -12,6 +12,7 @@ export function LoginForm({ deactivated }: { deactivated: boolean }) {
   const minutesLeft = useMinutesUntil(state.lockedUntil);
   const locked = minutesLeft > 0;
   const [showPassword, setShowPassword] = useState(false);
+  const [email, setEmail] = useState("");
 
   return (
     <form action={formAction} aria-busy={pending} className="flex flex-col gap-5">
@@ -36,7 +37,10 @@ export function LoginForm({ deactivated }: { deactivated: boolean }) {
             autoComplete="email"
             placeholder="you@company.com"
             required
-            defaultValue={state.email}
+            spellCheck={false}
+            autoCapitalize="none"
+            value={email}
+            onChange={(event) => setEmail(event.target.value)}
             className="h-11 pl-9"
           />
         </div>

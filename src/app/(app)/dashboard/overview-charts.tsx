@@ -32,6 +32,32 @@ const AGE_COLORS = ["#cfead9", "#7dcea0", "#e0a045", "#b45309"];
 
 export type VolumeLine = { id: string; label: string; color: string; values: number[] };
 
+/** Discrete intervals keep sparse support data honest: no interpolated activity. */
+export function VolumePulse({ buckets, selectedFrom, onPick }: {
+  buckets: VolumeBucket[];
+  selectedFrom: string;
+  onPick: (lineId: string, from: string, to: string) => void;
+}) {
+  if (!buckets.length) return <EmptyChart text="Choose a valid reported-date range." />;
+  const max = Math.max(1, ...buckets.map((bucket) => bucket.total));
+  const colors = ["#edf0e7", "#d8e5c4", "#a9c78e", "#477b4b", "#24543b"];
+  const total = buckets.reduce((sum, bucket) => sum + bucket.total, 0);
+  const dense = buckets.length > 31;
+  return (
+    <div className="cs-pulse">
+      <div className="cs-pulse-summary"><strong>{total.toLocaleString()}</strong><span>reported cases · {buckets.length} intervals</span></div>
+      <div className={`cs-pulse-grid${dense ? " is-dense" : ""}`} role="group" aria-label="Case arrivals by reported date. Darker cells mean more cases.">
+        {buckets.map((bucket) => {
+          const level = bucket.total === 0 ? 0 : Math.max(1, Math.ceil((bucket.total / max) * 4));
+          const selected = selectedFrom === bucket.from;
+          return <button type="button" key={bucket.from} className={`cs-pulse-cell${selectedFrom && !selected ? " is-dim" : ""}`} style={{ background: colors[level], color: level >= 3 ? "#fff" : "#20382e" }} aria-pressed={selected} aria-label={`${bucket.from} to ${bucket.to}: ${bucket.total} reported cases`} title={`${bucket.from} – ${bucket.to}: ${bucket.total} cases`} onClick={() => onPick("total", bucket.from, bucket.to)}><strong>{bucket.total}</strong><span>{dense ? bucket.from.slice(5) : bucket.label}</span></button>;
+        })}
+      </div>
+      <div className="cs-pulse-key"><span>Fewer</span>{colors.map((color) => <i key={color} style={{ background: color }} />)}<span>More</span></div>
+    </div>
+  );
+}
+
 function mark(selected: boolean, active: boolean) {
   if (!selected) return "idle";
   return active ? "on" : "dim";
@@ -40,10 +66,10 @@ function mark(selected: boolean, active: boolean) {
 function inkOn(color: string) {
   const hex = color.replace("#", "");
   if (hex.length !== 6) return "#fff";
-  const red = Number.parseInt(hex.slice(0, 2), 16);
-  const green = Number.parseInt(hex.slice(2, 4), 16);
-  const blue = Number.parseInt(hex.slice(4, 6), 16);
-  return (red * 299 + green * 587 + blue * 114) / 1000 > 168 ? "#173126" : "#fff";
+  const linear = (value: number) => value <= 0.04045 ? value / 12.92 : ((value + 0.055) / 1.055) ** 2.4;
+  const channels = [0, 2, 4].map((start) => linear(Number.parseInt(hex.slice(start, start + 2), 16) / 255));
+  const luminance = channels[0] * 0.2126 + channels[1] * 0.7152 + channels[2] * 0.0722;
+  return 1.05 / (luminance + 0.05) >= 4.5 ? "#fff" : "#000";
 }
 
 export function VolumeChart({
@@ -172,9 +198,9 @@ export function FawryDonut({
   const signature = slices.map((slice) => slice.count).join(",");
   return (
     <div className="cs-donut cs-draw" key={signature}>
-      <svg viewBox="0 0 120 120" role="img" aria-label={`Fawry payment, ${total} cases`}>
+      <svg viewBox="0 0 120 120" role="group" aria-label={`Fawry flag, ${total} cases`}>
         <circle cx="60" cy="60" r={radius} fill="none" stroke="#eef2ef" strokeWidth="14" />
-        {total > 0 && slices.map((slice) => {
+        {total > 0 && slices.filter((slice) => slice.count > 0).map((slice) => {
           const length = (slice.count / total) * circumference;
           const dash = `${length} ${circumference - length}`;
           const offset = circumference - cursor;

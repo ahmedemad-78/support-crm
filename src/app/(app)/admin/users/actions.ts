@@ -15,7 +15,7 @@ const password = z
   .max(72, "Password can be at most 72 characters");
 
 const createSchema = z.object({
-  fullName: z.string().trim().min(2, "Enter the full name"),
+  fullName: z.string().trim().min(2, "Enter the full name").max(120, "Name can be at most 120 characters"),
   email: z.email("Enter a valid email, e.g. name@selaheltelmeez.com"),
   role: z.enum(ROLES),
   password,
@@ -44,11 +44,17 @@ export async function createUser(input: z.input<typeof createSchema>): Promise<A
 
   // Supabase inserts the auth user before it writes app_metadata, so the profile trigger
   // can't see the role yet. Set it explicitly.
-  const { error: profileError } = await admin
+  const { data: profile, error: profileError } = await admin
     .from("profiles")
     .update({ role, full_name: fullName })
-    .eq("id", created.user.id);
-  if (profileError) return { ok: false, error: profileError.message };
+    .eq("id", created.user.id)
+    .select("id")
+    .maybeSingle();
+  if (profileError || !profile) {
+    const { error: banError } = await admin.auth.admin.updateUserById(created.user.id, { ban_duration: "876000h" });
+    revalidatePath("/admin/users");
+    return { ok: false, error: banError ? "The login was created, but profile setup and account suspension failed. An administrator must repair this account before it is used. Do not create it again." : "The login was created but profile setup failed. Sign-in has been suspended. An administrator must repair this account; do not create it again." };
+  }
 
   revalidatePath("/admin/users");
   return { ok: true, message: `${fullName} can now sign in.` };
@@ -91,11 +97,17 @@ export async function updateUser(input: z.input<typeof updateSchema>): Promise<A
       ...(passwordChanged ? { password: parsed.data.password } : {}),
       app_metadata: { role, full_name: current.full_name },
     });
-    if (error) return { ok: false, error: error.message };
+    if (error) {
+      revalidatePath("/admin/users");
+      return { ok: false, error: roleChanged ? "The profile role was saved, but login settings could not be synchronized. Review this user's role before retrying." : error.message };
+    }
 
     if (userId !== me.id) {
       const { error: revokeError } = await admin.rpc("revoke_user_sessions", { target_user: userId });
-      if (revokeError) return { ok: false, error: revokeError.message };
+      if (revokeError) {
+        revalidatePath("/admin/users");
+        return { ok: false, error: "The requested changes were saved, but existing sessions could not be revoked. Session revocation still needs attention." };
+      }
     }
   }
 
@@ -125,9 +137,18 @@ export async function setUserActive(userId: string, active: boolean): Promise<Ac
   const { error: banError } = await admin.auth.admin.updateUserById(userId, {
     ban_duration: active ? "none" : "876000h",
   });
-  if (banError) return { ok: false, error: banError.message };
+  if (banError) {
+    revalidatePath("/admin/users");
+    return { ok: false, error: `The profile is ${active ? "active" : "inactive"}, but the sign-in restriction could not be updated. Account access is not fully synchronized.` };
+  }
 
-  if (!active) await admin.rpc("revoke_user_sessions", { target_user: userId });
+  if (!active) {
+    const { error: revokeError } = await admin.rpc("revoke_user_sessions", { target_user: userId });
+    if (revokeError) {
+      revalidatePath("/admin/users");
+      return { ok: false, error: "The account was deactivated, but existing sessions could not be revoked. Session revocation still needs attention." };
+    }
+  }
 
   revalidatePath("/admin/users");
   return { ok: true, message: active ? "User reactivated." : "User deactivated. Their tickets and history are kept." };

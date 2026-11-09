@@ -44,6 +44,7 @@ export function NewTicketForm({
   const [errors, setErrors] = useState<PortalTicketFieldErrors>({});
   const [formError, setFormError] = useState<string | null>(null);
   const [files, setFiles] = useState<File[]>([]);
+  const [createdCase, setCreatedCase] = useState<{ ticketId: string; ticketNumber: string } | null>(null);
   const [pending, startTransition] = useTransition();
 
   function readForm(): SupportTicketInput {
@@ -56,6 +57,22 @@ export function NewTicketForm({
   function onSubmit(e: React.FormEvent) {
     e.preventDefault();
     setFormError(null);
+    if (createdCase) {
+      startTransition(async () => {
+        try {
+          const failed = await uploadAttachments(createdCase.ticketId, files);
+          if (failed.length) {
+            setFiles(failed);
+            setFormError(`Case ${createdCase.ticketNumber} is saved. ${failed.length} files still need uploading. Retry, or open the saved case.`);
+            return;
+          }
+          router.push(sources ? `/tickets/${createdCase.ticketId}` : `/portal/my-tickets/${createdCase.ticketId}`);
+        } catch {
+          setFormError("The case is saved. Attachment upload could not be confirmed. Open the case to check the files before retrying.");
+        }
+      });
+      return;
+    }
     const input = readForm();
     const check = sources ? supportTicketSchema.safeParse(input) : portalTicketSchema.safeParse(input);
     if (!check.success) {
@@ -66,6 +83,7 @@ export function NewTicketForm({
     setErrors({});
 
     startTransition(async () => {
+      try {
       const result = sources ? await createSupportTicket(input) : await createPortalTicket(input);
       if (!result.ok) {
         if (result.fieldErrors) setErrors(result.fieldErrors);
@@ -74,16 +92,22 @@ export function NewTicketForm({
         return;
       }
 
+      setCreatedCase({ ticketId: result.ticketId, ticketNumber: result.ticketNumber });
       const failed = await uploadAttachments(result.ticketId, files);
       if (failed.length) {
-        toast.warning(`Ticket ${result.ticketNumber} was created, but ${failed.join(", ")} didn't upload.`);
+        setFiles(failed);
+        setFormError(`Case ${result.ticketNumber} is saved. ${failed.map((file) => file.name).join(", ")} did not upload. Retry the files below, or open the saved case.`);
+        return;
       }
       router.push(sources ? `/tickets/${result.ticketId}` : `/portal/my-tickets?submitted=${encodeURIComponent(result.ticketNumber)}`);
+      } catch {
+        setFormError("We could not confirm the operation. Check the case queue before submitting again. Your entries are still here.");
+      }
     });
   }
 
   function addFiles(list: FileList | null) {
-    if (!list) return;
+    if (!list || pending) return;
     const next = [...files];
     for (const file of Array.from(list)) {
       const limit = ATTACHMENT_RULES.types[file.type];
@@ -104,7 +128,10 @@ export function NewTicketForm({
   const err = (field: Field) => errors[field];
 
   return (
-    <form ref={formRef} onSubmit={onSubmit} noValidate className="flex flex-col gap-5 px-4 py-6 sm:px-8">
+    <form ref={formRef} onSubmit={onSubmit} noValidate className="intake-workspace flex flex-col gap-5 px-4 py-6 sm:px-8" aria-busy={pending}>
+      <div className="intake-intro"><span className="cs-report-label">WORKSPACE / NEW CASE</span><h2>Start with the person.</h2><p>Record who needs help and what happened, then add the technical context and evidence.</p></div>
+      {createdCase && <div role="status" className="rounded-md border border-green-200 bg-green-50 p-4 text-sm text-green-900">Case {createdCase.ticketNumber} is already saved. Retrying uploads will use this same case. <button type="button" className="ml-2 font-semibold underline" onClick={() => router.push(sources ? `/tickets/${createdCase.ticketId}` : `/portal/my-tickets/${createdCase.ticketId}`)}>Open saved case</button></div>}
+      <fieldset disabled={pending || Boolean(createdCase)} className="flex min-w-0 flex-col gap-5 disabled:opacity-70">
       {sources && (
         <Section title="Source" hint="Where this case came from.">
           <SelectField name="source" label="Source" error={errors.source}>
@@ -164,7 +191,24 @@ export function NewTicketForm({
         </div>
       </Section>
 
-      <Section title="2. Device & app" hint="Helps Support reproduce the issue.">
+      <Section title="2. The request" hint="What happened and where.">
+        <div className="flex flex-col gap-4">
+          <div className="grid grid-cols-1 gap-x-5 gap-y-4 sm:grid-cols-2">
+            <TextField name="issue_date" label="Date of issue" type="date" error={err("issue_date")} />
+            <TextField
+              name="page_screen"
+              label="Page / screen"
+              optional
+              placeholder="e.g. Subscriptions → Payment status"
+              error={err("page_screen")}
+            />
+          </div>
+          <TextAreaField name="steps" label="Steps / scenario" optional error={err("steps")} />
+          <TextAreaField name="issue_description" label="Issue description" error={err("issue_description")} />
+        </div>
+      </Section>
+
+      <Section title="3. Device & app" hint="Helps Support reproduce the issue.">
         <div className="grid grid-cols-1 gap-x-5 gap-y-4 sm:grid-cols-2 xl:grid-cols-3">
           <ChoiceField
             name="platform"
@@ -201,24 +245,8 @@ export function NewTicketForm({
         </div>
       </Section>
 
-      <Section title="3. Issue" hint="What happened and where.">
-        <div className="flex flex-col gap-4">
-          <div className="grid grid-cols-1 gap-x-5 gap-y-4 sm:grid-cols-2">
-            <TextField name="issue_date" label="Date of issue" type="date" error={err("issue_date")} />
-            <TextField
-              name="page_screen"
-              label="Page / screen"
-              optional
-              placeholder="e.g. Subscriptions → Payment status"
-              error={err("page_screen")}
-            />
-          </div>
-          <TextAreaField name="steps" label="Steps / scenario" optional error={err("steps")} />
-          <TextAreaField name="issue_description" label="Issue description" error={err("issue_description")} />
-        </div>
-      </Section>
-
-      <Section title="4. Attachments" hint="Optional. Up to 5 files.">
+      </fieldset>
+      <Section title="4. Attachments" hint="Optional. Up to 5 files. If an upload fails, retry it on the saved case.">
         <div className="flex flex-col gap-3">
           <label
             onDragOver={(e) => e.preventDefault()}
@@ -235,6 +263,7 @@ export function NewTicketForm({
             </span>
             <input
               type="file"
+              disabled={pending}
               multiple
               accept={ATTACHMENT_RULES.accept}
               className="sr-only"
@@ -256,6 +285,7 @@ export function NewTicketForm({
               </span>
               <button
                 type="button"
+                disabled={pending}
                 onClick={() => setFiles(files.filter((_, j) => j !== i))}
                 className="rounded p-0.5 text-muted-foreground hover:text-foreground"
                 title={`Remove ${file.name}`}
@@ -279,24 +309,24 @@ export function NewTicketForm({
           Cancel
         </Button>
         <Button type="submit" size="lg" className="h-10 px-5 font-semibold" disabled={pending}>
-          {pending ? "Submitting…" : "Submit ticket"}
+          {pending ? "Saving…" : createdCase ? "Retry attachments" : "Create case"}
         </Button>
       </div>
     </form>
   );
 }
 
-async function uploadAttachments(ticketId: string, files: File[]): Promise<string[]> {
+async function uploadAttachments(ticketId: string, files: File[]): Promise<File[]> {
   if (!files.length) return [];
   const supabase = createClient();
-  const failed: string[] = [];
+  const failed: File[] = [];
 
   for (const file of files) {
     const safeName = file.name.replace(/[^\w.-]+/g, "_");
     const path = `${ticketId}/${crypto.randomUUID()}-${safeName}`;
     const upload = await supabase.storage.from(ATTACHMENTS_BUCKET).upload(path, file, { contentType: file.type });
     if (upload.error) {
-      failed.push(file.name);
+      failed.push(file);
       continue;
     }
     const { error } = await supabase.from("ticket_attachments").insert({
@@ -306,7 +336,7 @@ async function uploadAttachments(ticketId: string, files: File[]): Promise<strin
       mime_type: file.type,
       size_bytes: file.size,
     });
-    if (error) failed.push(file.name);
+    if (error) failed.push(file);
   }
   return failed;
 }

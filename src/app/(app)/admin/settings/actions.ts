@@ -21,6 +21,7 @@ export type ListTable = (typeof LIST_TABLES)[number];
 
 const tableSchema = z.enum(LIST_TABLES);
 const nameSchema = z.string().trim().min(2, "Name needs at least 2 characters").max(160);
+const listNameSchema = (table: ListTable) => nameSchema.max(table === "cities" || table === "issue_categories" ? 80 : table === "root_causes" ? 120 : 160);
 
 function sourceCode(name: string) {
   const code = name
@@ -39,7 +40,7 @@ function friendly(error: { code?: string; message: string }, name?: string): str
 export async function addListItem(table: ListTable, name: string): Promise<ActionResult> {
   await assertAdmin();
   const t = tableSchema.parse(table);
-  const parsed = nameSchema.safeParse(name);
+  const parsed = listNameSchema(t).safeParse(name);
   if (!parsed.success) return { ok: false, error: parsed.error.issues[0].message };
 
   const supabase = await createClient();
@@ -53,7 +54,7 @@ export async function addListItem(table: ListTable, name: string): Promise<Actio
 export async function renameListItem(table: ListTable, id: number, name: string): Promise<ActionResult> {
   await assertAdmin();
   const t = tableSchema.parse(table);
-  const parsed = nameSchema.safeParse(name);
+  const parsed = listNameSchema(t).safeParse(name);
   if (!parsed.success) return { ok: false, error: parsed.error.issues[0].message };
 
   const supabase = await createClient();
