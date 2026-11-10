@@ -16,6 +16,14 @@ export class MailNotConfiguredError extends Error {
 
 export type MailEnv = Record<string, string | undefined>;
 
+export function graphConfigured(env: MailEnv = process.env) {
+  return Boolean(env.GRAPH_TENANT_ID && env.GRAPH_CLIENT_ID && env.GRAPH_CLIENT_SECRET && env.GRAPH_SENDER);
+}
+
+export function mailConfigured(env: MailEnv = process.env) {
+  return graphConfigured(env) || smtpConfigured(env) || Boolean(env.RESEND_API_KEY);
+}
+
 export function smtpConfigured(env: MailEnv = process.env) {
   return Boolean(env.SMTP_HOST && env.SMTP_USER && env.SMTP_PASSWORD);
 }
@@ -67,6 +75,10 @@ export type SendOptions = {
 
 export async function sendOutbound(message: OutboundMessage, options: SendOptions = {}) {
   const env = options.env ?? process.env;
+  if (graphConfigured(env)) {
+    await sendGraph(message, env, options.fetchImpl ?? fetch);
+    return { provider: "microsoft-graph" as const };
+  }
   if (smtpConfigured(env)) {
     const transporter = createTransport(smtpTransportOptions(env, options.tls));
     await transporter.sendMail({
@@ -86,6 +98,23 @@ export async function sendOutbound(message: OutboundMessage, options: SendOption
   }
 
   throw new MailNotConfiguredError();
+}
+
+async function sendGraph(message: OutboundMessage, env: MailEnv, fetchImpl: typeof fetch) {
+  const tokenResponse = await fetchImpl(`https://login.microsoftonline.com/${encodeURIComponent(env.GRAPH_TENANT_ID!)}/oauth2/v2.0/token`, {
+    method: "POST", signal: AbortSignal.timeout(20_000),
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    body: new URLSearchParams({ client_id: env.GRAPH_CLIENT_ID!, client_secret: env.GRAPH_CLIENT_SECRET!, scope: "https://graph.microsoft.com/.default", grant_type: "client_credentials" }),
+  });
+  if (!tokenResponse.ok) throw new Error(`Microsoft sender authorization failed (${tokenResponse.status}). Check the company app configuration.`);
+  const token = await tokenResponse.json() as { access_token?: string };
+  if (!token.access_token) throw new Error("Microsoft did not return a sender token.");
+  const response = await fetchImpl(`https://graph.microsoft.com/v1.0/users/${encodeURIComponent(env.GRAPH_SENDER!)}/sendMail`, {
+    method: "POST", signal: AbortSignal.timeout(20_000),
+    headers: { Authorization: `Bearer ${token.access_token}`, "Content-Type": "application/json" },
+    body: JSON.stringify({ message: { subject: message.subject, body: { contentType: "HTML", content: message.html }, toRecipients: [{ emailAddress: { address: message.to } }] }, saveToSentItems: true }),
+  });
+  if (response.status !== 202) throw new Error(`Microsoft did not accept the email (${response.status}). Check the sender mailbox permission.`);
 }
 
 async function sendResend(message: OutboundMessage, env: MailEnv, apiKey: string, fetchImpl: typeof fetch) {
@@ -127,7 +156,8 @@ export function outboxFailurePatch(attempts: number, message: string, now = Date
 export function publicMailError(error: unknown, env: MailEnv = process.env) {
   if (error instanceof MailNotConfiguredError) return MISSING_MAIL_CONFIG;
   let message = error instanceof Error ? error.message : "Email delivery failed";
-  const secret = env.SMTP_PASSWORD;
-  if (secret) message = message.split(secret).join("[redacted]");
+  for (const secret of [env.SMTP_PASSWORD, env.GRAPH_CLIENT_SECRET, env.RESEND_API_KEY]) {
+    if (secret) message = message.split(secret).join("[redacted]");
+  }
   return message.slice(0, 500);
 }

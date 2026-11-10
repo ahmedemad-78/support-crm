@@ -1,4 +1,4 @@
-# Case lifecycle release — prepared, not deployed
+# Case lifecycle release
 
 Approved workflow:
 - Support records on behalf of the reporting owner. The original creator remains unchanged.
@@ -18,18 +18,15 @@ Validation completed:
 - 50 application regression tests pass.
 - 43 assertions against real local PostgreSQL via PGlite pass, including RLS, all source mappings, comments, duplicate attempts, two solution cycles, snapshots and central-only routing.
 - Local browser checks: explicit reopen selection and Arabic reason survive failed submission; recorded source owner and contact channel remain independent; mobile layout has no horizontal overflow at 390px; no console errors/warnings observed.
-- Production read-only verification: 64 tickets (61 resolved, 2 closed, 1 new), lifecycle schema not applied.
+- Production migration applied after connector confirmation; six source owners and central routing verified.
+- A real production transaction exercised creation, owner visibility, unrelated-user denial, resolution, comment idempotency, reopen, duplicate reopen refusal and a second resolution, then rolled back completely. Counts remain 64 tickets and no committed workflow events from QA.
 
-Release blockers:
-1. Supabase mutation confirmations expired on the transaction validation attempt and both migration application attempts. No migration was applied. The dashboard browser fallback requires a Supabase sign-in. Do not deploy code that reads the new schema before applying the migration.
-2. No SMTP / Resend delivery settings exist in Vercel. An Outlook destination address does not itself authorize or configure a sender. No real message delivery has been verified. Use an approved existing company sender without adding a paid service.
+Email connection pending:
+- Microsoft Graph app-only sender is implemented and covered by transport tests. See `docs/company-outlook-email.md` for the scoped company-mailbox setup. No sender credentials or company app permissions have been configured. Actual Outlook delivery is not yet verified.
+- Supabase security advisors reported no new workflow-table RLS issue. Existing server-only tables intentionally have no client policies; the pre-existing leaked-password-protection warning remains. No paid feature was enabled.
 
-Next release steps:
-1. Apply `supabase/migrations/20261110150000_case_lifecycle.sql` through the authenticated Supabase connection after its confirmation succeeds.
-2. Verify live schema, routing configuration, six source owners and unchanged legacy ticket counts. Run security advisors.
-3. Push this prepared branch and deploy its exact commit to the existing production project.
-4. Smoke-test an explicitly marked synthetic ticket end-to-end through the UI, including the reporting account's permissions, resolution, comment and reopen. Do not modify historical customer cases.
-5. Connect the approved sender and verify one email to Ahmed only. Do not release legacy queued mail or notify reporting owners during rollout.
+Release procedure:
+- Deploy the exact tested commit to the existing support-crm production project, then verify the canonical site. Production smoke-test evidence and deployment ID are recorded separately in audit.
 
 Local database test setup (no hosted environment):
 `npm install --prefix audit/db-test --no-package-lock --ignore-scripts @electric-sql/pglite`

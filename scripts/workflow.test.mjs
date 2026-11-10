@@ -239,7 +239,7 @@ test("central email delivery excludes all legacy jobs and other recipients", asy
     {id:"new-central",event_id:"event-3",to_address:central},
   ].map(row=>({...row,status:"pending",subject:"TKT-FIXTURE · Resolved & closed",body_text:"Cause: Sync delay. Action: Resync. Outcome: Fixed.",ticket_path:"/tickets/fixture",attempts:0,last_error:null,created_at:"2026-11-10T12:00:00Z",next_attempt_at:"2026-01-01T00:00:00Z"}));
   const admin={from(table){const predicates=[];let patch;const q={select(){return q;},eq(key,value){predicates.push(row=>row[key]===value);return q;},not(key,op,value){assert.equal(op,"is");assert.equal(value,null);predicates.push(row=>row[key]!=null);return q;},lte(key,value){predicates.push(row=>row[key]<=value);return q;},order(){return q;},limit(){return q;},update(value){patch=value;return q;},in(key,values){predicates.push(row=>values.includes(row[key]));return q;},async single(){assert.equal(table,"app_settings");return {data:{value:{mode:"central_only",email:central}},error:null};},then(resolve){const matching=rows.filter(row=>predicates.every(p=>p(row)));if(patch)for(const row of matching)Object.assign(row,patch);return Promise.resolve({data:matching,error:null}).then(resolve);}};return q;}};
-  const load=loadWith({"server-only":{},"@/lib/supabase/admin":{createAdminClient:()=>admin},"@/lib/email/send":{smtpConfigured:()=>true,sendOutbound:async message=>sent.push(message),MailNotConfiguredError:class extends Error{},publicMailError:()=>"failed",outboxFailurePatch:()=>({})}});
+  const load=loadWith({"server-only":{},"@/lib/supabase/admin":{createAdminClient:()=>admin},"@/lib/email/send":{mailConfigured:()=>true,sendOutbound:async message=>sent.push(message),MailNotConfiguredError:class extends Error{},publicMailError:()=>"failed",outboxFailurePatch:()=>({})}});
   const result=await load("src/lib/email/deliver.ts").deliverPendingEmails();
   assert.equal(result.sent,1);assert.equal(sent.length,1);assert.equal(sent[0].to,central);assert.match(sent[0].text,/Cause: Sync delay/);assert.match(sent[0].subject,/Resolved & closed/);
   assert.equal(rows[0].status,"pending");assert.equal(rows[1].status,"pending");assert.equal(rows[2].status,"pending");assert.equal(rows[3].status,"sent");
@@ -247,4 +247,17 @@ test("central email delivery excludes all legacy jobs and other recipients", asy
 
 test("resolution requires a meaningful Support response before a database write",async()=>{
   const h=caseHarness();const result=await h.actions.saveCaseWorkspace({error:""},fullCaseForm({status:"resolved",resolutionNotes:"  "}));assert.match(result.error,/clear Support response/);assert.equal(h.writes(),0);
+});
+
+test("Microsoft Graph uses app-only OAuth and sends through the configured mailbox",async()=>{
+  const load=loadWith({"server-only":{},nodemailer:{createTransport(){throw Error("SMTP must not run");}}});const mail=load("src/lib/email/send.ts");const calls=[];
+  const env={GRAPH_TENANT_ID:"tenant-fixture",GRAPH_CLIENT_ID:"client-fixture",GRAPH_CLIENT_SECRET:"secret-fixture",GRAPH_SENDER:"support@example.com"};
+  const result=await mail.sendOutbound({to:"ahmed@example.com",subject:"Case resolved",html:"<p>Cause and solution</p>"},{env,fetchImpl:async(url,options)=>{calls.push({url,options});return calls.length===1?{ok:true,json:async()=>({access_token:"test-token"})}:{status:202};}});
+  assert.equal(result.provider,"microsoft-graph");assert.match(calls[0].url,/oauth2\/v2.0\/token$/);assert.equal(calls[0].options.body.get("grant_type"),"client_credentials");assert.equal(calls[0].options.body.get("scope"),"https://graph.microsoft.com/.default");assert.match(calls[1].url,/users\/support%40example.com\/sendMail$/);const body=JSON.parse(calls[1].options.body);assert.deepEqual(body.message.toRecipients,[{emailAddress:{address:"ahmed@example.com"}}]);assert.equal(body.saveToSentItems,true);
+});
+test("Graph authorization and send failures never acknowledge delivery",async()=>{
+  const load=loadWith({"server-only":{},nodemailer:{}});const mail=load("src/lib/email/send.ts");const env={GRAPH_TENANT_ID:"fixture",GRAPH_CLIENT_ID:"fixture",GRAPH_CLIENT_SECRET:"test-secret",GRAPH_SENDER:"support@example.com"};
+  await assert.rejects(()=>mail.sendOutbound({to:"a@example.com",subject:"Fixture",html:"Fixture"},{env,fetchImpl:async()=>({ok:false,status:401})}),/authorization failed/);
+  let count=0;await assert.rejects(()=>mail.sendOutbound({to:"a@example.com",subject:"Fixture",html:"Fixture"},{env,fetchImpl:async()=>++count===1?{ok:true,json:async()=>({access_token:"test-token"})}:{status:403}}),/did not accept/);
+  assert.doesNotMatch(mail.publicMailError(new Error("failed test-secret"),env),/test-secret/);
 });

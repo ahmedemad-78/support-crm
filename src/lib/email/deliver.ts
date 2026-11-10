@@ -7,7 +7,7 @@ import {
   outboxFailurePatch,
   publicMailError,
   sendOutbound,
-  smtpConfigured,
+  mailConfigured,
 } from "@/lib/email/send";
 
 function appOrigin() {
@@ -57,7 +57,7 @@ export async function deliverPendingEmails() {
   return deliverOutbox({
     now,
     rows,
-    configured: smtpConfigured() || Boolean(process.env.RESEND_API_KEY),
+    configured: mailConfigured(),
     claim: async (row, until) => {
       const { data: claimed, error: claimError } = await admin
         .from("email_outbox")
