@@ -172,3 +172,48 @@ test("unified save returns an infrastructure error to the existing draft", async
   const result = await h.actions.saveCaseWorkspace({ error: "" }, fullCaseForm());
   assert.match(result.error, /Your draft is still here/); assert.equal(h.writes(), 0);
 });
+
+const intakeInput = { source: "whatsapp", customer_name: "Demo Customer", customer_email: " demo@example.com ", customer_phone: "", school_name: "", credentials_username: "demo.student", issue_date: "2026-10-01", city_id: "1", end_user_type: "parent", platform: "android", is_latest_version: "yes", fawry_payment: "no", app_version: "", device_type: "", page_screen: "", steps: "", issue_description: "Subscription could not be activated" };
+function intakeHarness({ role = "support_agent", activeSource = true } = {}) {
+  const records = new Map(); let writes = 0;
+  const client = { from(table) {
+    const where = {}; let values;
+    const query = { select() { return query; }, eq(key, value) { where[key] = value; return query; }, insert(value) { values = value; return query; },
+      async maybeSingle() {
+        if (table === "ticket_sources") return { data: activeSource ? { code: "whatsapp" } : null, error: null };
+        const row = records.get(where.id);
+        return { data: row && row.created_by === where.created_by ? row : null, error: null };
+      },
+      async single() {
+        if (records.has(values.id)) return { data: null, error: { code: "23505", message: "duplicate" } };
+        const row = { ...values, ticket_number: "TKT-FIXTURE-0001" }; records.set(row.id, row); writes++;
+        return { data: row, error: null };
+      },
+    }; return query;
+  } };
+  const load = loadWith({ "next/cache": { revalidatePath() {} }, "@/lib/auth/session": { getCurrentUser: async () => role ? { id: agentId, role } : null }, "@/lib/supabase/server": { createClient: async () => client } });
+  return { actions: load("src/app/(app)/portal/new-ticket/actions.ts"), records, writes: () => writes };
+}
+test("creation retries reuse the original case and trim pasted email", async () => {
+  const h = intakeHarness(); const first = await h.actions.createSupportTicket(intakeInput, caseId); const retry = await h.actions.createSupportTicket(intakeInput, caseId);
+  assert.equal(first.ok, true); assert.deepEqual(retry, first); assert.equal(first.ticketId, caseId); assert.equal(h.writes(), 1);
+  assert.equal(h.records.get(caseId).customer_email, "demo@example.com");
+});
+test("concurrent creation attempts with one request ID produce one case", async () => {
+  const h = intakeHarness(); const results = await Promise.all([h.actions.createSupportTicket(intakeInput, caseId), h.actions.createSupportTicket(intakeInput, caseId)]);
+  assert.ok(results.every((result) => result.ok)); assert.equal(h.writes(), 1); assert.equal(h.records.size, 1);
+});
+test("creation checks role, source, request ID and input before inserting", async () => {
+  for (const role of ["manager", "moderation", null]) { const h = intakeHarness({ role }); assert.equal((await h.actions.createSupportTicket(intakeInput, caseId)).ok, false); assert.equal(h.writes(), 0); }
+  const inactive = intakeHarness({ activeSource: false }); assert.equal((await inactive.actions.createSupportTicket(intakeInput, caseId)).fieldErrors.source, "Choose an active source."); assert.equal(inactive.writes(), 0);
+  const invalid = intakeHarness(); assert.equal((await invalid.actions.createSupportTicket(intakeInput, "bad-id")).ok, false); assert.equal((await invalid.actions.createSupportTicket({ ...intakeInput, customer_name: "" }, caseId)).ok, false); assert.equal(invalid.writes(), 0);
+});
+test("portal creation retains its role source and the same request on retry", async () => {
+  const h = intakeHarness({ role: "moderation" }); const input = { ...intakeInput }; delete input.source;
+  assert.equal((await h.actions.createPortalTicket(input, caseId)).ok, true); assert.equal((await h.actions.createPortalTicket(input, caseId)).ok, true);
+  assert.equal(h.records.get(caseId).source, "moderation"); assert.equal(h.writes(), 1);
+});
+test("a creation request never returns another user's existing case", async () => {
+  const h = intakeHarness(); h.records.set(caseId, { id: caseId, created_by: "someone-else", ticket_number: "PRIVATE" });
+  const result = await h.actions.createSupportTicket(intakeInput, caseId); assert.equal(result.ok, false); assert.equal(JSON.stringify(result).includes("PRIVATE"), false); assert.equal(h.writes(), 0);
+});

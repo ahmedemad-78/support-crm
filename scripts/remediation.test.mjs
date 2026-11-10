@@ -18,6 +18,7 @@ const files = [
   "src/lib/tickets/overview.ts",
   "src/lib/tickets/filters.ts",
   "src/lib/tickets/schema.ts",
+  "src/lib/tickets/intake.ts",
 ];
 
 for (const file of files) {
@@ -42,6 +43,7 @@ const outbox = require(join(directory, "lib/email/outbox.js"));
 const analytics = require(join(directory, "lib/tickets/analytics.js"));
 const overview = require(join(directory, "lib/tickets/overview.js"));
 const filters = require(join(directory, "lib/tickets/filters.js"));
+const intakeHelpers = require(join(directory, "lib/tickets/intake.js"));
 const schema = require(join(directory, "lib/tickets/schema.js"));
 
 after(() => rmSync(directory, { recursive: true, force: true }));
@@ -243,4 +245,31 @@ test("queue defaults retain historical open cases and explicit recent dates roun
   assert.equal(query.get("range"), "30"); assert.equal(query.get("sort"), "updated"); assert.equal(query.get("page"), "2");
   assert.equal(query.get("scope"), "dashboard"); assert.equal(query.get("topic"), "Login");
   assert.equal(filters.parseTicketListFilters({ sort: "DROP", view: "invalid", page: "-5" }).sort, "newest");
+});
+
+const fakeFile = (name = "evidence.png", type = "image/png", size = 200) => ({ name, type, size, lastModified: 1 });
+test("intake files reject duplicates, unsupported types, size and count overflow", () => {
+  const file = fakeFile(); assert.equal(intakeHelpers.checkIntakeFiles([file], [file]).accepted.length, 0);
+  assert.equal(intakeHelpers.checkIntakeFiles([], [fakeFile("bad.exe", "application/octet-stream")]).accepted.length, 0);
+  assert.equal(intakeHelpers.checkIntakeFiles([], [fakeFile("big.png", "image/png", 11 * 1024 * 1024)]).accepted.length, 0);
+  assert.equal(intakeHelpers.checkIntakeFiles([], Array.from({ length: 6 }, (_, index) => fakeFile(index + ".png"))).accepted.length, 5);
+});
+test("upload retries preserve paths and skip already uploaded objects", async () => {
+  let uploads = 0, records = 0; const paths = [];
+  const transport = { hasRecord: async () => ({ exists: false, failed: false }), upload: async (path) => { uploads++; paths.push(path); return { ok: true }; }, record: async (path) => { paths.push(path); return ++records > 1; } };
+  const failed = await intakeHelpers.uploadIntakeFiles("case", [{ id: "stable", file: fakeFile() }], transport);
+  assert.equal(failed.length, 1); assert.equal(failed[0].uploaded, true);
+  assert.equal((await intakeHelpers.uploadIntakeFiles("case", failed, transport)).length, 0); assert.equal(uploads, 1); assert.equal(new Set(paths).size, 1);
+});
+test("confirmed files and duplicate-object acknowledgements are handled safely", async () => {
+  let uploads = 0, records = 0; const item = { id: "stable", file: fakeFile() };
+  const transport = { hasRecord: async () => ({ exists: true, failed: false }), upload: async () => { uploads++; return { ok: false, alreadyExists: true }; }, record: async () => { records++; return true; } };
+  assert.equal((await intakeHelpers.uploadIntakeFiles("case", [item], transport)).length, 0); assert.equal(uploads, 0); assert.equal(records, 0);
+  transport.hasRecord = async () => ({ exists: false, failed: false });
+  assert.equal((await intakeHelpers.uploadIntakeFiles("case", [item], transport)).length, 0); assert.equal(uploads, 1); assert.equal(records, 1);
+});
+test("one failed file never removes another successfully saved attachment", async () => {
+  const items = [{ id: "a", file: fakeFile("a.png") }, { id: "b", file: fakeFile("b.png") }];
+  const failed = await intakeHelpers.uploadIntakeFiles("case", items, { hasRecord: async () => ({ exists: false, failed: false }), upload: async (_path, file) => { if (file.name === "a.png") throw new Error("offline"); return { ok: true }; }, record: async () => true });
+  assert.equal(failed.length, 1); assert.equal(failed[0].id, "a");
 });

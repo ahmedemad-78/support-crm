@@ -1,10 +1,14 @@
-import { PageHeader } from "@/components/app-shell/page-header";
+import { AgentFrame } from "@/components/app-shell/agent-frame";
 import { requireUser } from "@/lib/auth/session";
 import { createClient } from "@/lib/supabase/server";
 import { NewTicketForm } from "../../portal/new-ticket/new-ticket-form";
+import { cairoDate } from "@/lib/tickets/dashboard-model";
+import { safeAppReturn } from "@/lib/tickets/filters";
 
-export default async function SupportNewTicketPage() {
+export default async function SupportNewTicketPage({ searchParams }: PageProps<"/tickets/new">) {
   await requireUser(["support_agent"]);
+  const rawReturn = (await searchParams).returnTo;
+  const cancelHref = safeAppReturn(typeof rawReturn === "string" ? rawReturn : undefined) || "/tickets";
   const supabase = await createClient();
   const [cities, sources] = await Promise.all([
     supabase.from("cities").select("id, name").eq("is_active", true).order("sort_order").order("name"),
@@ -14,12 +18,8 @@ export default async function SupportNewTicketPage() {
   if (sources.error) throw sources.error;
 
   return (
-    <>
-      <PageHeader
-        title="New ticket"
-        actions={<span className="text-sm text-muted-foreground">Same form for every source. Fawry payment is required.</span>}
-      />
-      <NewTicketForm cities={cities.data ?? []} sources={sources.data ?? []} cancelHref="/tickets" />
-    </>
+    <AgentFrame title="Create case">
+      <NewTicketForm cities={cities.data ?? []} sources={sources.data ?? []} cancelHref={cancelHref} today={cairoDate(new Date().toISOString())} />
+    </AgentFrame>
   );
 }

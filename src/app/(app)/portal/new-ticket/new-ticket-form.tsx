@@ -1,498 +1,154 @@
 "use client";
-
-import { useRef, useState, useTransition } from "react";
+import { useEffect, useRef, useState, useTransition, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
-import { AlertCircle, FileImage, FileVideo, Lock, UploadCloud, X } from "lucide-react";
-import { toast } from "sonner";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
-import { cn } from "@/lib/utils";
+import { AlertCircle, ArrowLeft, ArrowUpRight, Check, FileImage, FileVideo, LoaderCircle, Lock, Plus, UploadCloud, X } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
-import {
-  ATTACHMENT_RULES,
-  ATTACHMENTS_BUCKET,
-  END_USER_TYPE_LABELS,
-  END_USER_TYPES,
-  PLATFORM_LABELS,
-  PLATFORMS,
-} from "@/lib/tickets/constants";
-import {
-  fieldErrorsOf,
-  portalTicketSchema,
-  supportTicketSchema,
-  type PortalTicketFieldErrors,
-  type SupportTicketInput,
-} from "@/lib/tickets/schema";
+import { ATTACHMENT_RULES, ATTACHMENTS_BUCKET, END_USER_TYPE_LABELS, END_USER_TYPES, PLATFORM_LABELS, PLATFORMS } from "@/lib/tickets/constants";
+import { APP_FIELDS, CUSTOMER_FIELDS, INTAKE_LABELS, checkIntakeFiles, initialIntakeDraft, uploadIntakeFiles, type IntakeField, type IntakeFile } from "@/lib/tickets/intake";
+import { fieldErrorsOf, portalTicketSchema, supportTicketSchema, type PortalTicketFieldErrors, type SupportTicketInput } from "@/lib/tickets/schema";
 import { createPortalTicket, createSupportTicket } from "./actions";
+import "./intake.css";
 
-type City = { id: number; name: string };
-type SourceOption = { code: string; name: string };
-type Field = keyof SupportTicketInput;
+type Props = { cities: { id: number; name: string }[]; sources?: { code: string; name: string }[]; today: string; cancelHref?: string; preview?: "failure" | "uploads" };
+type CreatedCase = { ticketId: string; ticketNumber: string };
+const optionalFields: IntakeField[] = ["school_name", "device_type", "app_version", "page_screen", "steps"];
 
-export function NewTicketForm({
-  cities,
-  sources,
-  cancelHref = "/portal/my-tickets",
-}: {
-  cities: City[];
-  sources?: SourceOption[];
-  cancelHref?: string;
-}) {
+export function NewTicketForm({ cities, sources, today, cancelHref = "/portal/my-tickets", preview }: Props) {
   const router = useRouter();
   const formRef = useRef<HTMLFormElement>(null);
+  const requestId = useRef<string | null>(null);
+  const inFlight = useRef(false);
+  const allowLeave = useRef(false);
+  const createdRef = useRef<CreatedCase | null>(null);
+  const [initial] = useState(() => initialIntakeDraft(today, sources?.length === 1 ? sources[0].code : ""));
+  const [draft, setDraft] = useState(initial);
   const [errors, setErrors] = useState<PortalTicketFieldErrors>({});
-  const [formError, setFormError] = useState<string | null>(null);
-  const [files, setFiles] = useState<File[]>([]);
-  const [createdCase, setCreatedCase] = useState<{ ticketId: string; ticketNumber: string } | null>(null);
+  const [formError, setFormError] = useState("");
+  const [fileIssues, setFileIssues] = useState<string[]>([]);
+  const [files, setFiles] = useState<IntakeFile[]>([]);
+  const [createdCase, setCreatedCase] = useState<CreatedCase | null>(null);
+  const [moreOpen, setMoreOpen] = useState(false);
+  const [evidenceOpen, setEvidenceOpen] = useState(false);
+  const [phase, setPhase] = useState("idle");
+  const [previewDone, setPreviewDone] = useState(false);
   const [pending, startTransition] = useTransition();
+  const [ready, setReady] = useState(false);
+  useEffect(() => { const frame = requestAnimationFrame(() => setReady(true)); return () => cancelAnimationFrame(frame); }, []);
+  const dirty = (Object.keys(initial) as IntakeField[]).some((key) => initial[key] !== draft[key]) || files.length > 0;
+  const groups = [
+    { name: "Customer", keys: CUSTOMER_FIELDS, target: "intake-customer" },
+    { name: "The issue", keys: ["issue_date", "issue_description", ...(sources ? ["source"] : [])] as IntakeField[], target: "intake-issue" },
+    { name: "App & payment", keys: APP_FIELDS, target: "intake-app" },
+  ];
+  const required = groups.flatMap((group) => group.keys);
+  const filled = required.filter((key) => draft[key].trim()).length;
+  const configMissing = !cities.length || (sources !== undefined && !sources.length);
+  const errorEntries = Object.entries(errors) as [IntakeField, string][];
 
-  function readForm(): SupportTicketInput {
-    const data = new FormData(formRef.current!);
-    return Object.fromEntries(
-      [...data.entries()].filter(([, v]) => typeof v === "string"),
-    ) as unknown as SupportTicketInput;
+  useEffect(() => {
+    if (!dirty || (createdCase && !files.length)) return;
+    const unload = (event: BeforeUnloadEvent) => { if (!allowLeave.current) { event.preventDefault(); event.returnValue = ""; } };
+    const navigate = (event: MouseEvent) => {
+      const link = (event.target as Element)?.closest?.("a[href]");
+      if (allowLeave.current || !(link instanceof HTMLAnchorElement) || link.target === "_blank" || event.button !== 0 || event.ctrlKey || event.metaKey || event.shiftKey || event.altKey) return;
+      const next = new URL(link.href, window.location.href);
+      if (next.pathname === window.location.pathname && next.search === window.location.search) return;
+      if (!window.confirm(createdCase ? "Some attachments are not uploaded. Leave this saved case?" : "Leave without creating this case? Your entries will be lost.")) { event.preventDefault(); event.stopPropagation(); }
+    };
+    window.addEventListener("beforeunload", unload); document.addEventListener("click", navigate, true);
+    return () => { window.removeEventListener("beforeunload", unload); document.removeEventListener("click", navigate, true); };
+  }, [dirty, createdCase, files.length]);
+  function change(key: IntakeField, value: string) {
+    setDraft((current) => ({ ...current, [key]: value }));
+    setErrors((current) => { const next = { ...current }; delete next[key]; return next; }); setFormError("");
   }
-
-  function onSubmit(e: React.FormEvent) {
-    e.preventDefault();
-    setFormError(null);
-    if (createdCase) {
-      startTransition(async () => {
-        try {
-          const failed = await uploadAttachments(createdCase.ticketId, files);
-          if (failed.length) {
-            setFiles(failed);
-            setFormError(`Case ${createdCase.ticketNumber} is saved. ${failed.length} files still need uploading. Retry, or open the saved case.`);
-            return;
-          }
-          router.push(sources ? `/tickets/${createdCase.ticketId}` : `/portal/my-tickets/${createdCase.ticketId}`);
-        } catch {
-          setFormError("The case is saved. Attachment upload could not be confirmed. Open the case to check the files before retrying.");
-        }
-      });
-      return;
-    }
-    const input = readForm();
-    const check = sources ? supportTicketSchema.safeParse(input) : portalTicketSchema.safeParse(input);
-    if (!check.success) {
-      setErrors(fieldErrorsOf(check.error));
-      scrollToFirstError();
-      return;
-    }
-    setErrors({});
-
+  function focusField(key: IntakeField) {
+    if (optionalFields.includes(key)) setMoreOpen(true);
+    requestAnimationFrame(() => {
+      const field = formRef.current?.querySelector<HTMLElement>(`[data-intake-field="${key}"]`);
+      field?.querySelector<HTMLElement>("input,textarea,select")?.focus({ preventScroll: true });
+      field?.scrollIntoView({ behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "instant" : "smooth", block: "center" });
+    });
+  }
+  function showErrors(next: PortalTicketFieldErrors) { setErrors(next); const first = Object.keys(next)[0] as IntakeField | undefined; if (first) focusField(first); }
+  const savedHref = (created: CreatedCase) => sources ? `/tickets/${created.ticketId}?returnTo=${encodeURIComponent(cancelHref)}` : `/portal/my-tickets/${created.ticketId}`;
+  function finish(created: CreatedCase) {
+    if (preview) { setPreviewDone(true); return; }
+    allowLeave.current = true; router.push(sources ? savedHref(created) : `/portal/my-tickets?submitted=${encodeURIComponent(created.ticketNumber)}`);
+  }
+  function leave() {
+    if (dirty && !createdCase && !window.confirm("Discard this case draft and return to the queue?")) return;
+    allowLeave.current = true; router.push(createdCase ? savedHref(createdCase) : cancelHref);
+  }
+  async function upload(created: CreatedCase, items: IntakeFile[], retry: boolean) {
+    if (preview) return preview === "uploads" && !retry ? items : [];
+    if (!items.length) return [];
+    const supabase = createClient();
+    return uploadIntakeFiles(created.ticketId, items, {
+      hasRecord: async (path) => { const { data, error } = await supabase.from("ticket_attachments").select("id").eq("ticket_id", created.ticketId).eq("storage_path", path).maybeSingle(); return { exists: Boolean(data), failed: Boolean(error) }; },
+      upload: async (path, file) => { const { error } = await supabase.storage.from(ATTACHMENTS_BUCKET).upload(path, file, { contentType: file.type }); return { ok: !error, alreadyExists: String((error as { statusCode?: string } | null)?.statusCode) === "409" }; },
+      record: async (path, file) => { const { error } = await supabase.from("ticket_attachments").insert({ ticket_id: created.ticketId, storage_path: path, file_name: file.name, mime_type: file.type, size_bytes: file.size }); return !error; },
+    });
+  }
+  function onSubmit(event: FormEvent) {
+    event.preventDefault(); if (!ready || inFlight.current || configMissing || previewDone) return;
+    setFormError(""); const existing = createdRef.current;
+    const submitted = { ...draft, ...Object.fromEntries([...new FormData(formRef.current!).entries()].filter(([, value]) => typeof value === "string")) };
+    setDraft(submitted);
+    if (!existing) { const check = (sources ? supportTicketSchema : portalTicketSchema).safeParse(submitted); if (!check.success) { showErrors(fieldErrorsOf(check.error)); return; } }
+    setErrors({}); setFileIssues([]); inFlight.current = true;
     startTransition(async () => {
       try {
-      const result = sources ? await createSupportTicket(input) : await createPortalTicket(input);
-      if (!result.ok) {
-        if (result.fieldErrors) setErrors(result.fieldErrors);
-        setFormError(result.error ?? "Please fix the highlighted fields.");
-        scrollToFirstError();
-        return;
-      }
-
-      setCreatedCase({ ticketId: result.ticketId, ticketNumber: result.ticketNumber });
-      const failed = await uploadAttachments(result.ticketId, files);
-      if (failed.length) {
-        setFiles(failed);
-        setFormError(`Case ${result.ticketNumber} is saved. ${failed.map((file) => file.name).join(", ")} did not upload. Retry the files below, or open the saved case.`);
-        return;
-      }
-      router.push(sources ? `/tickets/${result.ticketId}` : `/portal/my-tickets?submitted=${encodeURIComponent(result.ticketNumber)}`);
-      } catch {
-        setFormError("We could not confirm the operation. Check the case queue before submitting again. Your entries are still here.");
-      }
+        let created = existing;
+        if (!created) {
+          setPhase("saving"); requestId.current ??= crypto.randomUUID(); const input = submitted as unknown as SupportTicketInput;
+          const result = preview ? preview === "failure" ? { ok: false as const, error: "Preview save failed. Your entries are still here." } : { ok: true as const, ticketId: "11111111-1111-4111-8111-111111111111", ticketNumber: "TKT-PREVIEW-0001" } : sources ? await createSupportTicket(input, requestId.current) : await createPortalTicket(input, requestId.current);
+          if (!result.ok) { if ("fieldErrors" in result && result.fieldErrors) showErrors(result.fieldErrors); setFormError(result.error || "Please fix the highlighted fields."); return; }
+          created = { ticketId: result.ticketId, ticketNumber: result.ticketNumber }; createdRef.current = created; setCreatedCase(created);
+        }
+        if (files.length) setPhase("uploading");
+        const failed = await upload(created, files, Boolean(existing)); setFiles(failed);
+        if (failed.length) { setEvidenceOpen(true); setFormError(`Case ${created.ticketNumber} is saved. ${failed.length} attachment(s) still need uploading. Retry them below or open the saved case.`); return; }
+        finish(created);
+      } catch { setFormError(createdRef.current ? "The case is saved. Retry the remaining attachments, or open the case to check them." : "We could not confirm the save. Your entries are still here. Retry from this form so the same request is used."); }
+      finally { inFlight.current = false; setPhase("idle"); }
     });
   }
-
   function addFiles(list: FileList | null) {
-    if (!list || pending) return;
-    const next = [...files];
-    for (const file of Array.from(list)) {
-      const limit = ATTACHMENT_RULES.types[file.type];
-      if (!limit) {
-        toast.error(`${file.name}: only JPG, PNG, MP4 or MOV files are allowed.`);
-      } else if (file.size > limit) {
-        toast.error(`${file.name} is too large. Images up to 10 MB, videos up to 50 MB.`);
-      } else if (next.length >= ATTACHMENT_RULES.maxFiles) {
-        toast.error(`You can attach up to ${ATTACHMENT_RULES.maxFiles} files.`);
-        break;
-      } else {
-        next.push(file);
-      }
-    }
-    setFiles(next);
+    if (!list || pending || createdRef.current) return;
+    const checked = checkIntakeFiles(files.map((item) => item.file), Array.from(list)); setFileIssues(checked.issues);
+    setFiles((current) => [...current, ...(checked.accepted as File[]).map((file) => ({ id: crypto.randomUUID(), file }))]); setEvidenceOpen(true);
   }
-
-  const err = (field: Field) => errors[field];
-
-  return (
-    <form ref={formRef} onSubmit={onSubmit} noValidate className="intake-workspace flex flex-col gap-5 px-4 py-6 sm:px-8" aria-busy={pending}>
-      <div className="intake-intro"><span className="cs-report-label">WORKSPACE / NEW CASE</span><h2>Start with the person.</h2><p>Record who needs help and what happened, then add the technical context and evidence.</p></div>
-      {createdCase && <div role="status" className="rounded-md border border-green-200 bg-green-50 p-4 text-sm text-green-900">Case {createdCase.ticketNumber} is already saved. Retrying uploads will use this same case. <button type="button" className="ml-2 font-semibold underline" onClick={() => router.push(sources ? `/tickets/${createdCase.ticketId}` : `/portal/my-tickets/${createdCase.ticketId}`)}>Open saved case</button></div>}
-      <fieldset disabled={pending || Boolean(createdCase)} className="flex min-w-0 flex-col gap-5 disabled:opacity-70">
-      {sources && (
-        <Section title="Source" hint="Where this case came from.">
-          <SelectField name="source" label="Source" error={errors.source}>
-            {sources.map((source) => (
-              <option key={source.code} value={source.code}>
-                {source.name}
-              </option>
-            ))}
-          </SelectField>
-        </Section>
-      )}
-      <Section title="1. Customer" hint="Who is having the problem.">
-        <div className="grid grid-cols-1 gap-x-5 gap-y-4 sm:grid-cols-2">
-          <TextField name="customer_name" label="Name" error={err("customer_name")} />
-          <TextField name="customer_email" label="Email" type="email" error={err("customer_email")} />
-          <TextField
-            name="customer_phone"
-            label="Phone"
-            optional
-            inputMode="tel"
-            autoComplete="tel"
-            placeholder="e.g. 0100 123 4567"
-            error={err("customer_phone")}
-          />
-          <SelectField name="end_user_type" label="User type" error={err("end_user_type")}>
-            {END_USER_TYPES.map((t) => (
-              <option key={t} value={t}>
-                {END_USER_TYPE_LABELS[t]}
-              </option>
-            ))}
-          </SelectField>
-          <TextField
-            name="credentials_username"
-            label={
-              <span className="flex items-center gap-1.5">
-                <Lock className="size-3 text-muted-foreground" />
-                User name (login)
-              </span>
-            }
-            error={err("credentials_username")}
-            autoComplete="off"
-          />
-          <TextField
-            name="school_name"
-            label="School name"
-            optional
-            placeholder="e.g. El Nasr Language School"
-            error={err("school_name")}
-          />
-          <SelectField name="city_id" label="City" error={err("city_id")}>
-            {cities.map((c) => (
-              <option key={c.id} value={c.id}>
-                {c.name}
-              </option>
-            ))}
-          </SelectField>
-        </div>
-      </Section>
-
-      <Section title="2. The request" hint="What happened and where.">
-        <div className="flex flex-col gap-4">
-          <div className="grid grid-cols-1 gap-x-5 gap-y-4 sm:grid-cols-2">
-            <TextField name="issue_date" label="Date of issue" type="date" error={err("issue_date")} />
-            <TextField
-              name="page_screen"
-              label="Page / screen"
-              optional
-              placeholder="e.g. Subscriptions → Payment status"
-              error={err("page_screen")}
-            />
-          </div>
-          <TextAreaField name="steps" label="Steps / scenario" optional error={err("steps")} />
-          <TextAreaField name="issue_description" label="Issue description" error={err("issue_description")} />
-        </div>
-      </Section>
-
-      <Section title="3. Device & app" hint="Helps Support reproduce the issue.">
-        <div className="grid grid-cols-1 gap-x-5 gap-y-4 sm:grid-cols-2 xl:grid-cols-3">
-          <ChoiceField
-            name="platform"
-            label="Platform"
-            options={PLATFORMS.map((p) => ({ value: p, label: PLATFORM_LABELS[p] }))}
-            error={err("platform")}
-          />
-          <TextField
-            name="device_type"
-            label="Device type"
-            optional
-            placeholder="e.g. Samsung A32, iPhone 12"
-            error={err("device_type")}
-          />
-          <TextField name="app_version" label="App version number" optional placeholder="e.g. 4.2.1" error={err("app_version")} />
-          <ChoiceField
-            name="is_latest_version"
-            label="On the latest version?"
-            options={[
-              { value: "yes", label: "Yes" },
-              { value: "no", label: "No" },
-            ]}
-            error={err("is_latest_version")}
-          />
-          <ChoiceField
-            name="fawry_payment"
-            label="Fawry payment"
-            options={[
-              { value: "yes", label: "Yes" },
-              { value: "no", label: "No" },
-            ]}
-            error={err("fawry_payment")}
-          />
-        </div>
-      </Section>
-
-      </fieldset>
-      <Section title="4. Attachments" hint="Optional. Up to 5 files. If an upload fails, retry it on the saved case.">
-        <div className="flex flex-col gap-3">
-          <label
-            onDragOver={(e) => e.preventDefault()}
-            onDrop={(e) => {
-              e.preventDefault();
-              addFiles(e.dataTransfer.files);
-            }}
-            className="flex cursor-pointer items-center gap-3.5 rounded-lg border-2 border-dashed bg-muted px-5 py-4 transition-colors hover:border-brand-action hover:bg-brand-tint/40 has-focus-visible:ring-2 has-focus-visible:ring-ring"
-          >
-            <UploadCloud className="size-6 text-brand-action" />
-            <span className="flex flex-col">
-              <span className="text-sm font-semibold">Drop files here or browse</span>
-              <span className="text-xs text-muted-foreground">JPG or PNG up to 10&nbsp;MB · MP4 or MOV up to 50&nbsp;MB</span>
-            </span>
-            <input
-              type="file"
-              disabled={pending}
-              multiple
-              accept={ATTACHMENT_RULES.accept}
-              className="sr-only"
-              onChange={(e) => {
-                addFiles(e.target.files);
-                e.target.value = "";
-              }}
-            />
-          </label>
-          {files.map((file, i) => (
-            <div key={`${file.name}-${i}`} className="flex items-center gap-2.5 rounded-lg border px-3 py-2">
-              {file.type.startsWith("video/") ? (
-                <FileVideo className="size-4 text-muted-foreground" />
-              ) : (
-                <FileImage className="size-4 text-muted-foreground" />
-              )}
-              <span className="flex-1 text-[13px] font-medium">
-                {file.name} · {formatSize(file.size)}
-              </span>
-              <button
-                type="button"
-                disabled={pending}
-                onClick={() => setFiles(files.filter((_, j) => j !== i))}
-                className="rounded p-0.5 text-muted-foreground hover:text-foreground"
-                title={`Remove ${file.name}`}
-              >
-                <X className="size-4" />
-              </button>
-            </div>
-          ))}
-        </div>
-      </Section>
-
-      {formError && (
-        <p role="alert" className="flex items-center gap-2 text-sm font-medium text-destructive">
-          <AlertCircle className="size-4" />
-          {formError}
-        </p>
-      )}
-
-      <div className="flex items-center justify-end gap-3">
-        <Button type="button" variant="outline" size="lg" className="h-10 px-4" onClick={() => router.push(cancelHref)}>
-          Cancel
-        </Button>
-        <Button type="submit" size="lg" className="h-10 px-5 font-semibold" disabled={pending}>
-          {pending ? "Saving…" : createdCase ? "Retry attachments" : "Create case"}
-        </Button>
-      </div>
-    </form>
-  );
-}
-
-async function uploadAttachments(ticketId: string, files: File[]): Promise<File[]> {
-  if (!files.length) return [];
-  const supabase = createClient();
-  const failed: File[] = [];
-
-  for (const file of files) {
-    const safeName = file.name.replace(/[^\w.-]+/g, "_");
-    const path = `${ticketId}/${crypto.randomUUID()}-${safeName}`;
-    const upload = await supabase.storage.from(ATTACHMENTS_BUCKET).upload(path, file, { contentType: file.type });
-    if (upload.error) {
-      failed.push(file);
-      continue;
-    }
-    const { error } = await supabase.from("ticket_attachments").insert({
-      ticket_id: ticketId,
-      storage_path: path,
-      file_name: file.name,
-      mime_type: file.type,
-      size_bytes: file.size,
-    });
-    if (error) failed.push(file);
+  function field(key: IntakeField, options: { type?: string; optional?: boolean; hint?: string; placeholder?: string; maxLength?: number } = {}) { return <InputField key={key} name={key} value={draft[key]} onChange={(value) => change(key, value)} error={errors[key]} {...options} />; }
+  function select(key: IntakeField, items: { value: string; label: string }[]) {
+    return <FieldShell name={key} error={errors[key]}><select id={key} name={key} value={draft[key]} onChange={(event) => change(key, event.target.value)} aria-invalid={Boolean(errors[key])} aria-describedby={errors[key] ? `${key}-error` : undefined} required><option value="">Choose…</option>{items.map((item) => <option value={item.value} key={item.value}>{item.label}</option>)}</select></FieldShell>;
   }
-  return failed;
-}
-
-function scrollToFirstError() {
-  requestAnimationFrame(() => {
-    const field = document.querySelector<HTMLElement>("[aria-invalid='true']");
-    (field?.matches("input, textarea, select") ? field : field?.querySelector<HTMLElement>("input"))?.focus({ preventScroll: true });
-    field?.scrollIntoView({ behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "instant" : "smooth", block: "center" });
-  });
-}
-
-function formatSize(bytes: number) {
-  return bytes >= 1024 * 1024 ? `${(bytes / 1024 / 1024).toFixed(1)} MB` : `${Math.round(bytes / 1024)} KB`;
-}
-
-function Section({ title, hint, children }: { title: string; hint: string; children: React.ReactNode }) {
-  return (
-    <section className="form-section flex flex-col gap-5 rounded-2xl border bg-background p-5 xl:flex-row xl:gap-8 xl:p-6">
-      <div className="flex shrink-0 flex-col gap-1 xl:w-[200px]">
-        <h2 className="text-base font-semibold">{title}</h2>
-        <p className="text-[13px] leading-5 text-muted-foreground">{hint}</p>
-      </div>
-      <div className="min-w-0 flex-1">{children}</div>
-    </section>
-  );
-}
-
-function FieldShell({
-  label,
-  optional,
-  error,
-  htmlFor,
-  children,
-}: {
-  label: React.ReactNode;
-  optional?: boolean;
-  error?: string;
-  htmlFor?: string;
-  children: React.ReactNode;
-}) {
-  return (
-    <div className="flex flex-col gap-1.5">
-      <label htmlFor={htmlFor} className="flex items-center gap-1.5 text-[13px] font-medium">
-        {label}
-        {optional && <span className="text-xs font-normal text-muted-foreground">Optional</span>}
-      </label>
-      {children}
-      {error && (
-        <p className="flex items-center gap-1.5 text-xs font-medium text-destructive">
-          <AlertCircle className="size-3.5" />
-          {error}
-        </p>
-      )}
+  function choice(key: IntakeField, items: { value: string; label: string }[], hint?: string) {
+    return <fieldset className="intake-field intake-choice" data-intake-field={key} aria-invalid={Boolean(errors[key])} aria-describedby={errors[key] ? `${key}-error` : hint ? `${key}-hint` : undefined}><legend>{INTAKE_LABELS[key]} <span>Required</span></legend>{hint && <small id={`${key}-hint`}>{hint}</small>}<div>{items.map((item) => <label key={item.value}><input className="sr-only" type="radio" name={key} value={item.value} checked={draft[key] === item.value} onChange={() => change(key, item.value)} required /><span>{item.label}</span></label>)}</div>{errors[key] && <p id={`${key}-error`} className="intake-field-error">{errors[key]}</p>}</fieldset>;
+  }
+  return <form ref={formRef} onSubmit={onSubmit} noValidate autoComplete="off" className="intake-v3" inert={!ready} aria-busy={!ready || pending}>
+    <header className="intake-heading"><span className="intake-eyebrow">WORKSPACE / CREATE A CASE</span><h2>Good support starts here<span>.</span></h2><p>One page. The essential details first. Add more context when it helps.</p></header>
+    {createdCase && <div className="intake-saved" role="status"><Check size={18} /><div><strong>{createdCase.ticketNumber} is saved.</strong><p>{previewDone ? "Preview completed. No real case was created." : "Attachment retries stay on this same case."}</p></div><button type="button" disabled={pending || Boolean(preview)} onClick={leave}>Open saved case <ArrowUpRight size={14} /></button></div>}
+    {configMissing && <p className="intake-alert" role="alert">Required source or city options are unavailable. Ask an administrator to check the setup.</p>}
+    {errorEntries.length > 0 && <div className="intake-error-summary" role="alert"><strong>Check {errorEntries.length} field{errorEntries.length === 1 ? "" : "s"} before creating the case.</strong><div>{errorEntries.map(([key]) => <button type="button" key={key} onClick={() => focusField(key)}>{INTAKE_LABELS[key]} <ArrowUpRight size={11} /></button>)}</div></div>}
+    <div className="intake-layout"><fieldset className="intake-main" disabled={pending || Boolean(createdCase)}>
+      <section className="intake-panel" id="intake-customer"><header><span>01 / THE PERSON</span><h3>Who needs help?</h3><p>Customer details only. Phone is optional; the account username helps the team find the right account.</p></header><div className="intake-grid">{field("customer_name", { placeholder: "Customer’s full name" })}{field("customer_email", { type: "email", placeholder: "name@example.com" })}{field("customer_phone", { type: "tel", optional: true, placeholder: "e.g. 0100 123 4567" })}{field("credentials_username", { hint: "Username only. Never enter a password.", placeholder: "Student / teacher account username" })}{select("end_user_type", END_USER_TYPES.map((type) => ({ value: type, label: END_USER_TYPE_LABELS[type] })))}{select("city_id", cities.map((city) => ({ value: String(city.id), label: city.name })))}</div></section>
+      <section className="intake-panel" id="intake-issue"><header><span>02 / THE ISSUE</span><h3>What happened?</h3><p>Capture the source, reported date and the customer’s actual problem.</p></header><div className="intake-grid">{sources && select("source", sources.map((source) => ({ value: source.code, label: source.name })))}<div className="intake-date">{field("issue_date", { type: "date" })}<button type="button" onClick={() => change("issue_date", today)}>Use today</button></div><FieldShell name="issue_description" error={errors.issue_description} wide hint="Describe the symptom and what the customer expected."><textarea id="issue_description" name="issue_description" dir="auto" rows={5} value={draft.issue_description} onChange={(event) => change("issue_description", event.target.value)} aria-invalid={Boolean(errors.issue_description)} aria-describedby={errors.issue_description ? "issue_description-error" : "issue_description-hint"} required /><small className="intake-character-note">{draft.issue_description.trim().length} characters · minimum 5</small></FieldShell></div></section>
+      <section className="intake-panel" id="intake-app"><header><span>03 / APP & PAYMENT</span><h3>A little context goes a long way.</h3><p>Choose what was confirmed. Fawry is a case flag, not a payment verification.</p></header><div className="intake-grid">{choice("platform", PLATFORMS.map((platform) => ({ value: platform, label: PLATFORM_LABELS[platform] })))}{choice("is_latest_version", [{ value: "yes", label: "Yes" }, { value: "no", label: "No" }])}{choice("fawry_payment", [{ value: "yes", label: "Yes" }, { value: "no", label: "No" }])}</div></section>
+      <details className="intake-panel intake-more" open={moreOpen} onToggle={(event) => setMoreOpen(event.currentTarget.open)}><summary><Plus size={16} /><div><strong>More details</strong><span>Optional · school, device, app version & reproduction steps</span></div></summary><div className="intake-grid">{field("school_name", { optional: true, maxLength: 160 })}{field("device_type", { optional: true, maxLength: 80, placeholder: "e.g. Samsung A32, iPhone 12" })}{field("app_version", { optional: true, maxLength: 20, placeholder: "e.g. 4.2.1" })}{field("page_screen", { optional: true, maxLength: 160, placeholder: "e.g. Subscriptions → Payment status" })}<FieldShell name="steps" optional wide error={errors.steps}><textarea id="steps" name="steps" rows={4} dir="auto" maxLength={4000} value={draft.steps} onChange={(event) => change("steps", event.target.value)} aria-invalid={Boolean(errors.steps)} aria-describedby={errors.steps ? "steps-error" : undefined} /></FieldShell></div></details>
+    </fieldset>
+    <details className="intake-panel intake-evidence" open={evidenceOpen} onToggle={(event) => setEvidenceOpen(event.currentTarget.open)}><summary><UploadCloud size={18} /><div><strong>Attachments <b>{files.length}</b></strong><span>Optional · screenshots or short videos</span></div></summary><div className="intake-evidence-body"><label className={`intake-dropzone${pending || createdCase ? " is-disabled" : ""}`} onDragOver={(event) => event.preventDefault()} onDrop={(event) => { event.preventDefault(); addFiles(event.dataTransfer.files); }}><UploadCloud size={25} /><strong>Drop files here or browse</strong><span>Up to 5 files · JPG / PNG: 10 MB · MP4 / MOV: 50 MB</span><input type="file" aria-label="Attach evidence" multiple accept={ATTACHMENT_RULES.accept} disabled={pending || Boolean(createdCase)} onChange={(event) => { addFiles(event.target.files); event.target.value = ""; }} className="sr-only" /></label>{fileIssues.length > 0 && <ul className="intake-file-issues" role="alert">{fileIssues.map((issue, index) => <li key={index}>{issue}</li>)}</ul>}<ul className="intake-file-list">{files.map((item) => <li key={item.id}>{item.file.type.startsWith("video/") ? <FileVideo size={16} /> : <FileImage size={16} />}<div><strong>{item.file.name}</strong><span>{formatSize(item.file.size)} · {createdCase ? "Needs upload" : "Ready to attach"}</span></div><button type="button" disabled={pending} aria-label={`Remove ${item.file.name}`} onClick={() => setFiles((current) => current.filter((file) => file.id !== item.id))}><X size={15} /></button></li>)}</ul></div></details>
+<aside className="intake-review"><div><span className="intake-eyebrow">READY TO HAND OVER</span><h3>Keep it clear.</h3><p>{filled} of {required.length} required fields filled.</p><progress max={required.length} value={filled} aria-label="Required fields filled" /><ul>{groups.map((group) => { const count = group.keys.filter((key) => draft[key].trim()).length; return <li key={group.name}><a href={`#${group.target}`}>{count === group.keys.length ? <Check size={13} /> : <span className="intake-review-dot" />}{group.name}</a><span>{count} / {group.keys.length}</span></li>; })}</ul><p className="intake-review-hint"><Lock size={13} />Your entries stay in this page until you leave. They are not saved as a case until you submit.</p>
+      {formError && <p className="intake-alert" role="alert"><AlertCircle size={14} />{formError}</p>}
+      <button type="submit" className="intake-submit" disabled={!ready || pending || configMissing || previewDone}>{pending ? <LoaderCircle size={16} className="animate-spin" /> : <Plus size={16} />}{!ready ? "Preparing form…" : pending ? phase === "uploading" ? "Uploading attachments…" : "Creating case…" : previewDone ? "Preview completed" : createdCase ? files.length ? "Retry attachments" : "Open saved case" : "Create case"}</button><button type="button" className="intake-cancel" disabled={pending || Boolean(preview && createdCase)} onClick={leave}><ArrowLeft size={13} />{createdCase ? "Open saved case" : "Back to queue"}</button><small className="intake-save-hint">{createdCase ? "Case already created. Retrying never opens a second case." : dirty ? "Draft not submitted" : "No new case created yet"}</small>
+    </div></aside>
     </div>
-  );
+  </form>;
 }
-
-function TextField({
-  name,
-  label,
-  error,
-  optional,
-  ...props
-}: {
-  name: Field;
-  label: React.ReactNode;
-  error?: string;
-  optional?: boolean;
-} & Omit<React.ComponentProps<"input">, "name">) {
-  return (
-    <FieldShell label={label} optional={optional} error={error} htmlFor={name}>
-      <Input id={name} name={name} aria-invalid={Boolean(error)} className="h-10" {...props} />
-    </FieldShell>
-  );
+function FieldShell({ name, children, optional, hint, error, wide }: { name: IntakeField; children: React.ReactNode; optional?: boolean; hint?: string; error?: string; wide?: boolean }) {
+  return <div className={`intake-field${wide ? " intake-wide" : ""}`} data-intake-field={name}><label htmlFor={name}>{INTAKE_LABELS[name]}<span>{optional ? "Optional" : "Required"}</span></label>{hint && <small id={`${name}-hint`}>{hint}</small>}{children}{error && <p id={`${name}-error`} className="intake-field-error">{error}</p>}</div>;
 }
-
-function TextAreaField({
-  name,
-  label,
-  error,
-  optional,
-}: {
-  name: Field;
-  label: string;
-  error?: string;
-  optional?: boolean;
-}) {
-  return (
-    <FieldShell label={label} optional={optional} error={error} htmlFor={name}>
-      <Textarea id={name} name={name} rows={3} aria-invalid={Boolean(error)} />
-    </FieldShell>
-  );
+function InputField({ name, value, onChange, type = "text", error, optional, hint, placeholder, maxLength }: { name: IntakeField; value: string; onChange: (value: string) => void; type?: string; error?: string; optional?: boolean; hint?: string; placeholder?: string; maxLength?: number }) {
+  return <FieldShell name={name} error={error} optional={optional} hint={hint}><input id={name} name={name} type={type} dir={type === "text" ? "auto" : "ltr"} inputMode={type === "tel" ? "tel" : type === "email" ? "email" : undefined} value={value} onChange={(event) => onChange(event.target.value)} onInput={type === "date" ? (event) => onChange(event.currentTarget.value) : undefined} aria-invalid={Boolean(error)} aria-describedby={error ? `${name}-error` : hint ? `${name}-hint` : undefined} required={!optional} placeholder={placeholder} maxLength={maxLength} autoComplete="off" /></FieldShell>;
 }
-
-function SelectField({
-  name,
-  label,
-  error,
-  children,
-}: {
-  name: Field;
-  label: string;
-  error?: string;
-  children: React.ReactNode;
-}) {
-  return (
-    <FieldShell label={label} error={error} htmlFor={name}>
-      <select
-        id={name}
-        name={name}
-        defaultValue=""
-        aria-invalid={Boolean(error)}
-        className={cn(
-          "h-10 rounded-lg border border-input bg-background px-3 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50",
-          "aria-invalid:border-destructive",
-        )}
-      >
-        <option value="" disabled>
-          Select…
-        </option>
-        {children}
-      </select>
-    </FieldShell>
-  );
-}
-
-function ChoiceField({
-  name,
-  label,
-  options,
-  error,
-}: {
-  name: Field;
-  label: string;
-  options: { value: string; label: string }[];
-  error?: string;
-}) {
-  return (
-    <FieldShell label={label} error={error}>
-      <div
-        role="radiogroup"
-        aria-label={label}
-        aria-invalid={Boolean(error)}
-        className={cn("flex h-10 rounded-lg bg-muted p-[3px]", error && "ring-1 ring-destructive")}
-      >
-        {options.map((o) => (
-          <label
-            key={o.value}
-            className="flex flex-1 cursor-pointer items-center justify-center rounded-md text-[13px] font-medium text-muted-foreground has-focus-visible:ring-2 has-focus-visible:ring-ring has-checked:border has-checked:bg-background has-checked:font-semibold has-checked:text-foreground"
-          >
-            <input type="radio" name={name} value={o.value} className="sr-only" />
-            {o.label}
-          </label>
-        ))}
-      </div>
-    </FieldShell>
-  );
-}
+function formatSize(bytes: number) { return bytes >= 1024 * 1024 ? `${(bytes / 1024 / 1024).toFixed(1)} MB` : `${Math.round(bytes / 1024)} KB`; }

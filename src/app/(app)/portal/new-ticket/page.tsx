@@ -3,6 +3,7 @@ import { requireUser } from "@/lib/auth/session";
 import { PORTAL_ROLES, ROLE_LABELS } from "@/lib/auth/roles";
 import { createClient } from "@/lib/supabase/server";
 import { NewTicketForm } from "./new-ticket-form";
+import { cairoDate } from "@/lib/tickets/dashboard-model";
 
 export default async function NewTicketPage() {
   const user = await requireUser([...PORTAL_ROLES]);
@@ -28,7 +29,7 @@ export default async function NewTicketPage() {
           </div>
         }
       />
-      <NewTicketForm cities={cities ?? []} />
+      <NewTicketForm cities={cities ?? []} today={cairoDate(new Date().toISOString())} />
     </>
   );
 }

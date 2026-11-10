@@ -16,7 +16,7 @@ function todayInCairo() {
 /** The Moderation / Call Center form (FRD §5). Same schema runs in the browser and in the server action. */
 export const portalTicketSchema = z.object({
   customer_name: z.string().trim().min(2, "Name needs at least 2 characters"),
-  customer_email: z.email("Email needs a domain — try name@example.com"),
+  customer_email: z.string().trim().pipe(z.email("Email needs a domain — try name@example.com")),
   customer_phone: z
     .string()
     .trim()
