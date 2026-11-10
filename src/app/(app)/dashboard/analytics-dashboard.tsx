@@ -4,7 +4,7 @@ import Link from "next/link";
 import { ArrowDownToLine, ArrowUpRight, RefreshCw, SlidersHorizontal, X } from "lucide-react";
 import { sourceLabel, STATUS_LABELS, TICKET_STATUSES, type TicketStatus } from "@/lib/tickets/constants";
 import { cairoDate, shiftDay } from "@/lib/tickets/dashboard-model";
-import { dashboardListHref, dashboardQuery, type DashboardFilters } from "@/lib/tickets/filters";
+import { dashboardListHref, dashboardQuery, parseDashboardFilters, type DashboardFilters } from "@/lib/tickets/filters";
 import { csvCell, inPeriod, isOpen, validDay, type AnalyticsTicket } from "@/lib/tickets/analytics";
 import {
   AGE_BUCKETS,
@@ -85,12 +85,19 @@ export function DashboardBoard({
     const reported = reportedDay(ticket);
     return reported < day ? reported : day;
   }, today);
-  const [filters, setFilters] = useState<DashboardFilters>(() => ({
-    ...blank,
-    ...initialFilters,
-    from: validDay(initialFilters.from) ? initialFilters.from : earliest,
-    to: validDay(initialFilters.to) ? initialFilters.to : today,
-  }));
+  const [filters, setFilters] = useState<DashboardFilters>(() => {
+    // A back navigation can reuse cached server props from before a chart selection.
+    // The address bar carries the most recent report selection in that case.
+    const incoming = !preview && typeof window !== "undefined"
+      ? parseDashboardFilters(Object.fromEntries(new URLSearchParams(window.location.search)))
+      : initialFilters;
+    return {
+      ...blank,
+      ...incoming,
+      from: validDay(incoming.from) ? incoming.from : earliest,
+      to: validDay(incoming.to) ? incoming.to : today,
+    };
+  });
   const [page, setPage] = useState(1);
   const [error, setError] = useState("");
   const [refreshing, setRefreshing] = useState(false);
