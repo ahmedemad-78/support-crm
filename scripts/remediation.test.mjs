@@ -234,3 +234,13 @@ function intake(overrides) {
 function filtersMod(value) {
   return filters.dashboardListHref(value, "followup");
 }
+
+test("queue defaults retain historical open cases and explicit recent dates round-trip", () => {
+  assert.equal(filters.parseTicketListFilters({}).range, "all");
+  const parsed = filters.parseTicketListFilters({ view: "open", range: "30", sort: "updated", page: "2" });
+  assert.equal(parsed.view, "open"); assert.equal(parsed.range, "30"); assert.equal(parsed.sort, "updated");
+  const query = new URLSearchParams(filters.ticketListQuery(parsed, { scope: "dashboard", from: "2026-09-01", topic: "Login" }));
+  assert.equal(query.get("range"), "30"); assert.equal(query.get("sort"), "updated"); assert.equal(query.get("page"), "2");
+  assert.equal(query.get("scope"), "dashboard"); assert.equal(query.get("topic"), "Login");
+  assert.equal(filters.parseTicketListFilters({ sort: "DROP", view: "invalid", page: "-5" }).sort, "newest");
+});

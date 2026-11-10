@@ -1,23 +1,15 @@
-import Link from "next/link";
 import { notFound } from "next/navigation";
-import { ChevronRight, FileImage, FileVideo, Lock, Shield } from "lucide-react";
 import { AgentFrame } from "@/components/app-shell/agent-frame";
 import { requireUser } from "@/lib/auth/session";
-import { formatDate, formatDateTime, formatRelative } from "@/lib/format";
 import { createClient } from "@/lib/supabase/server";
 import {
   ATTACHMENTS_BUCKET,
-  END_USER_TYPE_LABELS,
-  PLATFORM_LABELS,
   sourceLabel,
-  STATUS_LABELS,
   type TicketStatus,
 } from "@/lib/tickets/constants";
 import { safeAppReturn } from "@/lib/tickets/filters";
-import { addTicketNote, saveResolution, saveTracker } from "../actions";
-import { CopyTicketNumber, CredentialsValue, TicketControls } from "./ticket-controls";
-import { StatusBadge } from "@/components/tickets/status-badge";
-import { SaveButton } from "@/components/tickets/save-button";
+import { CaseWorkspace } from "@/components/tickets/case-workspace";
+import { z } from "zod";
 
 export default async function AgentTicketPage({
   params,
@@ -27,9 +19,10 @@ export default async function AgentTicketPage({
   const { ticketId } = await params;
   const { error: errorMessage, returnTo, saved } = await searchParams;
   const backHref = safeAppReturn(typeof returnTo === "string" ? returnTo : undefined) ?? "/tickets";
+  if (!z.uuid().safeParse(ticketId).success) notFound();
   const supabase = await createClient();
 
-  const { data: ticket } = await supabase
+  const { data: ticket, error: ticketError } = await supabase
     .from("tickets")
     .select(
       `id, ticket_number, status, source, created_at, updated_at, customer_name, customer_email, customer_phone, school_name,
@@ -41,6 +34,7 @@ export default async function AgentTicketPage({
     )
     .eq("id", ticketId)
     .maybeSingle();
+  if (ticketError) throw ticketError;
   if (!ticket) notFound();
 
   const [history, attachments, notes, agents, categories, causes, requestTypes, topics, trackerCauses, trackerActions, outcomes] = await Promise.all([
@@ -81,256 +75,18 @@ export default async function AgentTicketPage({
   const canEdit = user.role === "support_agent";
   const city = nameOf(ticket.cities);
   const creator = nameOf(ticket.creator);
-  const version = `${ticket.app_version ?? "—"}${ticket.is_latest_version === false ? " (not latest)" : ""}`;
-
-  const fields: [string, React.ReactNode][] = [
-    ["Customer name", ticket.customer_name],
-    ["Email", ticket.customer_email ?? "—"],
-    ["User type", ticket.end_user_type ? END_USER_TYPE_LABELS[ticket.end_user_type as keyof typeof END_USER_TYPE_LABELS] : "—"],
-    ["School", ticket.school_name ?? "—"],
-    ["City", city || "—"],
-    ["Date of issue", ticket.issue_date ? formatDate(ticket.issue_date) : "—"],
-    ["Platform", ticket.platform ? PLATFORM_LABELS[ticket.platform as keyof typeof PLATFORM_LABELS] : "—"],
-    ["Device", ticket.device_type ?? "—"],
-    ["App version", version],
-    ["Page / screen", ticket.page_screen ?? "—"],
-    ["Phone", ticket.customer_phone ?? "—"],
-    ["Fawry payment", ticket.fawry_payment === true ? "Yes" : ticket.fawry_payment === false ? "No" : "Not recorded"],
-  ];
-
-  return (
-    <AgentFrame title="Case file">
-      <div className="case-file">
-      <div className="flex flex-col gap-4 border-b bg-background px-5 py-4 sm:px-8">
-        <nav className="flex items-center gap-1.5 text-[13px]">
-          <Link href={backHref} className="font-medium text-muted-foreground hover:text-foreground">{backHref.startsWith("/dashboard") ? "Support analytics" : "Tickets"}</Link>
-          <ChevronRight className="size-3.5 text-muted-foreground" />
-          <span className="font-mono font-medium">{ticket.ticket_number}</span>
-          <CopyTicketNumber value={ticket.ticket_number} />
-        </nav>
-        <div className="flex flex-wrap items-start justify-between gap-4">
-          <div className="min-w-0 flex-1">
-            <div className="mb-3 flex flex-wrap items-center gap-3"><span className="cs-report-label mb-0">CASE FILE / {ticket.ticket_number}</span><StatusBadge status={status} /></div>
-            <h2 className="max-w-3xl text-2xl font-medium tracking-tight" dir="auto">{ticket.issue_description.length > 140 ? `${ticket.issue_description.slice(0, 137)}…` : ticket.issue_description}</h2>
-            <p className="mt-2 flex flex-wrap items-center gap-3 text-[13px] text-muted-foreground">
-              <span className="inline-flex items-center gap-1.5">
-                <Shield className="size-3.5 text-status-awaiting" />
-                {ticketSource?.name || sourceLabel(ticket.source)}
-                {creator ? ` · by ${creator}` : ""}
-              </span>
-              <span>Created {formatDateTime(ticket.created_at)}</span>
-            </p>
-          </div>
-          {user.role === "support_agent" ? (
-            <TicketControls
-              key={ticket.updated_at}
-              ticketId={ticket.id}
-              ticketNumber={ticket.ticket_number}
-              status={status}
-              assigneeId={ticket.assignee_id}
-              agents={agents.data ?? []}
-              returnTo={backHref === "/tickets" ? "" : backHref}
-              updatedAt={ticket.updated_at}
-            />
-          ) : (
-            <p className="text-sm text-muted-foreground">{STATUS_LABELS[status]} · read-only</p>
-          )}
-        </div>
-        {typeof errorMessage === "string" && (
-          <p role="alert" className="rounded-lg border border-[#f3c7c9] bg-[#fdecec] px-3 py-2 text-sm text-destructive">
-            {errorMessage}
-          </p>
-        )}
-        {saved === "1" && !errorMessage && <p role="status" className="rounded-md border border-green-200 bg-green-50 px-3 py-2 text-sm text-green-900">Changes saved.</p>}
-        <p className="text-sm text-muted-foreground">
-          Request type, topic, cause, action, and outcome are required before Resolved. Closed - No Response does not require them. Classification can be corrected after the ticket is closed.
-        </p>
-      </div>
-
-      <div className="grid items-start gap-6 px-5 py-6 lg:grid-cols-[minmax(0,1fr)_320px] sm:px-8">
-        <div className="flex flex-col gap-5">
-          <section className="rounded-xl border bg-background p-6">
-            <h3 className="text-base font-semibold">Reported details</h3>
-            <dl className="mt-4 grid gap-x-6 gap-y-4 sm:grid-cols-2 xl:grid-cols-3">
-              {fields.map(([label, value]) => (
-                <div key={label} className="flex flex-col gap-1">
-                  <dt className="text-xs font-medium text-muted-foreground">{label}</dt>
-                  <dd className="text-sm break-words" dir="auto">{value}</dd>
-                </div>
-              ))}
-              <div className="flex flex-col gap-1">
-                <dt className="flex items-center gap-1 text-xs font-medium text-muted-foreground">
-                  <Lock className="size-3" /> User name (sensitive)
-                </dt>
-                <dd>
-                  {ticket.credentials_username ? <CredentialsValue value={ticket.credentials_username} /> : "—"}
-                </dd>
-              </div>
-            </dl>
-            <hr className="my-5" />
-            <div className="flex flex-col gap-1.5">
-              <p className="text-xs font-medium text-muted-foreground">Issue description</p>
-              <p className="text-sm leading-6 whitespace-pre-wrap">{ticket.issue_description}</p>
-            </div>
-            {ticket.steps && (
-              <div className="mt-4 flex flex-col gap-1.5">
-                <p className="text-xs font-medium text-muted-foreground">Steps</p>
-                <p className="text-sm leading-6 whitespace-pre-wrap">{ticket.steps}</p>
-              </div>
-            )}
-            {attachments.data && attachments.data.length > 0 && (
-              <div className="mt-4 flex flex-wrap gap-2">
-                {attachments.data.map((file) => {
-                  const Icon = file.mime_type.startsWith("video/") ? FileVideo : FileImage;
-                  return (
-                    <a
-                      key={file.id}
-                      href={urlByPath.get(file.storage_path) ?? "#"}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="flex items-center gap-2 rounded-lg border px-3 py-2 text-[13px] font-medium hover:bg-muted"
-                    >
-                      <Icon className="size-4 text-muted-foreground" />
-                      {file.file_name}
-                    </a>
-                  );
-                })}
-              </div>
-            )}
-          </section>
-
-          <section className="rounded-xl border bg-background p-6">
-            <h3 className="text-base font-semibold">Internal notes</h3>
-            <p className="mt-1 text-xs text-muted-foreground">Visible to Technical Support and Managers. Hidden from reporting teams.</p>
-            <ul className="mt-4 flex flex-col gap-3">
-              {(notes.data ?? []).map((note) => (
-                <li key={note.id} className="rounded-lg bg-muted px-3 py-2.5">
-                  <p className="text-sm whitespace-pre-wrap">{note.body}</p>
-                  <p className="mt-1 text-xs text-muted-foreground">
-                    {nameOf(note.author) || "Support"} · {formatRelative(note.created_at)}
-                  </p>
-                </li>
-              ))}
-              {notes.data?.length === 0 && <li className="text-sm text-muted-foreground">No internal notes yet.</li>}
-            </ul>
-            {canEdit && (
-              <form action={addTicketNote} className="mt-4 flex flex-col gap-2">
-                <input type="hidden" name="ticketId" value={ticket.id} />
-                {backHref !== "/tickets" && <input type="hidden" name="returnTo" value={backHref} />}
-                <textarea
-                  name="body"
-                  required
-                  rows={3}
-                  placeholder="Add an internal note"
-                  className="rounded-lg border bg-background px-3 py-2 text-sm outline-none"
-                />
-                <SaveButton>Add internal note</SaveButton>
-              </form>
-            )}
-          </section>
-        </div>
-
-        <div className="flex flex-col gap-5">
-          <section className="rounded-xl border bg-background p-5">
-            <h3 className="text-base font-semibold">Customer Support Tracker</h3>
-            <p className="mt-1 text-xs text-muted-foreground">Visible to the person who opened the ticket, the manager, and Technical Support.</p>
-            <form key={`tracker-${ticket.updated_at}`} action={saveTracker} className="mt-4 flex flex-col gap-3">
-              <input type="hidden" name="ticketId" value={ticket.id} />
-              <input type="hidden" name="updatedAt" value={ticket.updated_at} />
-              {backHref !== "/tickets" && <input type="hidden" name="returnTo" value={backHref} />}
-              <TrackerSelect label="Request type" name="requestTypeId" value={ticket.request_type_id} options={requestTypes.data ?? []} disabled={!canEdit} />
-              <TrackerSelect label="Topic" name="topicId" value={ticket.topic_id} options={topics.data ?? []} disabled={!canEdit} />
-              <TrackerSelect label="Cause" name="trackerCauseId" value={ticket.tracker_cause_id} options={trackerCauses.data ?? []} disabled={!canEdit} />
-              <TrackerSelect label="Action" name="trackerActionId" value={ticket.tracker_action_id} options={trackerActions.data ?? []} disabled={!canEdit} />
-              <TrackerSelect label="Outcome" name="outcomeId" value={ticket.outcome_id} options={outcomes.data ?? []} disabled={!canEdit} />
-              <Field label="Technical Support response">
-                <textarea name="resolutionNotes" defaultValue={ticket.resolution_notes ?? ""} disabled={!canEdit} rows={3} className="rounded-lg border bg-background px-3 py-2 text-sm" />
-              </Field>
-              <Field label="Follow-up notes">
-                <textarea name="followUpNotes" defaultValue={ticket.follow_up_notes ?? ""} disabled={!canEdit} rows={3} className="rounded-lg border bg-background px-3 py-2 text-sm" />
-              </Field>
-              <Field label="Tracker notes">
-                <textarea name="trackerNotes" defaultValue={ticket.tracker_notes ?? ""} disabled={!canEdit} rows={3} className="rounded-lg border bg-background px-3 py-2 text-sm" />
-              </Field>
-              {canEdit && (
-                <SaveButton>Save tracker</SaveButton>
-              )}
-            </form>
-          </section>
-
-          <section className="rounded-xl border bg-background p-5">
-            <h3 className="text-base font-semibold">Technical classification</h3>
-            <form key={`classification-${ticket.updated_at}`} action={saveResolution} className="mt-4 flex flex-col gap-3">
-              <input type="hidden" name="ticketId" value={ticket.id} />
-              <input type="hidden" name="updatedAt" value={ticket.updated_at} />
-              {backHref !== "/tickets" && <input type="hidden" name="returnTo" value={backHref} />}
-              <TrackerSelect label="Issue category" name="issueCategoryId" value={ticket.issue_category_id} options={categories.data ?? []} disabled={!canEdit} />
-              <TrackerSelect label="Root cause" name="rootCauseId" value={ticket.root_cause_id} options={causes.data ?? []} disabled={!canEdit} />
-              <Field label="Action taken">
-                <textarea name="actionTaken" defaultValue={ticket.action_taken ?? ""} disabled={!canEdit} rows={3} className="rounded-lg border bg-background px-3 py-2 text-sm" />
-              </Field>
-              {canEdit && (
-                <SaveButton>Save classification</SaveButton>
-              )}
-            </form>
-          </section>
-
-          <section className="rounded-xl border bg-background p-5">
-            <h3 className="text-base font-semibold">Status history</h3>
-            <ol className="mt-4 flex flex-col gap-3">
-              {(history.data ?? []).map((entry) => (
-                <li key={entry.id} className="border-l-2 border-brand-tint pl-3">
-                  <p className="text-sm font-medium">
-                    {entry.from_status ? `${STATUS_LABELS[entry.from_status as TicketStatus]} → ` : ""}
-                    {STATUS_LABELS[entry.to_status as TicketStatus]}
-                  </p>
-                  <p className="text-xs text-muted-foreground">
-                    {nameOf(entry.actor) || "System"} · {formatDateTime(entry.changed_at)}
-                  </p>
-                </li>
-              ))}
-            </ol>
-          </section>
-        </div>
-      </div>
-      </div>
-    </AgentFrame>
-  );
-}
-
-function TrackerSelect({
-  label,
-  name,
-  value,
-  options,
-  disabled,
-}: {
-  label: string;
-  name: string;
-  value: number | null;
-  options: { id: number; name: string; is_active: boolean }[];
-  disabled: boolean;
-}) {
-  const visible = options.filter((option) => option.is_active || option.id === value);
-  return (
-    <Field label={label}>
-      <select name={name} defaultValue={value ?? ""} disabled={disabled} className="h-9 rounded-lg border bg-background px-3 text-sm">
-        <option value="">Select</option>
-        {visible.map((option) => (
-          <option key={option.id} value={option.id}>{option.name}</option>
-        ))}
-      </select>
-    </Field>
-  );
-}
-
-function Field({ label, children }: { label: string; children: React.ReactNode }) {
-  return (
-    <label className="flex flex-col gap-1.5 text-xs font-medium text-muted-foreground">
-      {label}
-      {children}
-    </label>
-  );
+  const idValue = (value: number | null) => value == null ? "" : String(value);
+  return <AgentFrame title="Case file"><CaseWorkspace
+    ticket={{ ...ticket, status }} sourceName={ticketSource?.name || sourceLabel(ticket.source)} city={city} creator={creator} backHref={backHref}
+    saved={saved === "1"} error={typeof errorMessage === "string" ? errorMessage : undefined}
+    attachments={(attachments.data ?? []).map((file) => ({ ...file, url: urlByPath.get(file.storage_path) }))}
+    notes={(notes.data ?? []).map((note) => ({ ...note, author: nameOf(note.author) }))}
+    history={(history.data ?? []).map((entry) => ({ ...entry, actor: nameOf(entry.actor) }))}
+    editor={{ ticketId: ticket.id, updatedAt: ticket.updated_at, returnTo: backHref, userId: user.id, canEdit, agents: agents.data ?? [],
+      initial: { status, assigneeId: ticket.assignee_id || "", requestTypeId: idValue(ticket.request_type_id), topicId: idValue(ticket.topic_id), trackerCauseId: idValue(ticket.tracker_cause_id), trackerActionId: idValue(ticket.tracker_action_id), outcomeId: idValue(ticket.outcome_id), issueCategoryId: idValue(ticket.issue_category_id), rootCauseId: idValue(ticket.root_cause_id), resolutionNotes: ticket.resolution_notes || "", followUpNotes: ticket.follow_up_notes || "", trackerNotes: ticket.tracker_notes || "", actionTaken: ticket.action_taken || "" },
+      options: { requestTypes: requestTypes.data ?? [], topics: topics.data ?? [], causes: trackerCauses.data ?? [], actions: trackerActions.data ?? [], outcomes: outcomes.data ?? [], categories: categories.data ?? [], rootCauses: causes.data ?? [] }
+    }}
+  /></AgentFrame>;
 }
 
 function nameOf(value: unknown): string {

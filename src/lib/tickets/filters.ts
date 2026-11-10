@@ -1,7 +1,7 @@
 import { END_USER_TYPES, TICKET_STATUSES, type TicketStatus } from "./constants";
 import { validDay } from "./analytics";
 
-export const TICKET_VIEWS = ["all", "new", "mine", "awaiting", "resolved"] as const;
+export const TICKET_VIEWS = ["all", "open", "new", "mine", "awaiting", "resolved"] as const;
 export type TicketView = (typeof TICKET_VIEWS)[number];
 export const PAGE_SIZE = 8;
 
@@ -15,6 +15,7 @@ export type TicketListFilters = {
   range: "7" | "30" | "90" | "all";
   q: string;
   page: number;
+  sort?: "newest" | "oldest" | "updated";
 };
 
 function one(value: string | string[] | undefined): string {
@@ -37,9 +38,10 @@ export function parseTicketListFilters(
     city: one(searchParams.city),
     category: one(searchParams.category),
     assignee: one(searchParams.assignee),
-    range: range === "7" || range === "90" || range === "all" ? range : "30",
+    range: range === "7" || range === "30" || range === "90" ? range : "all",
     q: one(searchParams.q).slice(0, 80),
     page: Number.isFinite(page) && page > 0 ? Math.floor(page) : 1,
+    sort: one(searchParams.sort) === "oldest" ? "oldest" : one(searchParams.sort) === "updated" ? "updated" : "newest",
   };
 }
 
@@ -59,7 +61,8 @@ export function ticketListQuery(filters: TicketListFilters, extras?: Record<stri
   if (filters.city) params.set("city", filters.city);
   if (filters.category) params.set("category", filters.category);
   if (filters.assignee) params.set("assignee", filters.assignee);
-  if (filters.range !== "30") params.set("range", filters.range);
+  if (filters.range !== "all") params.set("range", filters.range);
+  if (filters.sort && filters.sort !== "newest") params.set("sort", filters.sort);
   if (filters.q) params.set("q", filters.q);
   if (filters.page > 1) params.set("page", String(filters.page));
   for (const [key, value] of Object.entries(extras ?? {})) {

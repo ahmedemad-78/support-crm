@@ -47,7 +47,7 @@ async function destination(action) {
   try { await action(); assert.fail("Expected action redirect"); }
   catch (error) { if (!error.destination) throw error; return new URL(error.destination, "https://fixture.invalid"); }
 }
-function caseHarness({ role = "support_agent", version = initialVersion, activeAgent = true } = {}) {
+function caseHarness({ role = "support_agent", version = initialVersion, activeAgent = true, databaseFailure = false } = {}) {
   const record = { id: caseId, status: "new", assignee_id: null, updated_at: version };
   let emails = 0;
   let writes = 0;
@@ -71,7 +71,7 @@ function caseHarness({ role = "support_agent", version = initialVersion, activeA
   const load = loadWith({
     "next/cache": { revalidatePath() {} }, "next/navigation": { redirect },
     "@/lib/auth/session": { getCurrentUser: async () => role ? { id: agentId, role } : null },
-    "@/lib/supabase/server": { createClient: async () => client },
+    "@/lib/supabase/server": { createClient: async () => { if (databaseFailure) throw new Error("network unavailable"); return client; } },
     "@/lib/email/deliver": { deliverPendingEmails: async () => { emails += 1; } },
   });
   return { actions: load("src/app/(app)/tickets/actions.ts"), record, emails: () => emails, writes: () => writes };
@@ -129,4 +129,46 @@ test("sign-in infrastructure failure returns a useful error and preserves email"
   const result = await load("src/app/login/actions.ts").signIn({}, data);
   assert.match(result.error, /temporarily unavailable/); assert.equal(result.email, "fixture@example.test");
   assert.equal(JSON.stringify(result).includes("synthetic-only"), false);
+});
+
+function fullCaseForm(overrides = {}) {
+  return form({ requestTypeId: "1", topicId: "2", trackerCauseId: "3", trackerActionId: "4", outcomeId: "5", issueCategoryId: "6", rootCauseId: "7", resolutionNotes: "  Payment checked; activation confirmed.  ", followUpNotes: "Next check tomorrow", trackerNotes: "Internal tracker context", actionTaken: "Verified payment", ...overrides });
+}
+test("unified case save writes status, tracker, response and classification once", async () => {
+  const h = caseHarness();
+  const result = await destination(() => h.actions.saveCaseWorkspace({ error: "" }, fullCaseForm({ status: "resolved", assigneeId: agentId })));
+  assert.equal(h.writes(), 1); assert.equal(h.emails(), 1);
+  assert.equal(h.record.status, "resolved"); assert.equal(h.record.assignee_id, agentId);
+  assert.equal(h.record.topic_id, 2); assert.equal(h.record.root_cause_id, 7);
+  assert.equal(h.record.resolution_notes, "Payment checked; activation confirmed.");
+  assert.equal(result.searchParams.get("saved"), "1");
+  assert.equal(result.searchParams.get("returnTo"), "/dashboard?from=2026-11-01");
+});
+test("unified case save rejects conflicts without partial writes or mail", async () => {
+  const h = caseHarness({ version: "2026-11-09T12:02:00Z" });
+  const result = await h.actions.saveCaseWorkspace({ error: "" }, fullCaseForm());
+  assert.match(result.error, /changed since/); assert.equal(h.writes(), 0); assert.equal(h.emails(), 0);
+});
+test("unified resolution requires every tracker field before a database write", async () => {
+  for (const key of ["requestTypeId", "topicId", "trackerCauseId", "trackerActionId", "outcomeId"]) {
+    const h = caseHarness(); const result = await h.actions.saveCaseWorkspace({ error: "" }, fullCaseForm({ status: "resolved", [key]: "" }));
+    assert.match(result.error, /before marking this case Resolved/); assert.equal(h.writes(), 0);
+  }
+});
+test("unified save enforces actor, active owner and numeric classification", async () => {
+  for (const role of ["manager", null]) {
+    const h = caseHarness({ role }); const result = await h.actions.saveCaseWorkspace({ error: "" }, fullCaseForm());
+    assert.match(result.error, /Only Technical Support/); assert.equal(h.writes(), 0);
+  }
+  const inactive = caseHarness({ activeAgent: false });
+  assert.match((await inactive.actions.saveCaseWorkspace({ error: "" }, fullCaseForm({ assigneeId: agentId }))).error, /active Technical Support/);
+  assert.equal(inactive.writes(), 0);
+  const invalid = caseHarness();
+  assert.match((await invalid.actions.saveCaseWorkspace({ error: "" }, fullCaseForm({ rootCauseId: "-1" }))).error, /valid tracker and classification/);
+  assert.equal(invalid.writes(), 0);
+});
+test("unified save returns an infrastructure error to the existing draft", async () => {
+  const h = caseHarness({ databaseFailure: true });
+  const result = await h.actions.saveCaseWorkspace({ error: "" }, fullCaseForm());
+  assert.match(result.error, /Your draft is still here/); assert.equal(h.writes(), 0);
 });

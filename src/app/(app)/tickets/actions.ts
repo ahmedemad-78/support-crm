@@ -168,3 +168,44 @@ export async function addTicketNote(formData: FormData) {
   revalidatePath(`/tickets/${id}`);
   redirect(ticketPath(id, error?.message, requestedReturn(formData)));
 }
+
+/** One version-checked write prevents separately saved sections overwriting one another. */
+export async function saveCaseWorkspace(_previous: { error: string }, formData: FormData): Promise<{ error: string }> {
+  const user = await supportAgent();
+  if (!user) return { error: "Only Technical Support can update a case." };
+  const id = String(formData.get("ticketId") ?? "");
+  const version = String(formData.get("updatedAt") ?? "");
+  if (!validUpdate(id, version)) return { error: "Reload this case before saving. Your changes have not been saved." };
+  const status = String(formData.get("status") ?? "");
+  if (!TICKET_STATUSES.includes(status as TicketStatus)) return { error: "Choose a valid case status." };
+  const trackerKeys = ["requestTypeId", "topicId", "trackerCauseId", "trackerActionId", "outcomeId"];
+  const idKeys = [...trackerKeys, "issueCategoryId", "rootCauseId"];
+  if (idKeys.some((key) => !numericId(formData.get(key)))) return { error: "Choose valid tracker and classification values." };
+  if (status === "resolved" && trackerKeys.some((key) => !formData.get(key))) return { error: "Complete request type, topic, cause, action and outcome before marking this case Resolved." };
+  const assignee = String(formData.get("assigneeId") ?? "");
+  if (assignee && !z.uuid().safeParse(assignee).success) return { error: "Choose a valid Support assignee." };
+  let failure: string | undefined;
+  try {
+  const supabase = await createClient();
+  if (assignee) {
+    const { data: agent, error } = await supabase.from("profiles").select("id").eq("id", assignee).eq("role", "support_agent").eq("is_active", true).maybeSingle();
+    if (error || !agent) return { error: "Choose an active Technical Support assignee." };
+  }
+  const idOf = (key: string) => formData.get(key) ? Number(formData.get(key)) : null;
+  const textOf = (key: string) => String(formData.get(key) ?? "").trim() || null;
+  failure = updateResult(await supabase.from("tickets").update({
+    status, assignee_id: assignee || null,
+    request_type_id: idOf("requestTypeId"), topic_id: idOf("topicId"), tracker_cause_id: idOf("trackerCauseId"),
+    tracker_action_id: idOf("trackerActionId"), outcome_id: idOf("outcomeId"),
+    issue_category_id: idOf("issueCategoryId"), root_cause_id: idOf("rootCauseId"),
+    resolution_notes: textOf("resolutionNotes"), follow_up_notes: textOf("followUpNotes"), tracker_notes: textOf("trackerNotes"), action_taken: textOf("actionTaken"),
+  }).eq("id", id).eq("updated_at", version).select("id"));
+  } catch { return { error: "Could not save the case right now. Your draft is still here; try again." }; }
+  if (failure) return { error: failure };
+  try { await deliverPendingEmails(); } catch { /* Saved; the existing outbox retries delivery. */ }
+  revalidatePath("/tickets");
+  revalidatePath(`/tickets/${id}`);
+  revalidatePath(`/portal/my-tickets/${id}`);
+  revalidatePath("/dashboard");
+  redirect(ticketPath(id, undefined, requestedReturn(formData)));
+}

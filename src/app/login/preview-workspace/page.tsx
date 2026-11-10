@@ -1,0 +1,23 @@
+import { notFound } from "next/navigation";
+import { CaseWorkspace, type CaseRecord } from "@/components/tickets/case-workspace";
+import { TicketQueue, type QueueRow } from "@/components/tickets/ticket-queue";
+import { parseTicketListFilters } from "@/lib/tickets/filters";
+import type { TicketStatus } from "@/lib/tickets/constants";
+
+/** Synthetic, development-only UI fixture; never reads a customer record. */
+export default async function WorkspacePreview({ searchParams }: PageProps<"/login/preview-workspace">) {
+  if (process.env.NODE_ENV !== "development") notFound();
+  const params = await searchParams;
+  const readonly = params.mode === "readonly";
+  const empty = params.mode === "empty";
+  const ticket: CaseRecord = {
+    id: "11111111-1111-4111-8111-111111111111", ticket_number: "TKT-DEMO-0042", status: "in_progress", source: "whatsapp",
+    created_at: "2026-11-08T09:00:00Z", updated_at: "2026-11-10T08:00:00Z", customer_name: "Demo Parent", customer_email: "parent@example.com", customer_phone: "+201000000000", school_name: "Demo Language School", credentials_username: "demo.student", issue_date: "2026-11-08", end_user_type: "parent", platform: "android", device_type: "Android phone", app_version: "4.2.0", is_latest_version: true, page_screen: "Subscriptions", issue_description: "Subscription is not active after payment. The customer can see the payment confirmation but cannot open the learning content.", steps: "Open the app → Sign in → Open the purchased course.\nThe course still asks the customer to subscribe.", fawry_payment: true,
+  };
+  const agents = [{ id: "22222222-2222-4222-8222-222222222222", full_name: "Demo Agent" }];
+  const option = (name: string) => [{ id: 1, name, is_active: true }];
+  const rows: QueueRow[] = empty ? [] : Array.from({ length: 8 }, (_, index) => ({ id: `${ticket.id}-${index}`, ticket_number: `TKT-DEMO-${String(42 + index).padStart(4, "0")}`, issue_description: index % 2 ? "Video lesson stops while playing on an Android device." : ticket.issue_description, customer_name: `Demo Customer ${index + 1}`, source: index % 2 ? "call_center" : "whatsapp", status: (["new", "in_progress", "awaiting_customer", "resolved"] as TicketStatus[])[index % 4], created_at: ticket.created_at, updated_at: ticket.updated_at, issue_date: ticket.issue_date, cities: { name: "Cairo" }, assignee: index % 3 ? { full_name: "Demo Agent" } : null }));
+  return <main className="workspace-main"><div style={{ padding: "16px 24px", background: "#e7edde", fontSize: 12 }}>Development preview · synthetic data · <a href="#case-preview">Case file</a> · <a href="#workspace-queue">Queue</a></div><div id="workspace-queue"><TicketQueue preview tickets={rows} total={empty ? 0 : 24} counts={{ all: empty ? 0 : 24, open: empty ? 0 : 18, new: empty ? 0 : 6, mine: empty ? 0 : 12, awaiting: empty ? 0 : 6, resolved: empty ? 0 : 6 }} filters={parseTicketListFilters({})} extras={{}} cities={[{ id: 1, name: "Cairo" }]} categories={[{ id: 1, name: "Payments & Fawry" }]} agents={agents} sources={[{ code: "whatsapp", name: "WhatsApp", is_active: true }, { code: "call_center", name: "Call", is_active: true }]} canCreate={!readonly} /></div>
+    <div id="case-preview"><CaseWorkspace ticket={ticket} sourceName="WhatsApp" city="Cairo" creator="Reporting team" backHref="#workspace-queue" notes={[{ id: "note-demo", body: "Payment reference has been checked. Waiting for the subscription activation to sync.", created_at: "2026-11-09T10:30:00Z", author: "Demo Agent" }]} history={[{ id: 1, from_status: "new", to_status: "in_progress", changed_at: ticket.updated_at, actor: "Demo Agent" }, { id: 2, from_status: null, to_status: "new", changed_at: ticket.created_at, actor: "Reporting team" }]} attachments={[]} editor={{ preview: true, ticketId: ticket.id, updatedAt: ticket.updated_at, returnTo: "/tickets", userId: agents[0].id, canEdit: !readonly, agents, initial: { status: "in_progress", assigneeId: "", requestTypeId: "1", topicId: "1", trackerCauseId: "", trackerActionId: "", outcomeId: "", issueCategoryId: "", rootCauseId: "", resolutionNotes: "", followUpNotes: "", trackerNotes: "", actionTaken: "" }, options: { requestTypes: option("Technical Issue"), topics: option("Subscription Payment"), causes: option("Payment sync delay"), actions: option("Investigated payment"), outcomes: option("Fixed by Technical Team"), categories: option("Payments & Fawry"), rootCauses: option("Payment processing") } }} /></div>
+  </main>;
+}
