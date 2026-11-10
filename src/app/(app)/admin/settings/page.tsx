@@ -2,10 +2,14 @@ import { PageHeader } from "@/components/app-shell/page-header";
 import { requireAdmin } from "@/lib/auth/session";
 import { createClient } from "@/lib/supabase/server";
 import { SettingsTabs } from "./settings-tabs";
+import { mailConfigured } from "@/lib/email/send";
+import { MailTestPanel } from "./mail-test-panel";
 
 export default async function SettingsPage() {
   await requireAdmin();
   const supabase = await createClient();
+  const { data: deliveryPolicy, error: deliveryPolicyError } = await supabase.from("app_settings").select("value").eq("key", "workflow_notifications").maybeSingle();
+  if (deliveryPolicyError) throw deliveryPolicyError;
 
   const [cities, categories, causes, requestTypes, topics, trackerCauses, trackerActions, outcomes, sources, emails] =
     await Promise.all([
@@ -28,6 +32,7 @@ export default async function SettingsPage() {
   return (
     <>
       <PageHeader title="Settings" />
+      <MailTestPanel configured={mailConfigured()} recipient={String(deliveryPolicy?.value?.email || "")} />
       <SettingsTabs
         lists={{
           cities: cities.data ?? [],

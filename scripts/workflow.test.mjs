@@ -261,3 +261,13 @@ test("Graph authorization and send failures never acknowledge delivery",async()=
   let count=0;await assert.rejects(()=>mail.sendOutbound({to:"a@example.com",subject:"Fixture",html:"Fixture"},{env,fetchImpl:async()=>++count===1?{ok:true,json:async()=>({access_token:"test-token"})}:{status:403}}),/did not accept/);
   assert.doesNotMatch(mail.publicMailError(new Error("failed test-secret"),env),/test-secret/);
 });
+
+test("mail connection test sends one fixed message to the configured central owner only",async()=>{
+ const sends=[];const queries=[];const load=loadWith({"@/lib/auth/session":{getCurrentUser:async()=>({id:agentId,role:"support_agent",isAdmin:true})},"@/lib/supabase/server":{createClient:async()=>({from(table){queries.push(table);return {select(){return this},eq(){return this},async single(){return {data:{value:{mode:"central_only",recipient_id:agentId,email:"central@example.com"}},error:null}}}}})},"@/lib/email/send":{mailConfigured:()=>true,publicMailError:()=>"SMTP failed",sendOutbound:async message=>{sends.push(message);return {provider:"smtp"}}}});
+ const result=await load("src/app/(app)/admin/settings/mail-test-actions.ts").sendTestNotification();assert.equal(result.ok,true);assert.equal(sends.length,1);assert.equal(sends[0].to,"central@example.com");assert.match(sends[0].subject,/connection test/);assert.deepEqual(queries,["app_settings"]);
+});
+test("mail connection test refuses non-admins and a different central owner",async()=>{
+ for(const profile of [null,{id:agentId,role:"manager",isAdmin:true},{id:agentId,role:"support_agent",isAdmin:false},{id:agentId,role:"support_agent",isAdmin:true}]){
+ let sent=0;const load=loadWith({"@/lib/auth/session":{getCurrentUser:async()=>profile},"@/lib/supabase/server":{createClient:async()=>({from(){return {select(){return this},eq(){return this},async single(){return {data:{value:{mode:"central_only",recipient_id:caseId,email:"other@example.com"}},error:null}}}}})},"@/lib/email/send":{mailConfigured:()=>true,publicMailError:()=>"SMTP failed",sendOutbound:async()=>{sent++;return {provider:"smtp"}}}});assert.equal((await load("src/app/(app)/admin/settings/mail-test-actions.ts").sendTestNotification()).ok,false);assert.equal(sent,0);
+ }
+});
