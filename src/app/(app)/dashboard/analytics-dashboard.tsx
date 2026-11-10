@@ -476,7 +476,7 @@ export function DashboardBoard({
         <Panel title="Contact channel" question="Recorded contact channel. Unspecified stays separate from the source team.">
           <SplitBar rows={channelRows} colors={CHANNEL_COLORS} selectedId={filters.channel ?? ""} onPick={(id) => toggle("channel", id)} />
         </Panel>
-        <Panel title="Referring team" question="Only Moderation and Marketing cases have a referring team.">
+        <Panel title="Referring team" question="Reporting team based on the recorded source, independent of contact channel.">
           <SourceRanking label="REFERRING TEAM" rows={teamRows} selectedId={filters.referringTeam ?? ""} onPick={(id) => toggle("referringTeam", id)} />
         </Panel>
       </div>
