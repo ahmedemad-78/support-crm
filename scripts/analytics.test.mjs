@@ -7,7 +7,7 @@ import { createRequire } from "node:module";
 import ts from "typescript";
 
 const directory = mkdtempSync(join(tmpdir(), "crm-analytics-test-"));
-for (const name of ["constants", "dashboard-model", "analytics", "overview"]) {
+for (const name of ["constants", "dashboard-model", "analytics", "overview", "chart-math"]) {
   const source = readFileSync(
     new URL(`../src/lib/tickets/${name}.ts`, import.meta.url),
     "utf8",
@@ -218,4 +218,21 @@ test("volume buckets keep days with no cases", () => {
   assert.equal(buckets[0].total, 1);
   assert.equal(buckets[1].total, 0);
   assert.equal(buckets[2].total, 0);
+});
+
+const { shareCells, shareLabel } = require(join(directory, "chart-math.js"));
+test("waffle allocation keeps exactly 100 cells and preserves empty categories", () => {
+  assert.deepEqual(shareCells([1, 1, 1, 0]), [34, 33, 33, 0]);
+  assert.deepEqual(shareCells([0, 0]), [0, 0]);
+  assert.deepEqual(shareCells([]), []);
+  assert.deepEqual(shareCells([0, 17, 0]), [0, 100, 0]);
+  const skewed = shareCells([999, 1, 0]);
+  assert.equal(skewed.reduce((sum, value) => sum + value, 0), 100);
+  assert.equal(skewed[2], 0);
+});
+test("share labels distinguish tiny nonzero populations from zero", () => {
+  assert.equal(shareLabel(1, 10000), "<0.1%");
+  assert.equal(shareLabel(1, 1000), "0.1%");
+  assert.equal(shareLabel(1, 3), "33.3%");
+  assert.equal(shareLabel(0, 0), "0%");
 });

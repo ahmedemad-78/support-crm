@@ -28,7 +28,11 @@ import {
   type StatusGroup,
   type VolumeMode,
 } from "@/lib/tickets/overview";
-import { AgeStrip, BarList, CauseChart, CHANNEL_COLORS, ColumnChart, EmptyChart, FawryDonut, Panel, SegmentChart, SOURCE_COLORS, Sparkline, SplitBar, STATUS_COLORS, TopicList, VolumeChart, VolumePulse, type VolumeLine } from "./overview-charts";
+import { AgeStrip, CauseChart, CHANNEL_COLORS, EmptyChart, FawryDonut, Panel, Sparkline, SplitBar, TopicList, VolumeChart, VolumePulse, type VolumeLine } from "./overview-charts";
+
+import { RequestWaffle, SegmentMatrix, SourceRanking, StatusRing, TeamTiles } from "./insight-charts";
+import { shareLabel } from "@/lib/tickets/chart-math";
+import "./intelligence.css";
 
 type Snapshot = { tickets: AnalyticsTicket[]; asOf: string };
 type Option = { id: string; name: string };
@@ -339,7 +343,7 @@ export function DashboardBoard({
       <header className="cs-title">
         <div>
           <p className="cs-report-label">OPERATIONS / SUPPORT INTELLIGENCE</p>
-          <h2>The support picture.</h2>
+          <h2>The support picture<span className="bi-title-dot">.</span></h2>
           <span>Cases reported {filters.from} – {filters.to}. Updated {updated}{refreshing ? " · Updating" : ""}.</span>
         </div>
         <div className="cs-title-actions no-print">
@@ -413,11 +417,11 @@ export function DashboardBoard({
       )}
 
       <div className="cs-row cs-row-even">
-        <Panel title="Where cases come from" question={`Compare all sources within the other filters · ${sourceFrame.length} cases.`}>
-          <ColumnChart rows={sourceRows} colors={SOURCE_COLORS} selectedId={filters.source} onPick={(id) => toggle("source", id)} />
+        <Panel title="Source ranking" question={`Compare all sources within the other filters · ${sourceFrame.length} cases.`}>
+          <SourceRanking rows={sourceRows} selectedId={filters.source} onPick={(id) => toggle("source", id)} />
         </Panel>
-        <Panel title="Request types" question="Recorded types stay visible. Not recorded is kept beside them.">
-          <SplitBar rows={requestRank} colors={{ Inquiry: "#285c46", "Technical Issue": "#477d91", Complaint: "#a16b22", __missing__: "#d6ddd4", __other__: "#7f8e81" }} selectedId={filters.requestType ?? ""} onPick={(id) => toggle("requestType", id)} />
+        <Panel title="Request types" question="The mix of work arriving. Missing types stay in the picture.">
+          <RequestWaffle rows={requestRank} selectedId={filters.requestType ?? ""} onPick={(id) => toggle("requestType", id)} />
         </Panel>
       </div>
       <div className="cs-row cs-row-even">
@@ -429,9 +433,8 @@ export function DashboardBoard({
         </Panel>
       </div>
       <div className="cs-row cs-row-even">
-        <Panel title="Cases by customer segment" question="School groups identified by source. Other segments remain unspecified." action={<div className="cs-modes"><button type="button" aria-pressed={!share} onClick={() => setShare(false)}>Count</button><button type="button" aria-pressed={share} onClick={() => setShare(true)}>Percentage</button></div>}>
-          <div className="cs-status-key"><span><i style={{ background: STATUS_COLORS.resolved }} />Resolved</span><span><i style={{ background: STATUS_COLORS.followup }} />Needs Follow-up</span><span><i style={{ background: STATUS_COLORS.closed }} />Closed Without Response</span></div>
-          <SegmentChart
+        <Panel title="Customer segment × status" question="Source-derived segments. Compare current outcomes within each group." action={<div className="cs-modes"><button type="button" aria-pressed={!share} onClick={() => setShare(false)}>Count</button><button type="button" aria-pressed={share} onClick={() => setShare(true)}>Within segment %</button></div>}>
+          <SegmentMatrix
             rows={segments}
             mode={share ? "share" : "count"}
             selectedSegment={filters.segment ?? ""}
@@ -452,7 +455,7 @@ export function DashboardBoard({
           <SplitBar rows={channelRows} colors={CHANNEL_COLORS} selectedId={filters.channel ?? ""} onPick={(id) => toggle("channel", id)} />
         </Panel>
         <Panel title="Referring team" question="Only Moderation and Marketing cases have a referring team.">
-          <BarList rows={teamRows} color="#1d4e3a" selectedId={filters.referringTeam ?? ""} onPick={(id) => toggle("referringTeam", id)} />
+          <TeamTiles rows={teamRows} selectedId={filters.referringTeam ?? ""} onPick={(id) => toggle("referringTeam", id)} />
         </Panel>
       </div>
     </div>
@@ -516,15 +519,15 @@ function FollowUp({ followups, page, pages, today, openAll, preview, returnTo, l
 }
 
 function Kpi({ label, value, total, detail, selected, dim, tone, spark, onClick }: { label: string; value: number; total?: number; detail: string; selected: boolean; dim: boolean; tone?: StatusGroup; spark?: number[]; onClick: () => void }) {
-  const percentage = total ? Math.round(value / total * 100) : 0;
+  const percentage = shareLabel(value, total ?? 0);
   return (
     <button type="button" className={`cs-kpi ${selected ? "is-on" : ""} ${dim ? "is-dim" : ""} ${tone ? `cs-kpi-${tone}` : ""}`} aria-pressed={selected} onClick={onClick}>
       {selected && <em>Selected</em>}
       <span>{label}</span>
-      <strong>{value.toLocaleString()}</strong>
+      <div className="bi-kpi-number"><strong>{value.toLocaleString()}</strong>{total !== undefined && <StatusRing value={value} total={total} />}</div>
       <small>{detail}</small>
       {spark && <Sparkline values={spark} />}
-      {total !== undefined && <div className="cs-kpi-visual" aria-label={`${percentage}% of selected cases`}><div className="cs-kpi-track"><i style={{ width: `${percentage}%` }} /></div><b>{percentage}%</b></div>}
+      {total !== undefined && <div className="cs-kpi-visual" aria-label={`${percentage} of selected cases`}><b>{percentage}</b><span>of this selection</span></div>}
     </button>
   );
 }

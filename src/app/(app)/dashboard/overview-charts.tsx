@@ -42,10 +42,12 @@ export function VolumePulse({ buckets, selectedFrom, onPick }: {
   const max = Math.max(1, ...buckets.map((bucket) => bucket.total));
   const colors = ["#edf0e7", "#d8e5c4", "#a9c78e", "#477b4b", "#24543b"];
   const total = buckets.reduce((sum, bucket) => sum + bucket.total, 0);
+  const active = buckets.filter((bucket) => bucket.total > 0).length;
+  const peak = buckets.reduce((best, bucket) => bucket.total > (best?.total ?? 0) ? bucket : best, null as VolumeBucket | null);
   const dense = buckets.length > 31;
   return (
     <div className="cs-pulse">
-      <div className="cs-pulse-summary"><strong>{total.toLocaleString()}</strong><span>reported cases · {buckets.length} intervals</span></div>
+      <div className="cs-pulse-summary"><div><strong>{total.toLocaleString()}</strong><span>reported cases</span></div><div><b>{active}<small> / {buckets.length}</small></b><span>active intervals</span></div><div><b>{peak?.total ?? 0}</b><span>{peak ? `peak · ${peak.label}` : "no arrivals"}</span></div></div>
       <div className={`cs-pulse-grid${dense ? " is-dense" : ""}`} role="group" aria-label="Case arrivals by reported date. Darker cells mean more cases.">
         {buckets.map((bucket) => {
           const level = bucket.total === 0 ? 0 : Math.max(1, Math.ceil((bucket.total / max) * 4));
@@ -449,11 +451,11 @@ export function AgeStrip({
       <div className="cs-age-bar" role="group" aria-label="Open cases by age since the reported date">
         {ages.map((age, index) => {
           const state = mark(Boolean(selected), selected === age.id);
-          const share = total ? (age.count / total) * 100 : 25;
+          const share = total ? Math.round(age.count / total * 100) : 0;
           return (
-            <button type="button" key={age.id} className={`cs-${state}${index >= 3 ? " is-ink" : ""}`} style={{ flexGrow: Math.max(share, 8), background: AGE_COLORS[index], color: index >= 3 ? "#fff" : "#173126" }} aria-pressed={state === "on"} onClick={() => onPick(age.id)}>
+            <button type="button" key={age.id} className={`cs-${state}${index >= 3 ? " is-ink" : ""}`} style={{ borderTopColor: AGE_COLORS[index] }} aria-pressed={state === "on"} onClick={() => onPick(age.id)}>
               <strong>{age.count}</strong>
-              <span>{age.label}</span>
+              <span>{age.label}</span><small>{share}% of open cases</small>
             </button>
           );
         })}
@@ -516,7 +518,7 @@ export function SplitBar({
           const share = total ? (row.count / total) * 100 : 0;
           const background = colors[row.id] ?? "#159d49";
           return (
-            <button type="button" key={row.id} className={`cs-${state}`} style={{ flexGrow: Math.max(share, 8), background, color: inkOn(background) }} aria-pressed={state === "on"} onClick={() => onPick(row.id)}>
+            <button type="button" key={row.id} className={`cs-${state}`} style={{ flex: `0 0 ${share}%`, background, color: inkOn(background) }} aria-label={`${row.name}: ${row.count} cases`} title={`${row.name}: ${row.count} cases`} aria-pressed={state === "on"} onClick={() => onPick(row.id)}>
               <strong>{row.count}</strong>
             </button>
           );
