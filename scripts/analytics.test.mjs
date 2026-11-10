@@ -236,3 +236,29 @@ test("share labels distinguish tiny nonzero populations from zero", () => {
   assert.equal(shareLabel(1, 3), "33.3%");
   assert.equal(shareLabel(0, 0), "0%");
 });
+
+const { treemapRects, cumulativeShares, weekdayCounts } = require(join(directory, "chart-math.js"));
+test("treemap conserves area and never overlaps or allocates area to zero groups", () => {
+  for (const counts of [[10, 5, 3, 0, 2], [999, 1], [0, 0], [1, 1, 1, 1, 1]]) {
+    const total = counts.reduce((sum, count) => sum + count, 0);
+    const rects = treemapRects(counts);
+    assert.equal(rects.length, counts.filter(Boolean).length);
+    for (const rect of rects) {
+      assert.ok(Math.abs(rect.width * rect.height / 6000 - counts[rect.index] / total) < 1e-10);
+      assert.ok(rect.x >= 0 && rect.y >= 0 && rect.x + rect.width <= 100.000001 && rect.y + rect.height <= 60.000001);
+      for (const other of rects.filter((item) => item.index !== rect.index)) {
+        const overlapX = Math.min(rect.x + rect.width, other.x + other.width) - Math.max(rect.x, other.x);
+        const overlapY = Math.min(rect.y + rect.height, other.y + other.height) - Math.max(rect.y, other.y);
+        assert.ok(overlapX <= 1e-8 || overlapY <= 1e-8);
+      }
+    }
+  }
+});
+test("Pareto cumulative percentages use the supplied recorded population", () => {
+  assert.deepEqual(cumulativeShares([6, 3, 1]), [60, 90, 100]);
+  assert.deepEqual(cumulativeShares([0, 0]), [0, 0]);
+  assert.deepEqual(cumulativeShares([]), []);
+});
+test("weekday rhythm respects calendar dates and rejects malformed inputs", () => {
+  assert.deepEqual(weekdayCounts(["2026-11-08", "2026-11-09", "2026-11-10", "2026-11-10", "2026-02-30", "", "bad"]), [1, 1, 2, 0, 0, 0, 0]);
+});

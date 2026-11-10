@@ -28,11 +28,13 @@ import {
   type StatusGroup,
   type VolumeMode,
 } from "@/lib/tickets/overview";
-import { AgeStrip, CauseChart, CHANNEL_COLORS, EmptyChart, FawryDonut, Panel, Sparkline, SplitBar, TopicList, VolumeChart, VolumePulse, type VolumeLine } from "./overview-charts";
+import { CHANNEL_COLORS, EmptyChart, FawryDonut, Panel, Sparkline, SplitBar, VolumeChart, VolumePulse, type VolumeLine } from "./overview-charts";
 
-import { RequestWaffle, SegmentMatrix, SourceRanking, StatusRing, TeamTiles } from "./insight-charts";
+import { RequestWaffle, SegmentMatrix, SourceRanking, StatusRing } from "./insight-charts";
 import { shareLabel } from "@/lib/tickets/chart-math";
 import "./intelligence.css";
+import { AgeColumns, CausePareto, OutcomeColumns, RequestMatrix, SourcePressure, StatusWheel, TopicTreemap, WeekdayRhythm } from "./analysis-charts";
+import "./analysis-charts.css";
 
 type Snapshot = { tickets: AnalyticsTicket[]; asOf: string };
 type Option = { id: string; name: string };
@@ -149,6 +151,9 @@ export function DashboardBoard({
   const teamFrame = useMemo(() => snapshot.tickets.filter((ticket) => matchesOverview(ticket, queryOf(causeTops, topicTops), ["team"], today)), [snapshot.tickets, queryOf, causeTops, topicTops, today]);
   const ageFrame = useMemo(() => snapshot.tickets.filter((ticket) => matchesOverview(ticket, queryOf(causeTops, topicTops), ["age"], today)), [snapshot.tickets, queryOf, causeTops, topicTops, today]);
   const segmentFrame = useMemo(() => snapshot.tickets.filter((ticket) => matchesOverview(ticket, queryOf(causeTops, topicTops), ["segment", "statusGroup"], today)), [snapshot.tickets, queryOf, causeTops, topicTops, today]);
+  const statusFrame = snapshot.tickets.filter((ticket) => matchesOverview(ticket, queryOf(causeTops, topicTops), ["status", "statusGroup"], today));
+  const matrixFrame = snapshot.tickets.filter((ticket) => matchesOverview(ticket, queryOf(causeTops, topicTops), ["source", "requestType"], today));
+  const outcomeRank = rankValues(rows, (ticket) => ticket.outcome, 5, "Other outcomes");
   const stats = headline(rows);
   const sources = useMemo(() => {
     const order = ["whatsapp", "call_center", "moderation", "marketing_team", "business_development", "june_schools", "google_play"];
@@ -346,7 +351,7 @@ export function DashboardBoard({
   ); }
 
   return (
-    <div className={`cs-board${refreshing ? " is-refreshing" : ""}`} aria-busy={refreshing} translate="no">
+    <div id="report-overview" className={`cs-board${refreshing ? " is-refreshing" : ""}`} aria-busy={refreshing} translate="no">
       <header className="cs-title">
         <div>
           <p className="cs-report-label">OPERATIONS / SUPPORT INTELLIGENCE</p>
@@ -386,6 +391,7 @@ export function DashboardBoard({
       {!valid && <p className="cs-alert" role="alert">Choose a reported-date range that starts on or before it ends.</p>}
       {error && <p className="cs-alert" role="alert">{error}</p>}
 
+      <nav className="an-section-nav no-print" aria-label="Report sections"><a href="#report-overview"><b>01</b> Overview</a><a href="#report-operations"><b>02</b> Operations</a><a href="#report-business"><b>03</b> Business drivers</a></nav>
       <section className="cs-kpis">
         <Kpi label="Total Cases" value={stats.total} detail="Reported in the selected period" selected={false} dim={Boolean(filters.status || filters.statusGroup)} spark={spark} onClick={() => pickGroup("")} />
         <Kpi label="Needs follow-up" value={stats.followup} total={stats.total} detail="Current status of selected arrivals" selected={filters.statusGroup === "followup"} dim={Boolean(filters.statusGroup) && filters.statusGroup !== "followup"} tone="followup" onClick={() => pickGroup("followup")} />
@@ -413,8 +419,17 @@ export function DashboardBoard({
           <FawryDonut slices={fawryRows} selectedId={filters.fawry ?? ""} onPick={(id) => toggle("fawry", id)} />
         </Panel>
       </div>
+      <div className="cs-section-heading an-section-title" id="report-operations"><span className="cs-report-label">02 / OPERATIONS & FOLLOW-UP</span><h2>Where support needs attention.</h2><p>Current workload, pressure points and reported-date patterns.</p></div>
+      <div className="cs-row cs-row-even">
+        <Panel title="Case status landscape" question="Current status of cases within the other filters. Select a status to inspect."><StatusWheel tickets={statusFrame} selected={filters.status} onPick={(status) => patch({ status: filters.status === status ? "" : status, statusGroup: "" })} /></Panel>
+        <Panel title="Source pressure map" question="Volume versus current follow-up share. Higher means more of that source still needs attention."><SourcePressure tickets={sourceFrame} names={sourceNames} selected={filters.source} onPick={(source) => toggle("source", source)} /></Panel>
+      </div>
+      <div className="cs-row cs-row-even">
+        <Panel title="Open cases by age" question="Calendar days since reported date. Counts, not an SLA target."><AgeColumns ages={ages} selected={filters.age ?? ""} onPick={(id) => patch({ age: filters.age === id ? "" : id, status: "", statusGroup: filters.age === id ? "" : "followup" })} /></Panel>
+        <Panel title="Reported weekday rhythm" question="Which reported weekdays account for the most arrivals in this selection?"><WeekdayRhythm tickets={rows} /></Panel>
+      </div>
       <FollowUp followups={followups} page={currentPage} pages={pages} today={today} openAll={openAll} preview={preview} returnTo={returnTo} listHref={listHref} onPage={setPage} onReset={reset} />
-      <div className="cs-section-heading"><span className="cs-report-label">02 / UNDERSTAND THE WORK</span><h2>Patterns behind the cases.</h2></div>
+      <div className="cs-section-heading an-section-title" id="report-business"><span className="cs-report-label">03 / BUSINESS DRIVERS</span><h2>Why people need support.</h2><p>Demand mix, recurring issues and recorded outcomes.</p></div>
       {insights.length > 0 && (
         <section className="cs-insights" aria-label="What this selection shows">
           {insights.map((item) => (
@@ -431,12 +446,13 @@ export function DashboardBoard({
           <RequestWaffle rows={requestRank} selectedId={filters.requestType ?? ""} onPick={(id) => toggle("requestType", id)} />
         </Panel>
       </div>
+      <Panel title="Source × request type" question="Identify the kind of demand each source brings. Select a cell to inspect that combination."><RequestMatrix tickets={matrixFrame} names={sourceNames} source={filters.source} request={filters.requestType ?? ""} onPick={(source, requestType) => { const same = filters.source === source && filters.requestType === requestType; patch({ source: same ? "" : source, requestType: same ? "" : requestType }); }} /></Panel>
       <div className="cs-row cs-row-even">
-        <Panel title="Root causes" question="Top recorded causes. Not recorded is a completeness check." action={<button type="button" className="cs-text" onClick={() => setAllCauses((open) => !open)}>{allCauses ? "Show top five" : "View all"}</button>}>
-          <CauseChart rows={causeRank} selectedId={filters.trackerCause ?? ""} onPick={(id) => toggle("trackerCause", id)} />
+        <Panel title="Root cause concentration" question="Bars show volume. The line shows cumulative share of recorded causes." action={<button type="button" className="cs-text" onClick={() => setAllCauses((open) => !open)}>{allCauses ? "Show top five" : "View all"}</button>}>
+          <CausePareto rows={causeRank} selected={filters.trackerCause ?? ""} onPick={(id) => toggle("trackerCause", id)} />
         </Panel>
-        <Panel title="Most common topics" question="Share of the cases in this chart." action={<button type="button" className="cs-text" onClick={() => setAllTopics((open) => !open)}>{allTopics ? "Show top topics" : "View all"}</button>}>
-          <TopicList rows={topicRank} selectedId={filters.topic ?? ""} onPick={(id) => toggle("topic", id)} />
+        <Panel title="Topic landscape" question="Area shows volume. Discover which topics take the largest share." action={<button type="button" className="cs-text" onClick={() => setAllTopics((open) => !open)}>{allTopics ? "Show top topics" : "View all"}</button>}>
+          <TopicTreemap rows={topicRank} selected={filters.topic ?? ""} onPick={(id) => toggle("topic", id)} />
         </Panel>
       </div>
       <div className="cs-row cs-row-even">
@@ -453,16 +469,14 @@ export function DashboardBoard({
             }}
           />
         </Panel>
-        <Panel title="Open cases by age" question="Calendar days since the reported date. This is case age, not an SLA.">
-          <AgeStrip ages={ages} selected={filters.age ?? ""} onPick={(id) => patch({ age: filters.age === id ? "" : id, status: "", statusGroup: filters.age === id ? "" : "followup" })} />
-        </Panel>
+        <Panel title="Recorded outcomes" question="What was recorded as the result of handling these cases?"><OutcomeColumns rows={outcomeRank} /></Panel>
       </div>
       <div className="cs-row cs-row-even">
         <Panel title="Contact channel" question="Channel inferred from the recorded source; not captured independently.">
           <SplitBar rows={channelRows} colors={CHANNEL_COLORS} selectedId={filters.channel ?? ""} onPick={(id) => toggle("channel", id)} />
         </Panel>
         <Panel title="Referring team" question="Only Moderation and Marketing cases have a referring team.">
-          <TeamTiles rows={teamRows} selectedId={filters.referringTeam ?? ""} onPick={(id) => toggle("referringTeam", id)} />
+          <SourceRanking label="REFERRING TEAM" rows={teamRows} selectedId={filters.referringTeam ?? ""} onPick={(id) => toggle("referringTeam", id)} />
         </Panel>
       </div>
     </div>

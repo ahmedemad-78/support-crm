@@ -15,18 +15,18 @@ function requestColor(id: string) {
   return requestPalette[hash % requestPalette.length];
 }
 
-export function SourceRanking({ rows, selectedId, onPick }: PickProps) {
+export function SourceRanking({ rows, selectedId, onPick, label = "SOURCE" }: PickProps & { label?: string }) {
   const total = rows.reduce((sum, row) => sum + row.count, 0);
   const max = Math.max(1, ...rows.map((row) => row.count));
   if (!total) return <EmptyChart text="No cases match the current filters." />;
   return <div className="bi-source-ranking">
-    <div className="bi-ranking-head"><span>SOURCE</span><span>CASES / SHARE</span></div>
+    <div className="bi-ranking-head"><span>{label}</span><span>CASES / SHARE</span></div>
     {rows.map((row, index) => <button key={row.id} type="button" className={`bi-source-row ${state(selectedId, row.id)}`} aria-pressed={selectedId === row.id} aria-label={`${row.name}: ${row.count} cases, ${shareLabel(row.count, total)}`} onClick={() => onPick(row.id)}>
       <span className="bi-source-label"><small>{String(index + 1).padStart(2, "0")}</small>{row.name}</span>
       <span className="bi-lollipop" aria-hidden="true"><i style={{ width: `${row.count / max * 100}%` }}><b /></i></span>
       <span className="bi-source-value"><strong>{row.count}</strong><small>{shareLabel(row.count, total)}</small></span>
     </button>)}
-    <p className="bi-chart-note">One shared scale · select a source to filter.</p>
+    <p className="bi-chart-note">One shared scale · select a category to filter.</p>
   </div>;
 }
 
