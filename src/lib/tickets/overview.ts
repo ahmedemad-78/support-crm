@@ -29,16 +29,20 @@ export function customerSegment(source: string) {
   return "Not specified";
 }
 
-export function contactChannel(source: string) {
+export function contactChannel(source: string, recorded?: string) {
+  if (recorded) return ({whatsapp:"WhatsApp",phone:"Phone",email:"Email",form:"Support Form",google_play:"Google Play"} as Record<string,string>)[recorded] || "Not specified";
   if (source === "whatsapp") return "WhatsApp";
   if (source === "call_center") return "Phone";
-  if (source === "moderation" || source === "june_schools" || source === "business_development") return "Support Form";
+  if (source === "google_play") return "Google Play";
   return "Not specified";
 }
 
 export function referringTeam(source: string) {
   if (source === "moderation") return "Moderation";
   if (source === "marketing_team") return "Marketing";
+  if (source === "call_center") return "Call Center";
+  if (source === "business_development") return "B2B";
+  if (source === "june_schools") return "30 June Schools";
   return "Not specified";
 }
 
@@ -104,7 +108,7 @@ export function matchesOverview(
   if (!skip.has("bucket") && filters.bucketFrom && filters.bucketTo && !inPeriod(day, filters.bucketFrom, filters.bucketTo)) return false;
   if (!skip.has("source") && filters.source && ticket.source !== filters.source) return false;
   if (!skip.has("segment") && filters.segment && customerSegment(ticket.source) !== filters.segment) return false;
-  if (!skip.has("channel") && filters.channel && contactChannel(ticket.source) !== filters.channel) return false;
+  if (!skip.has("channel") && filters.channel && contactChannel(ticket.source, ticket.contactChannel) !== filters.channel) return false;
   if (!skip.has("team") && filters.referringTeam && referringTeam(ticket.source) !== filters.referringTeam) return false;
   if (!skip.has("status") && filters.status && ticket.status !== filters.status) return false;
   if (!skip.has("statusGroup") && filters.statusGroup && statusGroup(ticket.status) !== filters.statusGroup) return false;
@@ -346,7 +350,7 @@ export function casesCsv(tickets: AnalyticsTicket[]) {
       reportedDay(ticket),
       ticket.sourceName || sourceLabel(ticket.source),
       customerSegment(ticket.source),
-      contactChannel(ticket.source),
+      contactChannel(ticket.source, ticket.contactChannel),
       referringTeam(ticket.source),
       STATUS_LABELS[ticket.status],
       ticket.requestType,

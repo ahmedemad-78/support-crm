@@ -6,6 +6,10 @@ export type AnalyticsTicket = DashboardTicket & {
   number: string;
   subject: string;
   sourceName?: string;
+  contactChannel?: string;
+  reopenCount?: number;
+  workflowEvents?: {kind:string;created_at:string}[];
+  isHistorical?: boolean;
   platform?: string;
   assigneeId?: string;
   assignee?: string;

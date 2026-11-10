@@ -1,3 +1,4 @@
+import { z } from "zod";
 import { PageHeader } from "@/components/app-shell/page-header";
 import { requireUser } from "@/lib/auth/session";
 import { PORTAL_ROLES, ROLE_LABELS } from "@/lib/auth/roles";
@@ -5,8 +6,10 @@ import { createClient } from "@/lib/supabase/server";
 import { NewTicketForm } from "./new-ticket-form";
 import { cairoDate } from "@/lib/tickets/dashboard-model";
 
-export default async function NewTicketPage() {
+export default async function NewTicketPage({ searchParams }: PageProps<"/portal/new-ticket">) {
   const user = await requireUser([...PORTAL_ROLES]);
+  const params = await searchParams;
+  const linked = typeof params.linked === "string" && z.uuid().safeParse(params.linked).success ? params.linked : "";
   const supabase = await createClient();
   const { data: cities, error } = await supabase
     .from("cities")
@@ -29,7 +32,7 @@ export default async function NewTicketPage() {
           </div>
         }
       />
-      <NewTicketForm cities={cities ?? []} today={cairoDate(new Date().toISOString())} />
+      <NewTicketForm linkedTicketId={linked} cities={cities ?? []} today={cairoDate(new Date().toISOString())} />
     </>
   );
 }

@@ -5,7 +5,7 @@ export const STATUS_LABELS: Record<TicketStatus, string> = {
   new: "New",
   in_progress: "In Progress",
   awaiting_customer: "Awaiting Customer Reply",
-  resolved: "Resolved",
+  resolved: "Resolved & closed",
   closed: "Closed - No Response",
 };
 

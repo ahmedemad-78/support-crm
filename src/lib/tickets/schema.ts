@@ -15,6 +15,8 @@ function todayInCairo() {
 
 /** The Moderation / Call Center form (FRD §5). Same schema runs in the browser and in the server action. */
 export const portalTicketSchema = z.object({
+  contact_channel: z.enum(["unspecified", "whatsapp", "phone", "email", "form", "google_play"]).optional().default("unspecified"),
+  linked_ticket_id: z.string().trim().optional().transform(value => value || null).pipe(z.uuid().nullable()),
   customer_name: z.string().trim().min(2, "Name needs at least 2 characters"),
   customer_email: z.string().trim().pipe(z.email("Email needs a domain — try name@example.com")),
   customer_phone: z

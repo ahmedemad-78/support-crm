@@ -9,6 +9,8 @@ import {
 } from "@/lib/tickets/constants";
 import { safeAppReturn } from "@/lib/tickets/filters";
 import { CaseWorkspace } from "@/components/tickets/case-workspace";
+import { CaseFollowup } from "@/components/tickets/case-followup";
+import { loadCaseWorkflow } from "@/lib/tickets/workflow";
 import { z } from "zod";
 
 export default async function AgentTicketPage({
@@ -70,6 +72,7 @@ export default async function AgentTicketPage({
     : { data: [] };
   const urlByPath = new Map(signed.data?.map((file) => [file.path, file.signedUrl]));
 
+  const workflow = await loadCaseWorkflow(ticket.id);
   const status = ticket.status as TicketStatus;
   const { data: ticketSource } = await supabase.from("ticket_sources").select("name").eq("code", ticket.source).maybeSingle();
   const canEdit = user.role === "support_agent";
@@ -77,7 +80,7 @@ export default async function AgentTicketPage({
   const creator = nameOf(ticket.creator);
   const idValue = (value: number | null) => value == null ? "" : String(value);
   return <AgentFrame title="Case file"><CaseWorkspace
-    ticket={{ ...ticket, status }} sourceName={ticketSource?.name || sourceLabel(ticket.source)} city={city} creator={creator} backHref={backHref}
+    ticket={{ ...ticket, status }} sourceName={ticketSource?.name || sourceLabel(ticket.source)} city={city} creator={`${creator} · Reporting owner: ${workflow.reporterName} · Reopened ${workflow.reopen_count} times`} backHref={backHref}
     saved={saved === "1"} error={typeof errorMessage === "string" ? errorMessage : undefined}
     attachments={(attachments.data ?? []).map((file) => ({ ...file, url: urlByPath.get(file.storage_path) }))}
     notes={(notes.data ?? []).map((note) => ({ ...note, author: nameOf(note.author) }))}
@@ -86,7 +89,7 @@ export default async function AgentTicketPage({
       initial: { status, assigneeId: ticket.assignee_id || "", requestTypeId: idValue(ticket.request_type_id), topicId: idValue(ticket.topic_id), trackerCauseId: idValue(ticket.tracker_cause_id), trackerActionId: idValue(ticket.tracker_action_id), outcomeId: idValue(ticket.outcome_id), issueCategoryId: idValue(ticket.issue_category_id), rootCauseId: idValue(ticket.root_cause_id), resolutionNotes: ticket.resolution_notes || "", followUpNotes: ticket.follow_up_notes || "", trackerNotes: ticket.tracker_notes || "", actionTaken: ticket.action_taken || "" },
       options: { requestTypes: requestTypes.data ?? [], topics: topics.data ?? [], causes: trackerCauses.data ?? [], actions: trackerActions.data ?? [], outcomes: outcomes.data ?? [], categories: categories.data ?? [], rootCauses: causes.data ?? [] }
     }}
-  /></AgentFrame>;
+  /><div className="case-file desk-case"><CaseFollowup ticketId={ticket.id} version={ticket.updated_at} status={status} count={workflow.reopen_count} events={workflow.events} canReply={canEdit} relatedHref={`/tickets/new?linked=${ticket.id}`} />{workflow.linked_ticket_id && <p>Related case: <a href={`/tickets/${workflow.linked_ticket_id}`}>Open related case ↗</a></p>}</div></AgentFrame>;
 }
 
 function nameOf(value: unknown): string {

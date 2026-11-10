@@ -7,7 +7,7 @@ export async function loadAnalytics() {
   const supabase = await createClient();
   const asOf = new Date().toISOString();
   const tickets: AnalyticsTicket[] = [];
-  const { data: sources, error: sourceError } = await supabase.from("ticket_sources").select("code, name");
+  const { data: sources, error: sourceError } = await supabase.from("ticket_sources").select("code, name, is_active");
   if (sourceError) throw sourceError;
   const sourceNames = new Map((sources ?? []).map((source) => [source.code, source.name]));
   // Deterministic cursor pagination, no silent 10k/5k cut-off or offset drift.
@@ -16,7 +16,7 @@ export async function loadAnalytics() {
     let query = supabase
       .from("tickets")
       .select(
-        "id, ticket_number, issue_description, status, source, created_at, updated_at, resolved_at, issue_date, customer_name, customer_email, customer_phone, school_name, end_user_type, city_id, issue_category_id, platform, assignee_id, fawry_payment, assignee:profiles!tickets_assignee_id_fkey(full_name), issue_categories(name), root_causes(name), request_types(name), topics(name), tracker_causes(name), tracker_actions(name), outcomes(name)",
+        "reopen_count, contact_channel, is_historical, workflow_events:ticket_workflow_events(kind,created_at), id, ticket_number, issue_description, status, source, created_at, updated_at, resolved_at, issue_date, customer_name, customer_email, customer_phone, school_name, end_user_type, city_id, issue_category_id, platform, assignee_id, fawry_payment, assignee:profiles!tickets_assignee_id_fkey(full_name), issue_categories(name), root_causes(name), request_types(name), topics(name), tracker_causes(name), tracker_actions(name), outcomes(name)",
       )
       .lte("created_at", asOf)
       .order("id")
@@ -38,6 +38,10 @@ export async function loadAnalytics() {
         subject: row.issue_description,
         status: row.status,
         source: row.source,
+        contactChannel: row.contact_channel,
+        reopenCount: row.reopen_count,
+        workflowEvents: row.workflow_events ?? [],
+        isHistorical: row.is_historical,
         sourceName: sourceNames.get(row.source),
         createdOn: cairoDate(row.created_at),
         createdAt: row.created_at,
@@ -68,5 +72,5 @@ export async function loadAnalytics() {
     }
     cursor = data[data.length - 1].id;
   }
-  return { tickets, asOf };
+  return { tickets, asOf, sources: sources ?? [] };
 }

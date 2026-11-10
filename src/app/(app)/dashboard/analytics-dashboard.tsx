@@ -36,7 +36,7 @@ import "./intelligence.css";
 import { AgeColumns, CausePareto, OutcomeColumns, RequestMatrix, SourcePressure, StatusWheel, TopicTreemap, WeekdayRhythm } from "./analysis-charts";
 import "./analysis-charts.css";
 
-type Snapshot = { tickets: AnalyticsTicket[]; asOf: string };
+type Snapshot = { tickets: AnalyticsTicket[]; asOf: string; sources?: {code:string;name:string;is_active:boolean}[] };
 type Option = { id: string; name: string };
 
 function leadingValue(tickets: AnalyticsTicket[], pick: (ticket: AnalyticsTicket) => string) {
@@ -81,7 +81,7 @@ export function DashboardBoard({
   preview?: boolean;
 }) {
   const [snapshot, setSnapshot] = useState(initialSnapshot);
-  const sourceNames = useMemo(() => new Map<string, string>(snapshot.tickets.map((ticket) => [ticket.source, ticket.sourceName || sourceLabel(ticket.source)])), [snapshot.tickets]);
+  const sourceNames = useMemo(() => new Map<string, string>([...(snapshot.sources ?? []).map(source => [source.code,source.name] as [string,string]),...snapshot.tickets.map((ticket) => [ticket.source, ticket.sourceName || sourceLabel(ticket.source)] as [string,string])]), [snapshot.tickets, snapshot.sources]);
   const today = cairoDate(snapshot.asOf);
   const earliest = snapshot.tickets.reduce((day, ticket) => {
     const reported = reportedDay(ticket);
@@ -164,12 +164,12 @@ export function DashboardBoard({
   const buckets = useMemo(() => valid ? volumeBuckets(volumeFrame, filters.from, filters.to, volumeMode, sources) : [], [volumeFrame, filters.from, filters.to, volumeMode, sources, valid]);
   const volumeLines = useMemo<VolumeLine[]>(() => {
     if (!breakdown) return [{ id: "total", label: "All cases", color: "#159d49", values: buckets.map((bucket) => bucket.total) }];
-    const names = ["WhatsApp", "Phone", "Support Form", "Email", "Not specified"];
+    const names = ["WhatsApp", "Phone", "Support Form", "Email", "Google Play", "Not specified"];
     return names.map((name) => ({
       id: name,
       label: name,
       color: CHANNEL_COLORS[name] ?? "#6f8f7a",
-      values: buckets.map((bucket) => volumeFrame.filter((ticket) => inPeriod(reportedDay(ticket), bucket.from, bucket.to) && contactChannel(ticket.source) === name).length),
+      values: buckets.map((bucket) => volumeFrame.filter((ticket) => inPeriod(reportedDay(ticket), bucket.from, bucket.to) && contactChannel(ticket.source,ticket.contactChannel) === name).length),
     })).filter((line) => line.values.some((value) => value > 0) || filters.channel === line.id);
   }, [breakdown, buckets, volumeFrame, filters.channel]);
   const spark = useMemo(() => valid ? volumeBuckets(rows, filters.from, filters.to, volumeMode, []).map((bucket) => bucket.total) : [], [rows, filters.from, filters.to, volumeMode, valid]);
@@ -190,16 +190,16 @@ export function DashboardBoard({
     { id: "__missing__", name: "Not recorded", count: fawryFrame.filter((ticket) => !ticket.fawry).length },
   ];
   const sourceRows = useMemo(() => {
-    const counts = new Map<string, number>();
+    const counts = new Map<string, number>((snapshot.sources ?? []).filter(source => source.is_active).map(source => [source.code,0]));
     for (const ticket of sourceFrame) counts.set(ticket.source, (counts.get(ticket.source) ?? 0) + 1);
     if (filters.source) counts.set(filters.source, counts.get(filters.source) ?? 0);
     return [...counts.entries()]
-      .filter(([id, count]) => count > 0 || id === filters.source)
       .map(([id, count]) => ({ id, name: sourceNames.get(id) || sourceLabel(id), count }))
       .sort((a, b) => b.count - a.count || a.name.localeCompare(b.name));
-  }, [sourceFrame, filters.source, sourceNames]);
+  }, [sourceFrame, filters.source, sourceNames, snapshot.sources]);
   const requestRank = useMemo(() => rankValues(requestFrame, (ticket) => ticket.requestType, 8, "Other request types"), [requestFrame]);
   const openAll = snapshot.tickets.filter(isOpen);
+  const eventFrame = snapshot.tickets.filter(ticket => matchesOverview(ticket, queryOf(causeTops, topicTops), ["dates", "bucket", "status", "statusGroup"], today));
   const followups = rows
     .filter((ticket) => statusGroup(ticket.status) === "followup")
     .sort((a, b) => reportedDay(a).localeCompare(reportedDay(b)) || a.number.localeCompare(b.number));
@@ -267,7 +267,7 @@ export function DashboardBoard({
       "Status", "Request type", "Topic", "Root cause", "Action", "Outcome", "Fawry", "Assignee", "Description",
     ], ...rows.map((ticket) => [
       ticket.number, ticket.customerName ?? "", ticket.schoolName ?? "", ticket.customerPhone ?? "", ticket.customerEmail ?? "",
-      reportedDay(ticket), ticket.sourceName || sourceLabel(ticket.source), customerSegment(ticket.source), contactChannel(ticket.source), referringTeam(ticket.source),
+      reportedDay(ticket), ticket.sourceName || sourceLabel(ticket.source), customerSegment(ticket.source), contactChannel(ticket.source,ticket.contactChannel), referringTeam(ticket.source),
       STATUS_LABELS[ticket.status], ticket.requestType, ticket.topic, ticket.trackerCause, ticket.trackerAction, ticket.outcome,
       ticket.fawry === "yes" ? "Yes" : ticket.fawry === "no" ? "No" : "", ticket.assignee ?? "", ticket.subject,
     ])];
@@ -295,7 +295,7 @@ export function DashboardBoard({
     filters.q ? { key: "q", label: `Dashboard filter: ${filters.q}` } : null,
   ].filter((chip): chip is { key: keyof DashboardFilters; label: string } => Boolean(chip));
 
-  const channelRows = rankValues(channelFrame, (ticket) => contactChannel(ticket.source), 8, "Other channels");
+  const channelRows = rankValues(channelFrame, (ticket) => contactChannel(ticket.source,ticket.contactChannel), 8, "Other channels");
   const teamRows = rankValues(teamFrame, (ticket) => referringTeam(ticket.source), 8, "Other teams");
   const ages = AGE_BUCKETS.map((bucket) => ({
     ...bucket,
@@ -345,7 +345,7 @@ export function DashboardBoard({
       <Select label="Status" value={filters.status} options={TICKET_STATUSES.map((status) => ({ id: status, name: STATUS_LABELS[status] }))} onChange={(status) => patch({ status: status as TicketStatus | "", statusGroup: "" })} />
       <Select label="Topic" value={filters.topic ?? ""} options={topicRank.map((row) => ({ id: row.id, name: row.name }))} onChange={(topic) => patch({ topic })} />
       <Select label="Root cause" value={filters.trackerCause ?? ""} options={causeRank.map((row) => ({ id: row.id, name: row.name }))} onChange={(trackerCause) => patch({ trackerCause })} />
-      <Select label="Referring team" value={filters.referringTeam ?? ""} options={["Moderation", "Marketing", "Not specified"].map((name) => ({ id: name, name }))} onChange={(referringTeam) => patch({ referringTeam })} />
+      <Select label="Referring team" value={filters.referringTeam ?? ""} options={["Moderation", "Marketing", "Call Center", "B2B", "30 June Schools", "Not specified"].map((name) => ({ id: name, name }))} onChange={(referringTeam) => patch({ referringTeam })} />
       <Select label="Request type" value={filters.requestType ?? ""} options={[...new Set(snapshot.tickets.map((ticket) => ticket.requestType).filter(Boolean)), "__missing__"].map((name) => ({ id: name, name: name === "__missing__" ? "Not recorded" : name }))} onChange={(requestType) => patch({ requestType })} />
     </>
   ); }
@@ -398,6 +398,7 @@ export function DashboardBoard({
         <Kpi label="Resolved" value={stats.resolved} total={stats.total} detail="Current status of selected arrivals" selected={filters.statusGroup === "resolved"} dim={Boolean(filters.statusGroup) && filters.statusGroup !== "resolved"} tone="resolved" onClick={() => pickGroup("resolved")} />
         <Kpi label="Closed without response" value={stats.closed} total={stats.total} detail="Current status of selected arrivals" selected={filters.statusGroup === "closed"} dim={Boolean(filters.statusGroup) && filters.statusGroup !== "closed"} tone="closed" onClick={() => pickGroup("closed")} />
       </section>
+      <section className="cs-kpis" aria-label="Lifecycle measurement"><div className="cs-backlog"><div><p>{rows.filter(t => (t.reopenCount ?? 0)>0).length} unique cases reopened</p><span>{rows.reduce((sum,t)=>sum+(t.reopenCount ?? 0),0)} reopen events over the lifetime of these cases. Each case remains counted once.</span></div></div><div className="cs-backlog"><div><p>{eventFrame.flatMap(t => t.workflowEvents ?? []).filter(e=>e.kind === "resolved" && inPeriod(cairoDate(e.created_at),filters.from,filters.to)).length} recorded resolution events in period</p><span>By solution date, independent of arrival date and current status. Events recorded since rollout.</span></div></div><div className="cs-backlog"><div><p>{rows.filter(t=>!t.requestType || !t.topic || !t.trackerCause || !t.trackerAction || !t.outcome).length} cases need tracker data</p><span>Missing values remain explicit. Historical data has not been backfilled.</span></div></div></section>
       <aside className="cs-backlog" aria-label="Current open workload">
         <div><p>{openAll.length} open {openAll.length === 1 ? "case" : "cases"} across the workspace</p><span>Current backlog across all reported dates, independent of the report filters.</span></div>
         {!preview && <Link href="/tickets?scope=followup">Review open work <ArrowUpRight size={14} /></Link>}
@@ -472,7 +473,7 @@ export function DashboardBoard({
         <Panel title="Recorded outcomes" question="What was recorded as the result of handling these cases?"><OutcomeColumns rows={outcomeRank} /></Panel>
       </div>
       <div className="cs-row cs-row-even">
-        <Panel title="Contact channel" question="Channel inferred from the recorded source; not captured independently.">
+        <Panel title="Contact channel" question="Recorded contact channel. Unspecified stays separate from the source team.">
           <SplitBar rows={channelRows} colors={CHANNEL_COLORS} selectedId={filters.channel ?? ""} onPick={(id) => toggle("channel", id)} />
         </Panel>
         <Panel title="Referring team" question="Only Moderation and Marketing cases have a referring team.">

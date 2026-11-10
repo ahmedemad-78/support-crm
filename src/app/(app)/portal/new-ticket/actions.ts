@@ -1,5 +1,6 @@
 "use server";
 
+import { deliverPendingEmails } from "@/lib/email/deliver";
 import { z } from "zod";
 import { revalidatePath } from "next/cache";
 import { isPortalRole } from "@/lib/auth/roles";
@@ -40,6 +41,7 @@ export async function createPortalTicket(input: PortalTicketInput, requestId?: s
   if (error?.code === "23505" && requestId) { const existing = await findRequest(supabase, requestId, user.id); return existing || { ok: false, error: "This request could not be confirmed. Check the case queue before trying a new form." }; }
   if (error) return { ok: false, error: `The ticket wasn't saved: ${error.message}` };
 
+  try { await deliverPendingEmails(); } catch { /* Notification remains in the outbox. */ }
   revalidatePath("/portal/my-tickets");
   return { ok: true, ticketId: data.id, ticketNumber: data.ticket_number };
 }
@@ -74,6 +76,7 @@ export async function createSupportTicket(input: SupportTicketInput, requestId?:
   if (error?.code === "23505" && requestId) { const existing = await findRequest(supabase, requestId, user.id); return existing || { ok: false, error: "This request could not be confirmed. Check the case queue before trying a new form." }; }
   if (error) return { ok: false, error: `The ticket wasn't saved: ${error.message}` };
 
+  try { await deliverPendingEmails(); } catch { /* Notification remains in the outbox. */ }
   revalidatePath("/tickets");
   revalidatePath("/inbox");
   revalidatePath("/dashboard");

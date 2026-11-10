@@ -191,7 +191,7 @@ function intakeHarness({ role = "support_agent", activeSource = true } = {}) {
       },
     }; return query;
   } };
-  const load = loadWith({ "next/cache": { revalidatePath() {} }, "@/lib/auth/session": { getCurrentUser: async () => role ? { id: agentId, role } : null }, "@/lib/supabase/server": { createClient: async () => client } });
+  const load = loadWith({ "@/lib/email/deliver": { deliverPendingEmails: async () => {} }, "next/cache": { revalidatePath() {} }, "@/lib/auth/session": { getCurrentUser: async () => role ? { id: agentId, role } : null }, "@/lib/supabase/server": { createClient: async () => client } });
   return { actions: load("src/app/(app)/portal/new-ticket/actions.ts"), records, writes: () => writes };
 }
 test("creation retries reuse the original case and trim pasted email", async () => {
@@ -216,4 +216,35 @@ test("portal creation retains its role source and the same request on retry", as
 test("a creation request never returns another user's existing case", async () => {
   const h = intakeHarness(); h.records.set(caseId, { id: caseId, created_by: "someone-else", ticket_number: "PRIVATE" });
   const result = await h.actions.createSupportTicket(intakeInput, caseId); assert.equal(result.ok, false); assert.equal(JSON.stringify(result).includes("PRIVATE"), false); assert.equal(h.writes(), 0);
+});
+
+test("follow-up actions validate role and input before calling a constrained RPC", async () => {
+  for (const role of [null,"manager","support_agent","call_center"]) {
+    const calls=[];
+    const load=loadWith({"next/cache":{revalidatePath(){}},"@/lib/auth/session":{getCurrentUser:async()=>role?{id:agentId,role}:null},"@/lib/supabase/server":{createClient:async()=>({rpc:async(name,args)=>{calls.push({name,args});return {error:null};}})},"@/lib/email/deliver":{deliverPendingEmails:async()=>{}}});
+    const action=load("src/app/(app)/tickets/lifecycle-actions.ts").submitCaseFollowup;
+    const data=form({mode:"reopen",body:"The subscription still does not appear.",requestId:caseId,version:initialVersion});
+    const result=await action({error:"",success:""},data);
+    if(role===null||role==="manager"){assert.ok(result.error);assert.equal(calls.length,0);}else{assert.equal(result.error,"");assert.equal(calls[0].name,"reopen_case");assert.equal(calls[0].args.case_id,caseId);assert.equal(calls[0].args.expected_version,initialVersion);}
+    data.set("body","x");const invalid=await action({error:"",success:""},data);assert.ok(invalid.error);
+  }
+});
+
+test("central email delivery excludes all legacy jobs and other recipients", async () => {
+  const central="ahmed.emad@selaheltelmeez.com",sent=[];
+  const rows=[
+    {id:"legacy-other",event_id:null,to_address:"other@example.com"},
+    {id:"legacy-central",event_id:null,to_address:central},
+    {id:"new-other",event_id:"event-2",to_address:"other@example.com"},
+    {id:"new-central",event_id:"event-3",to_address:central},
+  ].map(row=>({...row,status:"pending",subject:"TKT-FIXTURE · Resolved & closed",body_text:"Cause: Sync delay. Action: Resync. Outcome: Fixed.",ticket_path:"/tickets/fixture",attempts:0,last_error:null,created_at:"2026-11-10T12:00:00Z",next_attempt_at:"2026-01-01T00:00:00Z"}));
+  const admin={from(table){const predicates=[];let patch;const q={select(){return q;},eq(key,value){predicates.push(row=>row[key]===value);return q;},not(key,op,value){assert.equal(op,"is");assert.equal(value,null);predicates.push(row=>row[key]!=null);return q;},lte(key,value){predicates.push(row=>row[key]<=value);return q;},order(){return q;},limit(){return q;},update(value){patch=value;return q;},in(key,values){predicates.push(row=>values.includes(row[key]));return q;},async single(){assert.equal(table,"app_settings");return {data:{value:{mode:"central_only",email:central}},error:null};},then(resolve){const matching=rows.filter(row=>predicates.every(p=>p(row)));if(patch)for(const row of matching)Object.assign(row,patch);return Promise.resolve({data:matching,error:null}).then(resolve);}};return q;}};
+  const load=loadWith({"server-only":{},"@/lib/supabase/admin":{createAdminClient:()=>admin},"@/lib/email/send":{smtpConfigured:()=>true,sendOutbound:async message=>sent.push(message),MailNotConfiguredError:class extends Error{},publicMailError:()=>"failed",outboxFailurePatch:()=>({})}});
+  const result=await load("src/lib/email/deliver.ts").deliverPendingEmails();
+  assert.equal(result.sent,1);assert.equal(sent.length,1);assert.equal(sent[0].to,central);assert.match(sent[0].text,/Cause: Sync delay/);assert.match(sent[0].subject,/Resolved & closed/);
+  assert.equal(rows[0].status,"pending");assert.equal(rows[1].status,"pending");assert.equal(rows[2].status,"pending");assert.equal(rows[3].status,"sent");
+});
+
+test("resolution requires a meaningful Support response before a database write",async()=>{
+  const h=caseHarness();const result=await h.actions.saveCaseWorkspace({error:""},fullCaseForm({status:"resolved",resolutionNotes:"  "}));assert.match(result.error,/clear Support response/);assert.equal(h.writes(),0);
 });

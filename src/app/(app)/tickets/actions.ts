@@ -182,6 +182,7 @@ export async function saveCaseWorkspace(_previous: { error: string }, formData: 
   const idKeys = [...trackerKeys, "issueCategoryId", "rootCauseId"];
   if (idKeys.some((key) => !numericId(formData.get(key)))) return { error: "Choose valid tracker and classification values." };
   if (status === "resolved" && trackerKeys.some((key) => !formData.get(key))) return { error: "Complete request type, topic, cause, action and outcome before marking this case Resolved." };
+  if (status === "resolved" && String(formData.get("resolutionNotes") ?? "").trim().length < 5) return { error: "Write a clear Support response before resolving and closing." };
   const assignee = String(formData.get("assigneeId") ?? "");
   if (assignee && !z.uuid().safeParse(assignee).success) return { error: "Choose a valid Support assignee." };
   let failure: string | undefined;

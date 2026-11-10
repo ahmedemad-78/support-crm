@@ -25,24 +25,29 @@ function escapeHtml(value: string) {
 }
 
 function messageHtml(row: OutboxJob) {
-  const status = row.subject.replace(/^.* is now /, "");
+  const status = row.subject;
   const summary = escapeHtml(row.body_text).replaceAll("\n", "<br />");
   const link = `${appOrigin()}${row.ticket_path}`;
-  return `<p>Ticket status is now <strong>${escapeHtml(status)}</strong>.</p><p><strong>Problem</strong><br />${summary}</p><p><a href="${link}">Open the ticket</a></p>`;
+  return `<p>Case update: <strong>${escapeHtml(status)}</strong>.</p><p><strong>Case details</strong><br />${summary}</p><p><a href="${link}">Open the ticket</a></p>`;
 }
 
 function messageText(row: OutboxJob) {
-  const status = row.subject.replace(/^.* is now /, "");
-  return `Ticket status is now ${status}.\n\nProblem\n${row.body_text}\n\nOpen the ticket: ${appOrigin()}${row.ticket_path}`;
+  const status = row.subject;
+  return `Case update: ${status}.\n\nCase details\n${row.body_text}\n\nOpen the ticket: ${appOrigin()}${row.ticket_path}`;
 }
 
 export async function deliverPendingEmails() {
   const admin = createAdminClient();
+  const { data: setting, error: policyError } = await admin.from("app_settings").select("value").eq("key", "workflow_notifications").single();
+  if(policyError || setting?.value?.mode !== "central_only") throw new Error("Central notification routing is unavailable");
+  const centralEmail = String(setting.value.email);
   const now = new Date();
   const { data, error } = await admin
     .from("email_outbox")
     .select("id, to_address, subject, body_text, ticket_path, attempts, last_error, created_at")
     .eq("status", "pending")
+    .not("event_id", "is", null)
+    .eq("to_address", centralEmail)
     .lte("next_attempt_at", now.toISOString())
     .order("created_at", { ascending: true })
     .limit(100);
@@ -66,7 +71,7 @@ export async function deliverPendingEmails() {
     },
     send: async (row) => {
       await sendOutbound({
-        to: row.to_address,
+        to: centralEmail,
         subject: row.subject,
         html: messageHtml(row),
         text: messageText(row),

@@ -18,7 +18,7 @@ export default async function MyTicketsPage({ searchParams }: PageProps<"/portal
   const { data: tickets, error } = await supabase
     .from("tickets")
     .select("id, ticket_number, issue_description, customer_name, status, created_at")
-    .eq("created_by", user.id)
+    .or(`reporter_id.eq.${user.id},and(reporter_id.is.null,created_by.eq.${user.id})`)
     .order("created_at", { ascending: false })
     .limit(200);
   if (error) throw error;
