@@ -11,7 +11,7 @@ export function LoginArtwork() {
   function move(event: PointerEvent<HTMLDivElement>) {
     if (event.pointerType !== "mouse" || window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
     const bounds = event.currentTarget.getBoundingClientRect();
-    point.current = { x: (0.5 - (event.clientY - bounds.top) / bounds.height) * 4, y: ((event.clientX - bounds.left) / bounds.width - 0.5) * 4 };
+    point.current = { x: (0.5 - (event.clientY - bounds.top) / bounds.height) * 5, y: ((event.clientX - bounds.left) / bounds.width - 0.5) * 7 };
     if (frame.current !== null) return;
     frame.current = requestAnimationFrame(() => {
       art.current?.style.setProperty("--book-x", point.current.x + "deg");
@@ -27,57 +27,36 @@ export function LoginArtwork() {
   }
   return <div className="auth-artwork" aria-hidden="true" onPointerMove={move} onPointerLeave={reset}>
     <div className="auth-book" ref={art}>
-      <svg viewBox="0 0 1000 640" fill="none" focusable="false">
+      <svg viewBox="0 0 600 360" fill="none" focusable="false">
         <defs>
-          <linearGradient id="folio-cover" x1="125" y1="190" x2="815" y2="535" gradientUnits="userSpaceOnUse"><stop stopColor="#365D43" /><stop offset=".5" stopColor="#1D4432" /><stop offset="1" stopColor="#4E7451" /></linearGradient>
-          <linearGradient id="folio-left" x1="125" y1="300" x2="490" y2="300" gradientUnits="userSpaceOnUse"><stop stopColor="#E9E5CC" /><stop offset=".25" stopColor="#F5F0DB" /><stop offset=".85" stopColor="#F1EBD5" /><stop offset="1" stopColor="#ABB69A" /></linearGradient>
-          <linearGradient id="folio-right" x1="490" y1="300" x2="865" y2="300" gradientUnits="userSpaceOnUse"><stop stopColor="#A9B599" /><stop offset=".09" stopColor="#E5E4CA" /><stop offset=".3" stopColor="#FAF4DF" /><stop offset="1" stopColor="#EEE8CF" /></linearGradient>
-          <linearGradient id="folio-edge" x1="490" y1="466" x2="490" y2="520" gradientUnits="userSpaceOnUse"><stop stopColor="#E0DFC5" /><stop offset="1" stopColor="#9AAE8A" /></linearGradient>
-          <linearGradient id="folio-leaf" x1="490" y1="315" x2="865" y2="290" gradientUnits="userSpaceOnUse"><stop stopColor="#A8B89C" /><stop offset=".16" stopColor="#E9E7D0" /><stop offset=".6" stopColor="#FFF8E4" /><stop offset="1" stopColor="#D9DEC0" /></linearGradient>
-          <radialGradient id="folio-shadow"><stop stopColor="#051B12" stopOpacity=".8" /><stop offset="1" stopColor="#051B12" stopOpacity="0" /></radialGradient>
-          <radialGradient id="folio-glow"><stop stopColor="#B6CD90" stopOpacity=".13" /><stop offset="1" stopColor="#B6CD90" stopOpacity="0" /></radialGradient>
-          <clipPath id="folio-paper-clip"><path d="M128 169C253 130 368 163 490 222C620 161 736 129 865 169V455C736 416 621 447 490 507C366 448 252 416 128 455V169Z" /></clipPath>
-          <pattern id="folio-paper-grain" width="13" height="11" patternUnits="userSpaceOnUse"><path d="M1 2H2M7 8H8M11 4H12" stroke="#48694D" strokeOpacity=".075" strokeWidth=".6" /></pattern>
+          <linearGradient id="casebook-left" x1="75" y1="170" x2="300" y2="190" gradientUnits="userSpaceOnUse"><stop stopColor="#D6E1BF" /><stop offset=".82" stopColor="#EFF0D6" /><stop offset="1" stopColor="#A4B593" /></linearGradient>
+          <linearGradient id="casebook-right" x1="300" y1="180" x2="529" y2="155" gradientUnits="userSpaceOnUse"><stop stopColor="#BDCBA7" /><stop offset=".12" stopColor="#F6F3DD" /><stop offset="1" stopColor="#E4E7CA" /></linearGradient>
+          <linearGradient id="casebook-leaf" x1="300" y1="80" x2="365" y2="170" gradientUnits="userSpaceOnUse"><stop stopColor="#FBF8E8" /><stop offset="1" stopColor="#CFDABB" stopOpacity=".2" /></linearGradient>
+          <radialGradient id="casebook-light"><stop stopColor="#BDD99E" stopOpacity=".15" /><stop offset="1" stopColor="#BDD99E" stopOpacity="0" /></radialGradient>
+          <radialGradient id="casebook-shadow"><stop stopColor="#061D15" stopOpacity=".65" /><stop offset="1" stopColor="#061D15" stopOpacity="0" /></radialGradient>
         </defs>
-        <ellipse cx="510" cy="328" rx="480" ry="280" fill="url(#folio-glow)" />
-        <ellipse className="auth-folio-shadow" cx="510" cy="534" rx="420" ry="68" fill="url(#folio-shadow)" />
-        <g className="auth-casebook-object">
-          <g transform="rotate(-9 500 340)">
-            <path d="M91 207C235 162 357 197 490 258C628 194 754 159 902 204V499C758 454 630 484 490 548C354 485 231 455 91 500V207Z" fill="url(#folio-cover)" stroke="#74916B" strokeWidth="1.5" />
-            <path d="M107 194C241 151 365 185 490 246C622 182 749 151 887 192V480C748 439 621 473 490 532C363 473 240 439 107 482V194Z" fill="#B1BF9D" />
-            <path d="M119 182C250 141 369 175 490 234C620 173 740 140 877 181V469C740 430 620 461 490 521C367 462 249 429 119 470V182Z" fill="url(#folio-edge)" />
-            <g stroke="#6D8661" strokeOpacity=".4" strokeWidth="1.1">
-              <path d="M114 467C248 427 367 458 490 518C621 458 744 425 881 465" />
-              <path d="M112 474C247 434 366 465 490 525C622 465 746 432 883 472" />
-              <path d="M110 481C245 441 365 472 490 532C623 472 748 439 885 479" />
-              <path d="M108 488C243 448 363 479 490 539C625 479 750 446 887 486" />
-            </g>
-            <path d="M128 169C253 130 368 163 490 222V507C366 448 252 416 128 455V169Z" fill="url(#folio-left)" />
-            <path d="M490 222C620 161 736 129 865 169V455C736 416 621 447 490 507V222Z" fill="url(#folio-right)" />
-            <path d="M490 223V507" stroke="#778D6C" strokeOpacity=".7" />
-            <g clipPath="url(#folio-paper-clip)"><path fill="url(#folio-paper-grain)" d="M120 130H880V520H120Z" /></g>
-            <g className="auth-folio-copy" fill="#51694C" fontFamily="var(--font-plex-sans), sans-serif">
-              <text x="171" y="213" fontSize="12" letterSpacing="2.4">01 / THE ISSUE</text>
-              <text x="171" y="255" fontSize="28" fill="#2B5038">A little context.</text>
-              <text x="171" y="283" fontSize="15" fill="#79846A">A person. A question. A place to start.</text>
-              <path d="M171 306C251 296 330 320 417 354M171 324C250 315 322 338 385 362" fill="none" stroke="#92A083" strokeWidth="1.5" strokeLinecap="round" opacity=".55" />
-              <text x="568" y="213" fontSize="12" letterSpacing="2.4">02 / THE RESPONSE</text>
-              <text x="568" y="255" fontSize="28" fill="#2B5038">A way forward.</text>
-              <text x="568" y="283" fontSize="15" fill="#79846A">Understand. Act. Keep the answer.</text>
-              <path d="M568 309C640 286 722 282 804 299M568 328C642 306 712 302 777 312" fill="none" stroke="#92A083" strokeWidth="1.5" strokeLinecap="round" opacity=".55" />
-            </g>
-            <path className="auth-book-ribbon" d="M724 145L747 146V249L736 237L724 250V145Z" fill="#3B7250" />
-            <path d="M729 148V230" stroke="#84A46F" strokeOpacity=".5" />
-            <path d="M195 393C293 337 382 447 490 402C588 361 660 337 787 356" stroke="#A5B490" strokeOpacity=".4" strokeWidth="1.5" strokeDasharray="3 7" />
-            <path className="auth-book-route" d="M195 393C293 337 382 447 490 402C588 361 660 337 787 356" pathLength="1" stroke="#397653" strokeWidth="2.7" strokeLinecap="round" />
-            <g className="auth-book-point auth-point-one"><circle cx="195" cy="393" r="14" fill="#719564" fillOpacity=".12" /><circle cx="195" cy="393" r="5" fill="#407454" stroke="#F5EFD8" strokeWidth="2.5" /></g>
-            <g className="auth-book-point auth-point-two"><circle cx="490" cy="402" r="14" fill="#719564" fillOpacity=".16" /><circle cx="490" cy="402" r="5" fill="#407454" stroke="#F5EFD8" strokeWidth="2.5" /></g>
-            <g className="auth-book-seal"><circle cx="787" cy="356" r="25" fill="#285C40" /><circle cx="787" cy="356" r="31" stroke="#6B9464" strokeOpacity=".5" /><path d="M776 356L784 364L799 348" stroke="#E7EDCE" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" /></g>
-            <g className="auth-folio-stamp" transform="rotate(4 760 410)"><rect x="711" y="402" width="114" height="29" rx="2" stroke="#427650" strokeOpacity=".5" /><text x="768" y="422" textAnchor="middle" fontFamily="var(--font-plex-mono), monospace" fontSize="12" fill="#427650" letterSpacing="2">RESOLVED</text></g>
-            <g className="auth-turning-leaf"><path d="M490 222C620 161 736 129 865 169V455C736 416 621 447 490 507V222Z" fill="url(#folio-leaf)" stroke="#D9DFC6" strokeOpacity=".45" /><path d="M553 257C638 221 718 209 809 230M553 278C638 242 718 230 809 251" stroke="#8B9A7C" strokeOpacity=".25" strokeWidth="1.5" /></g>
+        <ellipse cx="300" cy="155" rx="280" ry="150" fill="url(#casebook-light)" />
+        <ellipse className="auth-book-shadow" cx="300" cy="316" rx="235" ry="29" fill="url(#casebook-shadow)" />
+        <g className="auth-book-spread">
+          <path d="M57 106C140 70 218 83 300 126C384 83 463 70 543 106V292C461 261 384 274 300 317C218 274 139 261 57 292V106Z" fill="#2C543F" stroke="#78926F" strokeWidth="1.3" />
+          <path d="M67 98C144 63 222 77 300 119C380 77 458 63 534 98V283C458 253 380 265 300 309C222 265 144 253 67 283V98Z" fill="#BAC9A7" />
+          <path d="M69 104C144 70 223 84 300 126M300 126C380 84 458 70 532 104M69 278C144 250 223 264 300 304M300 304C380 264 458 250 532 278" stroke="#698365" strokeOpacity=".65" />
+          <path className="auth-page-left" d="M76 83C151 49 225 68 300 109V296C224 253 150 235 76 270V83Z" fill="url(#casebook-left)" />
+          <path className="auth-page-right" d="M300 109C377 68 451 49 526 83V270C451 235 377 253 300 296V109Z" fill="url(#casebook-right)" />
+          <path d="M300 111V294" stroke="#7F9879" strokeOpacity=".55" />
+          <g className="auth-page-lines" stroke="#77906D" strokeWidth="1.5" strokeLinecap="round" opacity=".48">
+            <path d="M106 115C154 96 205 107 263 136" pathLength="1" /><path d="M106 135C154 116 205 127 263 156" pathLength="1" /><path d="M106 155C151 138 194 146 231 162" pathLength="1" />
+            <path d="M337 136C392 107 441 96 493 115" pathLength="1" /><path d="M337 156C392 127 441 116 493 135" pathLength="1" /><path d="M365 163C405 146 448 139 493 155" pathLength="1" />
           </g>
+          <path className="auth-book-ribbon" d="M382 74L397 69V139L389 131L382 146V74Z" fill="#387453" />
+          <path className="auth-book-route" d="M127 220C190 181 244 260 300 225C356 190 398 182 471 210" pathLength="1" stroke="#2B7752" strokeWidth="2.4" strokeLinecap="round" />
+          <g className="auth-book-point auth-point-one"><circle cx="127" cy="220" r="11" fill="#719762" fillOpacity=".15" /><circle cx="127" cy="220" r="4" fill="#2B6A48" stroke="#F5F2DC" strokeWidth="2" /></g>
+          <g className="auth-book-point auth-point-two"><circle cx="300" cy="225" r="11" fill="#719762" fillOpacity=".15" /><circle cx="300" cy="225" r="4" fill="#2B6A48" stroke="#F5F2DC" strokeWidth="2" /></g>
+          <g className="auth-book-seal"><circle cx="471" cy="210" r="17" fill="#2A6849" /><circle cx="471" cy="210" r="21" stroke="#62966B" strokeOpacity=".4" /><path d="M463 210L469 216L480 204" stroke="#EFF1D8" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" /></g>
+          <path className="auth-turning-leaf" d="M300 110C312 77 334 62 362 59C338 103 333 179 300 296V110Z" fill="url(#casebook-leaf)" />
         </g>
       </svg>
     </div>
+    <div className="auth-art-caption"><span><i />Record</span><b /><span><i />Resolve</span><b /><span><i />Follow up</span></div>
   </div>;
 }

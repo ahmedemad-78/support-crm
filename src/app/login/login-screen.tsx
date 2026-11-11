@@ -1,4 +1,5 @@
-import { ArrowUpRight, BookOpenCheck, Mail, ShieldCheck } from "lucide-react";
+import Image from "next/image";
+import { ArrowUpRight, Mail, ShieldCheck } from "lucide-react";
 import { LoginForm } from "./login-form";
 import { LoginArtwork } from "./login-artwork";
 import type { SignInState } from "./actions";
@@ -10,23 +11,16 @@ export function LoginScreen({ deactivated = false, initialState }: { deactivated
   return <main className="login-v2">
     <section className="auth-brand-pane" aria-label="Selah El Telmeez Technical Support Center">
       <header className="auth-brand-header">
-        <svg className="auth-brand-logo" viewBox="0 0 1476 570" role="img" aria-label="Selah El Telmeez">
-          <defs><filter id="auth-logo-cutout" colorInterpolationFilters="sRGB" x="0" y="0" width="100%" height="100%">
-            <feColorMatrix type="matrix" values="0 0 0 0 1 0 0 0 0 1 0 0 0 0 1 -.2126 -.7152 -.0722 0 1" />
-            <feComponentTransfer result="lettering"><feFuncA type="linear" slope="2.4" intercept="-.12" /></feComponentTransfer>
-            <feFlood className="auth-logo-ink" result="ink" /><feComposite in="ink" in2="lettering" operator="in" />
-          </filter></defs>
-          <image href="/brand/logo.jpg" width="1476" height="570" filter="url(#auth-logo-cutout)" />
-        </svg>
-        <span className="auth-wordmark"><BookOpenCheck className="auth-mobile-mark" aria-hidden="true" /><span>TECHNICAL SUPPORT<strong>CENTER</strong></span></span>
+        <Image src="/brand/logo.jpg" alt="Selah El Telmeez" width={1476} height={570} priority sizes="(max-width: 900px) 140px, 176px" className="auth-brand-logo" />
+        <span className="auth-wordmark">TECHNICAL SUPPORT<strong>CENTER</strong></span>
       </header>
       <div className="auth-brand-body">
-        <p className="auth-eyebrow"><span /> THE CASEBOOK</p>
-        <h2 className="auth-headline"><span>Every case.</span><em>A clear next step.</em></h2>
-        <p className="auth-brand-description">One place for issues, answers and follow-up.</p>
+        <p className="auth-eyebrow"><span /> THE SUPPORT WORKSPACE</p>
+        <h2 className="auth-headline"><span>Every case.</span><span>A clear</span><em>next step.</em></h2>
+        <p className="auth-brand-description">Keep the issue, the response and the follow-up<br className="auth-desktop-break" /> in one place.</p>
         <LoginArtwork />
       </div>
-      <footer className="auth-brand-footer"><div className="auth-art-caption" aria-hidden="true"><span><i />Record</span><b /><span><i />Resolve</span><b /><span><i />Follow up</span></div><div className="auth-brand-legal"><span>SELAH EL TELMEEZ</span><span>People behind every case.</span></div></footer>
+      <footer className="auth-brand-footer">A shared record. A thoughtful response.</footer>
     </section>
     <section className="auth-form-pane" aria-labelledby="signin-heading">
       <div className="auth-form-meta"><ShieldCheck size={15} aria-hidden="true" /> Internal workspace</div>
