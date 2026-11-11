@@ -273,3 +273,26 @@ test("one failed file never removes another successfully saved attachment", asyn
   const failed = await intakeHelpers.uploadIntakeFiles("case", items, { hasRecord: async () => ({ exists: false, failed: false }), upload: async (_path, file) => { if (file.name === "a.png") throw new Error("offline"); return { ok: true }; }, record: async () => true });
   assert.equal(failed.length, 1); assert.equal(failed[0].id, "a");
 });
+
+
+test("optional contacts and genuine unknown answers survive intake validation", () => {
+  const result=schema.portalTicketSchema.parse(intake({customer_email:"",customer_phone:"",credentials_username:"",is_latest_version:"unknown",fawry_payment:"unknown"}));
+  assert.equal(result.customer_email,null);assert.equal(result.credentials_username,null);assert.equal(result.customer_phone,null);
+  assert.equal(result.is_latest_version,null);assert.equal(result.fawry_payment,null);
+  assert.equal(schema.portalTicketSchema.safeParse(intake({customer_email:"bad"})).success,false);
+  assert.equal(schema.portalTicketSchema.safeParse(intake({is_latest_version:""})).success,false);
+});
+test("school sources require school on support and portal forms", () => {
+  assert.equal(schema.supportTicketSchema.safeParse(intake({source:"june_schools"})).success,false);
+  assert.equal(schema.portalTicketSchemaFor("business_development").safeParse(intake({school_name:"Demo school"})).success,true);
+  assert.equal(schema.portalTicketSchemaFor("business_development").safeParse(intake({school_name:" "})).success,false);
+  assert.equal(schema.portalTicketSchemaFor("call_center").safeParse(intake()).success,true);
+});
+test("PDF and Excel are bounded attachments, including missing browser MIME", () => {
+  for(const [name,mime] of [["case.pdf","application/pdf"],["case.xls","application/vnd.ms-excel"],["case.xlsx",""]]) {
+    const f=fakeFile(name,mime);assert.equal(intakeHelpers.checkIntakeFiles([],[f]).accepted.length,1);
+    assert.equal(intakeHelpers.checkIntakeFiles([],[{...f,size:10485761}]).accepted.length,0);
+  }
+  assert.equal(intakeHelpers.checkIntakeFiles([],[fakeFile("bad.html","text/html")]).accepted.length,0);
+  assert.equal(intakeHelpers.checkIntakeFiles([],[fakeFile("empty.pdf","application/pdf",0)]).accepted.length,0);
+});

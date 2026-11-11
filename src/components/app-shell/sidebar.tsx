@@ -110,15 +110,15 @@ export function Sidebar({
         })}
       </nav>
 
-      <div className="flex items-center gap-2.5 border-t px-2 pt-5 pb-1.5">
+      <div className="support-nav-footer border-t">
         <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-brand-action text-[13px] font-semibold text-white">
           {initials}
         </div>
         <div className="support-nav-user flex min-w-0 flex-1 flex-col">
-          <span className="truncate text-sm font-semibold">
+          <span title={user.fullName} className="support-nav-fullname text-sm font-semibold">
             {user.fullName}
           </span>
-          <span className="truncate text-xs text-muted-foreground">
+          <span className="support-nav-role text-xs text-muted-foreground">
             {ROLE_LABELS[user.role]}
             {user.isAdmin ? " · Admin" : ""}
           </span>
@@ -127,10 +127,10 @@ export function Sidebar({
           <button
             type="submit"
             title="Sign out"
-            className="rounded-md p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground"
+            className="support-nav-signout text-muted-foreground hover:bg-muted hover:text-foreground"
           >
             <LogOut className="size-4" />
-            <span className="sr-only">Sign out</span>
+            <span className="support-nav-signout-label">Sign out</span>
           </button>
         </form>
       </div>
@@ -158,15 +158,15 @@ export function Sidebar({
         </button>
         {content}
       </aside>
-      <div className="flex h-16 shrink-0 items-center justify-between border-b bg-background px-4 lg:hidden">
-        <span className="flex items-center gap-2 text-sm font-semibold">
+      <div className="support-mobile-header flex h-16 shrink-0 items-center justify-between border-b bg-background px-4 lg:hidden">
+        <span className="order-last flex items-center gap-2 text-sm font-semibold">
           <Image src="/brand/logo.jpg" alt="Selah El Telmeez" width={1476} height={570} priority sizes="120px" className="h-10 w-auto shrink-0 object-contain mix-blend-multiply" style={{ width: "auto" }} />
           <span className="sr-only">Support Center</span>
         </span>
         <Sheet open={open} onOpenChange={setOpen}>
           <SheetTrigger
             aria-label="Open navigation"
-            className="rounded-lg border p-2.5"
+            className="order-first rounded-lg border p-2.5"
           >
             <Menu className="size-5" />
           </SheetTrigger>

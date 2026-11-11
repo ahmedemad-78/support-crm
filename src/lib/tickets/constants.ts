@@ -30,7 +30,7 @@ export type TicketSource = (typeof TICKET_SOURCES)[number];
 export const SOURCE_LABELS: Record<TicketSource, string> = {
   whatsapp: "WhatsApp",
   moderation: "Moderation",
-  call_center: "Call",
+  call_center: "Call Center",
   marketing_team: "Marketing Team",
   june_schools: "30 June Schools",
   business_development: "B2B Schools",
@@ -64,8 +64,11 @@ export const ATTACHMENT_RULES = {
     "image/png": 10 * 1024 * 1024,
     "video/mp4": 50 * 1024 * 1024,
     "video/quicktime": 50 * 1024 * 1024,
+    "application/pdf": 10 * 1024 * 1024,
+    "application/vnd.ms-excel": 10 * 1024 * 1024,
+    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": 10 * 1024 * 1024,
   } as Record<string, number>,
-  accept: "image/jpeg,image/png,video/mp4,video/quicktime",
+  accept: ".jpg,.jpeg,.png,.mp4,.mov,.pdf,.xls,.xlsx",
 };
 
 export const ATTACHMENTS_BUCKET = "ticket-attachments";

@@ -2,9 +2,8 @@ import { z } from "zod";
 import { validDay } from "./analytics";
 import { END_USER_TYPES, PLATFORMS } from "./constants";
 
-const required = (label: string) => z.string().trim().min(1, `${label} is required`);
 const yesNo = (label: string) =>
-  z.enum(["yes", "no"], { error: `Choose Yes or No for "${label}"` }).transform((v) => v === "yes");
+  z.enum(["yes", "no", "unknown"], { error: `Choose Yes, No or Unknown for "${label}"` }).transform((v) => v === "unknown" ? null : v === "yes");
 
 const optionalText = (max: number) =>
   z.string().trim().max(max).optional().transform((v) => v || null);
@@ -18,7 +17,7 @@ export const portalTicketSchema = z.object({
   contact_channel: z.enum(["unspecified", "whatsapp", "phone", "email", "form", "google_play"]).optional().default("unspecified"),
   linked_ticket_id: z.string().trim().optional().transform(value => value || null).pipe(z.uuid().nullable()),
   customer_name: z.string().trim().min(2, "Name needs at least 2 characters"),
-  customer_email: z.string().trim().pipe(z.email("Email needs a domain — try name@example.com")),
+  customer_email: z.string().trim().optional().transform(value => value || null).pipe(z.email("Enter a valid email, or leave it blank").nullable()),
   customer_phone: z
     .string()
     .trim()
@@ -30,7 +29,7 @@ export const portalTicketSchema = z.object({
       "Enter the phone number, or leave it blank",
     ),
   school_name: optionalText(160),
-  credentials_username: required("User name"),
+  credentials_username: optionalText(160),
   issue_date: z
     .string()
     .refine(validDay, "Pick a real date")
@@ -47,9 +46,17 @@ export const portalTicketSchema = z.object({
   issue_description: z.string().trim().min(5, "Describe the issue in a few words"),
 });
 
+export const SCHOOL_SOURCES = ["june_schools", "business_development"] as const;
+export function needsSchool(source: string) { return SCHOOL_SOURCES.some(code => code === source); }
+function schoolCheck(source: string, school: string | null | undefined, ctx: z.RefinementCtx) {
+  if (needsSchool(source) && !school?.trim()) ctx.addIssue({ code: "custom", path: ["school_name"], message: "School name is required for this source" });
+}
+export function portalTicketSchemaFor(source: string) {
+  return portalTicketSchema.superRefine((value, ctx) => schoolCheck(source, value.school_name, ctx));
+}
 export const supportTicketSchema = portalTicketSchema.extend({
   source: z.string().trim().min(1, "Choose a source"),
-});
+}).superRefine((value, ctx) => schoolCheck(value.source, value.school_name, ctx));
 
 export type PortalTicketInput = z.input<typeof portalTicketSchema>;
 export type SupportTicketInput = z.input<typeof supportTicketSchema>;

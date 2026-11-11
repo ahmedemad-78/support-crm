@@ -8,7 +8,7 @@ import { getCurrentUser } from "@/lib/auth/session";
 import { createClient } from "@/lib/supabase/server";
 import {
   fieldErrorsOf,
-  portalTicketSchema,
+  portalTicketSchemaFor,
   supportTicketSchema,
   type PortalTicketFieldErrors,
   type PortalTicketInput,
@@ -26,7 +26,7 @@ export async function createPortalTicket(input: PortalTicketInput, requestId?: s
   }
 
   if (requestId && !z.uuid().safeParse(requestId).success) return { ok: false, error: "Start a new form before trying again." };
-  const parsed = portalTicketSchema.safeParse(input);
+  const parsed = portalTicketSchemaFor(user.role).safeParse(input);
   if (!parsed.success) return { ok: false, fieldErrors: fieldErrorsOf(parsed.error) };
 
   const supabase = await createClient();
@@ -34,7 +34,7 @@ export async function createPortalTicket(input: PortalTicketInput, requestId?: s
   const { data, error } = await supabase
     .from("tickets")
     // ticket_number, source, status and created_by are set by the database trigger.
-    .insert({ ...(requestId ? { id: requestId } : {}), ...parsed.data, ticket_number: "pending", source: user.role, created_by: user.id })
+    .insert({ ...(requestId ? { id: requestId } : {}), ...parsed.data, contact_channel: "unspecified", ticket_number: "pending", source: user.role, created_by: user.id })
     .select("id, ticket_number")
     .single();
 

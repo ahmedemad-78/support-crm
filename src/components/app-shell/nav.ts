@@ -56,7 +56,7 @@ export function navFor(user: CurrentUser): NavSection[] {
         {
           heading: ROLE_LABELS[user.role],
           items: [
-            { href: "/portal/new-ticket", label: "New ticket", icon: "new-ticket" },
+            { href: "/portal/new-ticket", label: "Create ticket", icon: "new-ticket" },
             { href: "/portal/my-tickets", label: "My tickets", icon: "my-tickets" },
           ],
         },

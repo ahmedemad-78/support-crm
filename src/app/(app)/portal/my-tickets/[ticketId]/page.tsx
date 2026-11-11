@@ -3,7 +3,7 @@ import { loadCaseWorkflow } from "@/lib/tickets/workflow";
 import "@/app/(app)/tickets/workspace.css";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { ChevronRight, FileImage, FileVideo, Lock } from "lucide-react";
+import { ChevronRight, FileImage, FileText, FileVideo, Lock } from "lucide-react";
 import { UserNotifications } from "@/components/app-shell/user-notifications";
 import { StatusBadge } from "@/components/tickets/status-badge";
 import { PORTAL_ROLES } from "@/lib/auth/roles";
@@ -57,12 +57,12 @@ export default async function PortalTicketPage({ params }: PageProps<"/portal/my
     ["Email", ticket.customer_email ?? "—"],
     ["Phone", ticket.customer_phone ?? "—"],
     ["User type", ticket.end_user_type ? END_USER_TYPE_LABELS[ticket.end_user_type as keyof typeof END_USER_TYPE_LABELS] : "—"],
-    ["User name", ticket.credentials_username ?? "—"],
+    ["Account credential", ticket.credentials_username ?? "—"],
     ["School", ticket.school_name ?? "—"],
     ["City", city],
     ["Platform", ticket.platform ? PLATFORM_LABELS[ticket.platform as keyof typeof PLATFORM_LABELS] : "—"],
     ["Device", ticket.device_type ?? "—"],
-    ["App version", `${ticket.app_version ?? "—"}${ticket.is_latest_version === false ? " (not latest)" : ""}`],
+    ["Latest app version", ticket.is_latest_version === true ? "Yes" : ticket.is_latest_version === false ? "No" : "Unknown"], ["App version", `${ticket.app_version ?? "—"}${ticket.is_latest_version === false ? " (not latest)" : ""}`],
     ["Date of issue", ticket.issue_date ? formatDate(ticket.issue_date) : "—"],
     ["Page / screen", ticket.page_screen ?? "—"],
     ["Fawry payment", ticket.fawry_payment === true ? "Yes" : ticket.fawry_payment === false ? "No" : "Not recorded"],
@@ -135,7 +135,7 @@ export default async function PortalTicketPage({ params }: PageProps<"/portal/my
           {attachments && attachments.length > 0 && (
             <div className="flex flex-wrap gap-2.5">
               {attachments.map((a) => {
-                const Icon = a.mime_type.startsWith("video/") ? FileVideo : FileImage;
+                const Icon = a.mime_type.startsWith("video/") ? FileVideo : a.mime_type.startsWith("image/") ? FileImage : FileText;
                 return (
                   <a
                     key={a.id}

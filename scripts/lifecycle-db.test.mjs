@@ -22,7 +22,7 @@ try {
     create function storage.foldername(text) returns text[] language sql immutable as $$select string_to_array($1,'/')$$;
   `);
   const files=readdirSync('supabase/migrations').filter(f=>f.endsWith('.sql')).sort();
-  for(const file of files.filter(f=>!f.includes('case_lifecycle'))) await db.exec(readFileSync(`supabase/migrations/${file}`,'utf8'));
+  for(const file of files.filter(f=>!f.includes('case_lifecycle') && !f.includes('intake_optional_contacts'))) await db.exec(readFileSync(`supabase/migrations/${file}`,'utf8'));
   const names=['Ahmed Emad','sonia','kabany','Olaa','Yasser Arab','Manager'];
   const roles=['support_agent','moderation','call_center','business_development','june_schools','manager'];
   const ids=names.map((_,i)=>`10000000-0000-4000-8000-${String(i+1).padStart(12,'0')}`);
@@ -30,6 +30,7 @@ try {
   await db.exec(`update public.profiles set is_admin=true where id='${ids[0]}'; grant select,insert,update on all tables in schema public to authenticated; grant usage,select on all sequences in schema public to authenticated;`);
   await db.exec(readFileSync('supabase/migrations/20261110150000_case_lifecycle.sql','utf8'));
   await db.exec(`insert into public.cities(name) values('Fixture City') on conflict do nothing;`);
+  await db.exec(readFileSync('supabase/migrations/20261111143745_intake_optional_contacts_and_documents.sql','utf8'));
   const signIn=async i=>{await db.exec('reset role');await db.query("select set_config('request.jwt.claim.sub',$1,false)",[ids[i]]);await db.exec('set role authenticated');};
   await signIn(0);
   const ticket=(await db.query(`insert into public.tickets(ticket_number,source,created_by,customer_name,customer_email,credentials_username,issue_date,city_id,end_user_type,platform,is_latest_version,fawry_payment,issue_description,contact_channel)
@@ -78,7 +79,7 @@ try {
   await denied(`update tickets set reopen_count=99 where id='${ticket.id}'`,/managed by the system/);
   await denied(`insert into ticket_workflow_events(ticket_id,kind,actor_id) values('${ticket.id}','comment','${ids[0]}')`,/permission denied/);
   for(const [source,index] of [['moderation',1],['call_center',2],['business_development',3],['june_schools',4],['whatsapp',0],['google_play',0]]) {
-    const copy=(await db.query(`insert into tickets(ticket_number,source,created_by,customer_name,customer_email,credentials_username,issue_date,city_id,end_user_type,platform,is_latest_version,fawry_payment,issue_description) values('pending',$1,$2,'Fixture','fixture@example.com','fixture.student',current_date,(select id from cities limit 1),'parent','android',true,false,'Synthetic mapping check') returning reporter_id`,[source,ids[0]])).rows[0];
+    const copy=(await db.query(`insert into tickets(ticket_number,source,created_by,customer_name,customer_email,credentials_username,issue_date,city_id,end_user_type,platform,is_latest_version,fawry_payment,issue_description,school_name) values('pending',$1,$2,'Fixture','fixture@example.com','fixture.student',current_date,(select id from cities limit 1),'parent','android',true,false,'Synthetic mapping check','Demo School') returning reporter_id`,[source,ids[0]])).rows[0];
     check(copy.reporter_id,ids[index]);
   }
   await signIn(2);
@@ -87,6 +88,16 @@ try {
   await signIn(0);await db.exec(`update tickets set status='closed' where id='${linked.id}'`);
   check(await scalar(`select resolved_at is null and closed_at is not null v from tickets where id='${linked.id}'`),true);
   await denied(`update tickets set status='closed' where id='${ticket.id}'`,/before changing its final outcome/);
+  await signIn(0);
+  const optional=(await db.query(`insert into tickets(ticket_number,source,created_by,customer_name,issue_date,city_id,end_user_type,platform,issue_description,contact_channel) values('pending','whatsapp',$1,'Optional customer',current_date,(select id from cities limit 1),'parent','web','Optional contact and unknown details','email') returning *`,[ids[0]])).rows[0];
+  check(optional.customer_email,null);check(optional.credentials_username,null);check(optional.fawry_payment,null);check(optional.is_latest_version,null);check(optional.contact_channel,'unspecified');
+  await denied(`insert into tickets(ticket_number,source,created_by,customer_name,issue_date,city_id,end_user_type,platform,issue_description) values('pending','june_schools','${ids[0]}','School fixture',current_date,(select id from cities limit 1),'teacher','web','Missing school must fail')`,/School name is required/);
+  await denied(`insert into tickets(ticket_number,source,created_by,customer_name,issue_date,end_user_type,platform,issue_description) values('pending','whatsapp','${ids[0]}','City fixture',current_date,'parent','web','Missing city must fail')`,/city, user type/);
+  for (const mime of ['application/pdf','application/vnd.ms-excel','application/vnd.openxmlformats-officedocument.spreadsheetml.sheet']) {
+    const a=(await db.query('insert into ticket_attachments(ticket_id,storage_path,file_name,mime_type,size_bytes) values($1,$2,$3,$4,200) returning mime_type',[optional.id,optional.id+'/'+mime.split('/').pop(),'fixture document',mime])).rows[0];check(a.mime_type,mime);
+  }
+  await denied(`insert into ticket_attachments(ticket_id,storage_path,file_name,mime_type,size_bytes) values('${optional.id}','too-large','large.pdf','application/pdf',10485761)`,/size_bytes_check/);
+  await denied(`insert into ticket_attachments(ticket_id,storage_path,file_name,mime_type,size_bytes) values('${optional.id}','script','bad.html','text/html',200)`,/mime_type_check/);
   await db.exec('reset role');await db.exec(`update profiles set is_active=false where id='${ids[2]}'`);await signIn(2);
   await denied(`select public.comment_on_case('${ticket.id}','Inactive accounts cannot comment',gen_random_uuid())`,/Sign in/);
   console.log(`PostgreSQL lifecycle: ${assertions} assertions passed (create, resolve twice, reopen, duplicate protection, comments, RLS, snapshots, source mapping, central-only routing).`);

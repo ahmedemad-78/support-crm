@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { PageHeader } from "@/components/app-shell/page-header";
 import { requireUser } from "@/lib/auth/session";
-import { PORTAL_ROLES, ROLE_LABELS } from "@/lib/auth/roles";
+import { PORTAL_ROLES } from "@/lib/auth/roles";
 import { createClient } from "@/lib/supabase/server";
 import { NewTicketForm } from "./new-ticket-form";
 import { cairoDate } from "@/lib/tickets/dashboard-model";
@@ -22,17 +22,9 @@ export default async function NewTicketPage({ searchParams }: PageProps<"/portal
   return (
     <>
       <PageHeader
-        title="New ticket"
-        actions={
-          <div className="flex flex-1 items-center justify-between">
-            <span className="rounded-full bg-status-awaiting-bg px-2.5 py-0.5 text-xs font-semibold text-status-awaiting">
-              Reported by: {ROLE_LABELS[user.role]}
-            </span>
-            <span className="text-sm text-muted-foreground">All fields are required unless marked optional</span>
-          </div>
-        }
+        title="Create ticket"
       />
-      <NewTicketForm linkedTicketId={linked} cities={cities ?? []} today={cairoDate(new Date().toISOString())} />
+      <NewTicketForm lockedSource={user.role} linkedTicketId={linked} cities={cities ?? []} today={cairoDate(new Date().toISOString())} />
     </>
   );
 }
