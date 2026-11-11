@@ -170,7 +170,7 @@ export default async function PortalTicketPage({ params }: PageProps<"/portal/my
           </p>
         </aside>
       </div>
-      <div className="case-file desk-case"><CaseFollowup ticketId={ticket.id} version={ticket.updated_at} status={status} count={workflow.reopen_count} events={workflow.events} canReply={true} relatedHref={`/portal/new-ticket?linked=${ticket.id}`} /></div>
+      <div className="case-file desk-case"><CaseFollowup perspective="reporter" reporterName={user.fullName} ticketId={ticket.id} version={ticket.updated_at} status={status} count={workflow.reopen_count} events={workflow.events} canReply={true} relatedHref={`/portal/new-ticket?linked=${ticket.id}`} /></div>
     </>
   );
 }

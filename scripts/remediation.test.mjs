@@ -21,6 +21,7 @@ const files = [
   "src/lib/tickets/intake.ts",
   "src/lib/tickets/resolution.ts",
   "src/lib/tickets/queue.ts",
+  "src/lib/tickets/conversation.ts",
 ];
 
 for (const file of files) {
@@ -48,6 +49,7 @@ const filters = require(join(directory, "lib/tickets/filters.js"));
 const intakeHelpers = require(join(directory, "lib/tickets/intake.js"));
 const resolution = require(join(directory, "lib/tickets/resolution.js"));
 const queue = require(join(directory, "lib/tickets/queue.js"));
+const conversation = require(join(directory, "lib/tickets/conversation.js"));
 const schema = require(join(directory, "lib/tickets/schema.js"));
 
 after(() => rmSync(directory, { recursive: true, force: true }));
@@ -319,4 +321,17 @@ test("resolution readiness includes a meaningful response as the sixth requireme
   let result=resolution.resolutionReadiness(values);assert.equal(result.filter(field=>field.ready).length,5);assert.equal(result.find(field=>!field.ready).key,"resolutionNotes");
   result=resolution.resolutionReadiness({...values,resolutionNotes:"Fixed the account sync."});assert.equal(result.every(field=>field.ready),true);
   assert.equal(resolution.resolutionReadiness({...values,topicId:"-1"})[1].ready,false);
+});
+
+test("conversation orders messages chronologically without mutating history",()=>{
+  const events=[{id:"b",created_at:"2026-11-10T12:00:00Z",kind:"comment",resolution_snapshot:null},{id:"a",created_at:"2026-11-10T09:00:00Z",kind:"created",resolution_snapshot:null}];
+  assert.deepEqual(conversation.chronologicalEvents(events).map(event=>event.id),["a","b"]);assert.equal(events[0].id,"b");
+});
+test("conversation separates Support and reporter roles without guessing unknown actors",()=>{
+  assert.equal(conversation.conversationSide("support_agent"),"support");for(const role of ["call_center","moderation","june_schools","business_development"])assert.equal(conversation.conversationSide(role),"reporter");
+  assert.equal(conversation.conversationSide(null),"unknown");assert.equal(conversation.conversationSide("manager"),"unknown");
+});
+test("resolution messages only render textual fields from their preserved snapshot",()=>{
+  assert.deepEqual(conversation.resolutionSnapshot({response:"Fixed the sync",cause:"Payment delay",action:"Resynced",outcome:null,secret:"ignore",topic:{invalid:true}}),{response:"Fixed the sync",cause:"Payment delay",action:"Resynced"});
+  assert.deepEqual(conversation.resolutionSnapshot(["bad"]),{});assert.deepEqual(conversation.resolutionSnapshot(null),{});
 });
