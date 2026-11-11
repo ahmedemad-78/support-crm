@@ -162,6 +162,89 @@ try {
   const spoofed=(await db.query(`insert into tickets(ticket_number,source,reporter_id,customer_name,issue_date,city_id,end_user_type,platform,issue_description) values('pending','whatsapp','${ids[1]}','Portal fixture',current_date,(select id from cities limit 1),'parent','web','Portal identity remains fixed') returning source,reporter_id`)).rows[0];
   check(spoofed.source,'call_center');check(spoofed.reporter_id,ids[2]);
   await db.exec('reset role');check(await scalar('select count(*)::int v from email_outbox'),mailCount);
+  // Complete both portal journeys, including a DIFFERENT person of the SAME
+  // role. A team/source match must never imply permission to another's ticket.
+  for(const ownerIndex of [1,2]) {
+    const role=roles[ownerIndex],owner=ids[ownerIndex];
+    await db.exec('reset role');
+    const peer=`40000000-0000-4000-8000-${String(ownerIndex).padStart(12,'0')}`;
+    await db.query('insert into auth.users(id,email,raw_app_meta_data) values($1,$2,$3)',[peer,`${role}-peer@example.com`,{full_name:`Second ${role}`,role}]);
+    const peerIndex=ids.push(peer)-1;
+    const create=async()=> (await db.query(`insert into tickets(ticket_number,source,reporter_id,created_by,customer_name,issue_date,city_id,end_user_type,platform,issue_description)
+      values('pending','google_play',$1,$2,'Portal journey fixture',current_date,(select id from cities limit 1),'parent','android','A synthetic continuing issue') returning *`,[ids[0],ids[0]])).rows[0];
+    await signIn(ownerIndex);const own=await create();
+    check(own.source,role);check(own.reporter_id,owner);check(own.created_by,owner);
+    await signIn(peerIndex);const theirs=await create();
+    check(await scalar(`select count(*)::int v from tickets where id='${own.id}'`),0);
+    await denied(`select public.send_case_message('${own.id}',gen_random_uuid(),'comment','Same team is not ownership',now(),'[]')`,/not available/);
+    await denied(`select public.reopen_case('${own.id}',now(),'Same team must not reopen')`,/not available/);
+    await signIn(ownerIndex);
+    check(await scalar(`select count(*)::int v from tickets where id='${theirs.id}'`),0);
+    const intakePath=`${own.id}/intake.png`;
+    await db.query(`insert into storage.objects(id,bucket_id,name,owner_id,metadata) values(gen_random_uuid(),'ticket-attachments',$1,$2,$3)`,[intakePath,owner,{size:200,mimetype:'image/png'}]);
+    await db.query(`insert into ticket_attachments(ticket_id,storage_path,file_name,mime_type,size_bytes) values($1,$2,'intake.png','image/png',200)`,[own.id,intakePath]);
+    await signIn(0);
+    check(await scalar(`select count(*)::int v from storage.objects where name='${intakePath}'`),1);
+    check(await scalar(`select count(*)::int v from ticket_attachments where ticket_id='${own.id}' and event_id is null`),1);
+    // Both directions attach the same supported image, video, audio and documents.
+    for(const actorIndex of [ownerIndex,0]) {
+      await signIn(actorIndex);const actor=ids[actorIndex];
+      const request=(await db.query('select gen_random_uuid() id')).rows[0].id;
+      const media=[];
+      for(const [name,type] of [['image.png','image/png'],['clip.mp4','video/mp4'],['voice.mp3','audio/mpeg'],['evidence.pdf','application/pdf'],['tracker.xlsx','application/vnd.openxmlformats-officedocument.spreadsheetml.sheet']]){
+        const path=`${own.id}/${actor}/${request}/${name}`;
+        await db.query(`insert into storage.objects(id,bucket_id,name,owner_id,metadata) values(gen_random_uuid(),'ticket-attachments',$1,$2,$3)`,[path,actor,{size:200,mimetype:type}]);
+        media.push({path,name,type,size:200});
+      }
+      const receiverIndex=actorIndex===0?ownerIndex:0;
+      await signIn(receiverIndex);
+      check(await scalar(`select count(*)::int v from storage.objects where name like '${own.id}/${actor}/${request}/%'`),0);
+      await signIn(actorIndex);
+      await db.query('select public.send_case_message($1,$2,$3,$4,$5,$6)',[own.id,request,'comment','Please review these files.',own.updated_at,JSON.stringify(media)]);
+      await db.query('select public.send_case_message($1,$2,$3,$4,$5,$6)',[own.id,request,'comment','Please review these files.',own.updated_at,JSON.stringify(media)]);
+      check(await scalar(`select status::text v from tickets where id='${own.id}'`),'new');
+      await signIn(receiverIndex);
+      check(await scalar(`select count(*)::int v from storage.objects where name like '${own.id}/${actor}/${request}/%'`),5);
+      check(await scalar(`select count(*)::int v from ticket_attachments where event_id='${request}'`),5);
+      check(await scalar(`select count(*)::int v from notifications where event_id='${request}' and recipient_id='${ids[receiverIndex]}'`),1);
+      const notice=await scalar(`select id::text v from notifications where event_id='${request}'`);
+      await signIn(peerIndex);
+      check(await scalar(`select count(*)::int v from storage.objects where name like '${own.id}/%'`),0);
+      check(await scalar(`select count(*)::int v from ticket_attachments where ticket_id='${own.id}'`),0);
+      check(await scalar(`select count(*)::int v from ticket_workflow_events where ticket_id='${own.id}'`),0);
+      check(await scalar(`select count(*)::int v from notifications where id='${notice}'`),0);
+      const changed=await db.query(`update notifications set read_at=now() where id=$1 returning id`,[notice]);check(changed.rows.length,0);
+      await signIn(receiverIndex);
+      check(await scalar(`select read_at is null v from notifications where id='${notice}'`),true);
+      await db.query('update notifications set read_at=now() where id=$1',[notice]);
+      check(await scalar(`select read_at is not null v from notifications where id='${notice}'`),true);
+    }
+    await signIn(0);
+    await db.exec(`update tickets set status='resolved',resolution_notes='Synthetic resolution after account resync.',request_type_id=(select id from request_types limit 1),topic_id=(select id from topics limit 1),tracker_cause_id=(select id from tracker_causes limit 1),tracker_action_id=(select id from tracker_actions limit 1),outcome_id=(select id from outcomes limit 1) where id='${own.id}'`);
+    await signIn(ownerIndex);
+    check(await scalar(`select count(*)::int v from notifications where ticket_id='${own.id}' and status='resolved'`),1);
+    const closedReply=(await db.query('select gen_random_uuid() id')).rows[0].id;
+    const closedPath=`${own.id}/${owner}/${closedReply}/after-resolution.png`;
+    await db.query(`insert into storage.objects(id,bucket_id,name,owner_id,metadata) values(gen_random_uuid(),'ticket-attachments',$1,$2,$3)`,[closedPath,owner,{size:200,mimetype:'image/png'}]);
+    await db.query('select public.send_case_message($1,$2,$3,$4,$5,$6)',[own.id,closedReply,'comment','An additional question after resolution.',own.updated_at,JSON.stringify([{path:closedPath,name:'after-resolution.png',type:'image/png',size:200}])]);
+    check(await scalar(`select status::text v from tickets where id='${own.id}'`),'resolved');
+    check(await scalar(`select reopen_count v from tickets where id='${own.id}'`),0);
+    await signIn(0);
+    check(await scalar(`select count(*)::int v from storage.objects where name='${closedPath}'`),1);
+    check(await scalar(`select count(*)::int v from notifications where event_id='${closedReply}'`),1);
+    await signIn(ownerIndex);
+    const version=await scalar(`select updated_at::text v from tickets where id='${own.id}'`);
+    const request=(await db.query('select gen_random_uuid() id')).rows[0].id;
+    await db.query('select public.send_case_message($1,$2,$3,$4,$5,$6)',[own.id,request,'reopen','The same problem continues.',version,'[]']);
+    await db.query('select public.send_case_message($1,$2,$3,$4,$5,$6)',[own.id,request,'reopen','The same problem continues.',version,'[]']);
+    check(await scalar(`select reopen_count v from tickets where id='${own.id}'`),1);
+    check(await scalar(`select status::text v from tickets where id='${own.id}'`),'in_progress');
+    await signIn(0);check(await scalar(`select count(*)::int v from notifications where event_id='${request}'`),1);
+    await db.exec(`update tickets set status='resolved',resolution_notes='Second synthetic resolution.' where id='${own.id}'`);
+    await signIn(ownerIndex);check(await scalar(`select count(*)::int v from ticket_workflow_events where ticket_id='${own.id}' and kind='resolved'`),2);
+    await signIn(peerIndex);check(await scalar(`select count(*)::int v from tickets where id='${own.id}'`),0);
+    await db.exec('reset role');check(await scalar('select count(*)::int v from email_outbox'),mailCount);
+  }
   await db.exec(`update profiles set is_active=false where id='${ids[2]}'`);await signIn(2);
   await denied(`select public.comment_on_case('${ticket.id}','Inactive accounts cannot comment',gen_random_uuid())`,/Sign in/);
   console.log(`PostgreSQL lifecycle: ${assertions} assertions passed (create, resolve, reopen, media ownership/atomicity, retries, RLS, source-bound reporter selection, participant notifications, email deferred).`);
