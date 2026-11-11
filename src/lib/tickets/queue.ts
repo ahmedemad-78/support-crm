@@ -10,3 +10,5 @@ export function inQueueView(ticket: {status:string; reopenCount?:number; assigne
   if(view==="resolved")return ticket.status==="resolved";
   return true;
 }
+
+export const QUEUE_VIEWS: Record<TicketView,string> = { open:"Open", new:"New", reopened:"Reopened", awaiting:"Waiting for customer", mine:"Assigned to me", all:"All cases", resolved:"Resolved" };

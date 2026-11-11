@@ -1,5 +1,5 @@
 import { redirect } from "next/navigation";
-import { TicketQueue, QUEUE_VIEWS, type QueueRow } from "@/components/tickets/ticket-queue";
+import { TicketQueue, type QueueRow } from "@/components/tickets/ticket-queue";
 import "./workspace.css";
 import { AgentFrame } from "@/components/app-shell/agent-frame";
 import { requireUser } from "@/lib/auth/session";
@@ -17,7 +17,7 @@ import {
 import { cairoDate } from "@/lib/tickets/dashboard-model";
 import { loadAnalytics } from "@/lib/tickets/load-analytics";
 import { dashboardPopulation, reportedDay, statusGroup } from "@/lib/tickets/overview";
-import { inQueueView as inListView, OPEN_QUEUE_STATUSES } from "@/lib/tickets/queue";
+import { inQueueView as inListView, OPEN_QUEUE_STATUSES, QUEUE_VIEWS } from "@/lib/tickets/queue";
 import type { AnalyticsTicket } from "@/lib/tickets/analytics";
 
 const VIEW_LABELS = QUEUE_VIEWS;

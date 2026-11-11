@@ -7,9 +7,10 @@ import { Sheet, SheetContent, SheetTitle, SheetDescription } from "@/components/
 import { formatDate, formatDateTime, formatRelative } from "@/lib/format";
 import { sourceLabel, STATUS_LABELS, TICKET_STATUSES, type TicketStatus } from "@/lib/tickets/constants";
 import { PAGE_SIZE, ticketListQuery, type TicketListFilters, type TicketView } from "@/lib/tickets/filters";
+import { QUEUE_VIEWS } from "@/lib/tickets/queue";
 import { StatusBadge } from "./status-badge";
 export type QueueRow = { id:string; ticket_number:string; issue_description:string; customer_name:string; source:string; status:string; created_at:string; updated_at?:string; issue_date?:string|null; cities:unknown; assignee:unknown; reporter?:unknown; creator?:unknown; reopen_count?:number; last_reopened_at?:string|null; school_name?:string|null; resolution_notes?:string|null };
-export const QUEUE_VIEWS: Record<TicketView,string> = { open:"Open", new:"New", reopened:"Reopened", awaiting:"Waiting for customer", mine:"Assigned to me", all:"All cases", resolved:"Resolved" };
+
 type Option = { id:string|number; name:string };
 export type TicketQueueProps = { tickets:QueueRow[]; total:number; counts:Record<TicketView,number>; filters:TicketListFilters; extras:Record<string,string>; cities:Option[]; categories:Option[]; agents:{id:string;full_name:string}[]; sources:{code:string;name:string;is_active:boolean}[]; canCreate:boolean; reportHref?:string; preview?:boolean };
 export function relationName(value:unknown):string { const row=Array.isArray(value)?value[0]:value; if(row&&typeof row==="object") { if("name" in row&&typeof row.name==="string")return row.name; if("full_name" in row&&typeof row.full_name==="string")return row.full_name; } return ""; }
