@@ -271,3 +271,62 @@ test("mail connection test refuses non-admins and a different central owner",asy
  let sent=0;const load=loadWith({"@/lib/auth/session":{getCurrentUser:async()=>profile},"@/lib/supabase/server":{createClient:async()=>({from(){return {select(){return this},eq(){return this},async single(){return {data:{value:{mode:"central_only",recipient_id:caseId,email:"other@example.com"}},error:null}}}}})},"@/lib/email/send":{mailConfigured:()=>true,publicMailError:()=>"SMTP failed",sendOutbound:async()=>{sent++;return {provider:"smtp"}}}});assert.equal((await load("src/app/(app)/admin/settings/mail-test-actions.ts").sendTestNotification()).ok,false);assert.equal(sent,0);
  }
 });
+
+
+function loginHarness({ error = null, lock = { locked: false, failuresLeft: 5 }, authThrows = false } = {}) {
+  const attempts = []; let calls = 0;
+  const load = loadWith({
+    "next/navigation": { redirect },
+    "@/lib/auth/lockout": { getLockStatus: async () => lock, recordAttempt: async (_email, ok) => attempts.push(ok) },
+    "@/lib/supabase/server": { createClient: async () => ({ auth: { signInWithPassword: async () => { calls++; if(authThrows) throw new Error("network down"); return { error }; } } }) },
+  });
+  const submit = (email = "fixture@example.test", password = "synthetic-only") => {
+    const data = new FormData(); data.set("email", email); data.set("password", password);
+    return load("src/app/login/actions.ts").signIn({}, data);
+  };
+  return { submit, attempts, calls: () => calls };
+}
+
+test("login validation assigns errors to the correct fields without calling Auth", async () => {
+  const h = loginHarness(); const r = await h.submit("broken-email", "");
+  assert.match(r.fieldErrors.email, /valid work email/); assert.match(r.fieldErrors.password, /Enter your password/);
+  assert.equal(r.error, undefined); assert.equal(h.calls(), 0); assert.deepEqual(h.attempts, []);
+});
+
+test("returned provider outages and unknown errors never consume password attempts", async () => {
+  for (const error of [{code:"unexpected_failure",status:500},{code:"request_timeout",status:504},{name:"AuthRetryableFetchError",status:0},{code:"future_provider_error",status:400}]) {
+    const h=loginHarness({error});const r=await h.submit();assert.equal(r.kind,"unavailable");assert.deepEqual(h.attempts,[]);assert.equal(JSON.stringify(r).includes("synthetic-only"),false);
+  }
+});
+
+test("provider rate limits and activation errors have separate safe messages",async()=>{
+  for(const [error,kind] of [[{status:429},"rate_limited"],[{code:"over_request_rate_limit"},"rate_limited"],[{code:"user_banned"},"deactivated"],[{code:"email_not_confirmed"},"deactivated"]]){
+    const h=loginHarness({error});const r=await h.submit();assert.equal(r.kind,kind);assert.deepEqual(h.attempts,[]);
+  }
+});
+
+test("only confirmed invalid credentials consume a failed attempt",async()=>{
+  const h=loginHarness({error:{code:"invalid_credentials",status:400}});const r=await h.submit();assert.equal(r.kind,"credentials");assert.deepEqual(h.attempts,[false]);assert.equal(r.fieldErrors,undefined);
+});
+
+test("a locked account never reaches Auth and retains its deadline",async()=>{
+  const until=new Date(Date.now()+60000);const h=loginHarness({lock:{locked:true,unlocksAt:until}});const r=await h.submit();assert.equal(r.lockedUntil,until.toISOString());assert.equal(h.calls(),0);assert.deepEqual(h.attempts,[]);
+});
+
+test("successful login resets attempt history and redirects into role routing",async()=>{
+  const h=loginHarness();const r=await destination(()=>h.submit(" fixture@example.test "));assert.equal(r.pathname,"/");assert.deepEqual(h.attempts,[true]);
+});
+
+test("lock deadline matches the oldest counted failure in the rolling window",async()=>{
+  const now=Date.now();const data=[0,1,2,3,4].map(minutes=>({succeeded:false,attempted_at:new Date(now-minutes*60000).toISOString()}));
+  const query={select(){return query;},eq(){return query;},gte(){return query;},order(){return query;},limit:async()=>({data,error:null})};
+  const load=loadWith({"server-only":{},"@/lib/supabase/admin":{createAdminClient:()=>({from:()=>query})}});
+  const r=await load("src/lib/auth/lockout.ts").getLockStatus("fixture@example.test");assert.equal(r.locked,true);assert.equal(r.unlocksAt.getTime(),Date.parse(data[4].attempted_at)+15*60000);
+});
+
+test("successful attempts within the window reset the consecutive failure count",async()=>{
+  const data=[{succeeded:false,attempted_at:new Date().toISOString()},{succeeded:true,attempted_at:new Date().toISOString()},{succeeded:false,attempted_at:new Date().toISOString()}];
+  const query={select(){return query;},eq(){return query;},gte(){return query;},order(){return query;},limit:async()=>({data,error:null})};
+  const load=loadWith({"server-only":{},"@/lib/supabase/admin":{createAdminClient:()=>({from:()=>query})}});
+  const r=await load("src/lib/auth/lockout.ts").getLockStatus("fixture@example.test");assert.deepEqual(r,{locked:false,failuresLeft:4});
+});

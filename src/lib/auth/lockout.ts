@@ -29,8 +29,9 @@ export async function getLockStatus(email: string): Promise<LockStatus> {
   const failures = consecutiveFailures === -1 ? attempts.length : consecutiveFailures;
 
   if (failures >= MAX_FAILED_ATTEMPTS) {
-    const lastFailure = new Date(attempts[0].attempted_at);
-    return { locked: true, unlocksAt: new Date(lastFailure.getTime() + LOCK_MINUTES * 60_000) };
+    // The rolling window unlocks as soon as its oldest counted failure expires.
+    const oldestCountedFailure = new Date(attempts[MAX_FAILED_ATTEMPTS - 1].attempted_at);
+    return { locked: true, unlocksAt: new Date(oldestCountedFailure.getTime() + LOCK_MINUTES * 60_000) };
   }
   return { locked: false, failuresLeft: MAX_FAILED_ATTEMPTS - failures };
 }
