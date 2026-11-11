@@ -45,7 +45,7 @@ export default async function AgentTicketPage({
       .select("id, from_status, to_status, changed_at, actor:profiles!ticket_status_history_changed_by_fkey(full_name)")
       .eq("ticket_id", ticket.id)
       .order("changed_at", { ascending: false }),
-    supabase.from("ticket_attachments").select("id, file_name, mime_type, storage_path").eq("ticket_id", ticket.id),
+    supabase.from("ticket_attachments").select("id, file_name, mime_type, storage_path").eq("ticket_id", ticket.id).is("event_id",null),
     supabase
       .from("ticket_notes")
       .select("id, body, created_at, author:profiles!ticket_notes_author_id_fkey(full_name)")

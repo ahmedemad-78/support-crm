@@ -64,11 +64,17 @@ export const ATTACHMENT_RULES = {
     "image/png": 10 * 1024 * 1024,
     "video/mp4": 50 * 1024 * 1024,
     "video/quicktime": 50 * 1024 * 1024,
+    "audio/mpeg": 10 * 1024 * 1024,
+    "audio/mp4": 10 * 1024 * 1024,
+    "audio/wav": 10 * 1024 * 1024,
+    "audio/x-wav": 10 * 1024 * 1024,
+    "audio/ogg": 10 * 1024 * 1024,
+    "audio/webm": 10 * 1024 * 1024,
     "application/pdf": 10 * 1024 * 1024,
     "application/vnd.ms-excel": 10 * 1024 * 1024,
     "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": 10 * 1024 * 1024,
   } as Record<string, number>,
-  accept: ".jpg,.jpeg,.png,.mp4,.mov,.pdf,.xls,.xlsx",
+  accept: ".jpg,.jpeg,.png,.mp4,.mov,.mp3,.m4a,.wav,.ogg,.weba,.pdf,.xls,.xlsx",
 };
 
 export const ATTACHMENTS_BUCKET = "ticket-attachments";

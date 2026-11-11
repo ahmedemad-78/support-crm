@@ -40,6 +40,7 @@ export async function deliverPendingEmails() {
   const admin = createAdminClient();
   const { data: setting, error: policyError } = await admin.from("app_settings").select("value").eq("key", "workflow_notifications").single();
   if(policyError || setting?.value?.mode !== "central_only") throw new Error("Central notification routing is unavailable");
+  if (setting.value.email_enabled === false) return { sent: 0, failed: 0, deferred: true };
   const centralEmail = String(setting.value.email);
   const now = new Date();
   const { data, error } = await admin

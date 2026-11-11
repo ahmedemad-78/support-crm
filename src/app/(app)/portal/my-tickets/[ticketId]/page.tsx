@@ -1,9 +1,10 @@
+import { AttachmentPreview } from "@/components/tickets/attachment-preview";
 import { CaseFollowup } from "@/components/tickets/case-followup";
 import { loadCaseWorkflow } from "@/lib/tickets/workflow";
 import "@/app/(app)/tickets/workspace.css";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { ChevronRight, FileImage, FileText, FileVideo, Lock } from "lucide-react";
+import { ChevronRight, Lock } from "lucide-react";
 import { UserNotifications } from "@/components/app-shell/user-notifications";
 import { StatusBadge } from "@/components/tickets/status-badge";
 import { PORTAL_ROLES } from "@/lib/auth/roles";
@@ -41,7 +42,7 @@ export default async function PortalTicketPage({ params }: PageProps<"/portal/my
       .select("id, to_status, changed_at")
       .eq("ticket_id", ticket.id)
       .order("changed_at", { ascending: false }),
-    supabase.from("ticket_attachments").select("id, file_name, mime_type, storage_path").eq("ticket_id", ticket.id),
+    supabase.from("ticket_attachments").select("id, file_name, mime_type, storage_path").eq("ticket_id", ticket.id).is("event_id",null),
   ]);
 
   const signed = attachments?.length
@@ -133,23 +134,7 @@ export default async function PortalTicketPage({ params }: PageProps<"/portal/my
           <Note label="Follow-up notes" value={ticket.follow_up_notes} />
           <Note label="Tracker notes" value={ticket.tracker_notes} />
           {attachments && attachments.length > 0 && (
-            <div className="flex flex-wrap gap-2.5">
-              {attachments.map((a) => {
-                const Icon = a.mime_type.startsWith("video/") ? FileVideo : a.mime_type.startsWith("image/") ? FileImage : FileText;
-                return (
-                  <a
-                    key={a.id}
-                    href={urlByPath.get(a.storage_path) ?? "#"}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="flex items-center gap-2 rounded-lg border px-3 py-2 text-[13px] font-medium hover:bg-muted"
-                  >
-                    <Icon className="size-4 text-muted-foreground" />
-                    {a.file_name}
-                  </a>
-                );
-              })}
-            </div>
+            <div className="attachment-grid">{attachments.map(file=><AttachmentPreview key={file.id} attachment={{...file,url:urlByPath.get(file.storage_path)}}/>)}</div>
           )}
         </section>
 

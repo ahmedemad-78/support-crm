@@ -335,3 +335,14 @@ test("resolution messages only render textual fields from their preserved snapsh
   assert.deepEqual(conversation.resolutionSnapshot({response:"Fixed the sync",cause:"Payment delay",action:"Resynced",outcome:null,secret:"ignore",topic:{invalid:true}}),{response:"Fixed the sync",cause:"Payment delay",action:"Resynced"});
   assert.deepEqual(conversation.resolutionSnapshot(["bad"]),{});assert.deepEqual(conversation.resolutionSnapshot(null),{});
 });
+
+test("audio attachments infer common formats and enforce the shared 10 MB limit",()=>{
+ for(const [name,type] of [["voice.mp3","audio/mpeg"],["voice.m4a","audio/mp4"],["voice.wav","audio/wav"],["voice.ogg","audio/ogg"],["voice.weba","audio/webm"]]){
+   const file={name,type:"",size:200,lastModified:1};
+   assert.equal(intakeHelpers.attachmentMime(file),type);
+   assert.equal(intakeHelpers.checkIntakeFiles([],[file]).accepted.length,1);
+   assert.equal(intakeHelpers.checkIntakeFiles([],[{...file,size:10485761}]).accepted.length,0);
+ }
+ assert.equal(intakeHelpers.attachmentMime({name:"voice.m4a",type:"audio/x-m4a"}),"audio/mp4");
+ assert.equal(intakeHelpers.checkIntakeFiles([],[{name:"empty.mp3",type:"audio/mpeg",size:0,lastModified:1}]).accepted.length,0);
+});

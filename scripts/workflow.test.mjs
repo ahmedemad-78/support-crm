@@ -225,7 +225,7 @@ test("follow-up actions validate role and input before calling a constrained RPC
     const action=load("src/app/(app)/tickets/lifecycle-actions.ts").submitCaseFollowup;
     const data=form({mode:"reopen",body:"The subscription still does not appear.",requestId:caseId,version:initialVersion});
     const result=await action({error:"",success:""},data);
-    if(role===null||role==="manager"){assert.ok(result.error);assert.equal(calls.length,0);}else{assert.equal(result.error,"");assert.equal(calls[0].name,"reopen_case");assert.equal(calls[0].args.case_id,caseId);assert.equal(calls[0].args.expected_version,initialVersion);}
+    if(role===null||role==="manager"){assert.ok(result.error);assert.equal(calls.length,0);}else{assert.equal(result.error,"");assert.equal(calls[0].name,"send_case_message");assert.equal(calls[0].args.case_id,caseId);assert.equal(calls[0].args.expected_version,initialVersion);}
     data.set("body","x");const invalid=await action({error:"",success:""},data);assert.ok(invalid.error);
   }
 });
@@ -243,6 +243,23 @@ test("central email delivery excludes all legacy jobs and other recipients", asy
   const result=await load("src/lib/email/deliver.ts").deliverPendingEmails();
   assert.equal(result.sent,1);assert.equal(sent.length,1);assert.equal(sent[0].to,central);assert.match(sent[0].text,/Cause: Sync delay/);assert.match(sent[0].subject,/Resolved & closed/);
   assert.equal(rows[0].status,"pending");assert.equal(rows[1].status,"pending");assert.equal(rows[2].status,"pending");assert.equal(rows[3].status,"sent");
+});
+
+test("deferred email policy never reads queued jobs or invokes a mail transport",async()=>{
+  const tables=[];
+  const load=loadWith({"server-only":{},"@/lib/supabase/admin":{createAdminClient:()=>({from(table){tables.push(table);assert.equal(table,"app_settings");return {select(){return this;},eq(){return this;},single:async()=>({data:{value:{mode:"central_only",email_enabled:false}},error:null})};}})},"@/lib/email/send":{mailConfigured:()=>{throw Error("No mail transport allowed");},MailNotConfiguredError:class extends Error{}}});
+  const result=await load("src/lib/email/deliver.ts").deliverPendingEmails();assert.equal(result.deferred,true);assert.deepEqual(tables,["app_settings"]);
+});
+
+test("follow-up rejects invalid media before any database call and never dispatches email",async()=>{
+ const calls=[];
+ const load=loadWith({"next/cache":{revalidatePath(){}},"@/lib/auth/session":{getCurrentUser:async()=>({id:agentId,role:"support_agent"})},"@/lib/supabase/server":{createClient:async()=>({rpc:async(name,args)=>{calls.push({name,args});return {error:null};}})},"@/lib/email/deliver":{deliverPendingEmails:async()=>{throw Error("Email must stay deferred");}}});
+ const action=load("src/app/(app)/tickets/lifecycle-actions.ts").submitCaseFollowup;
+ const data=form({mode:"comment",body:"Please review the evidence.",requestId:caseId,version:initialVersion});
+ for(const files of ['invalid',JSON.stringify([{path:"p",name:"x.html",type:"text/html",size:20}]),JSON.stringify([{path:"p",name:"x.mp3",type:"audio/mpeg",size:10485761}])]){
+   data.set("files",files);assert.ok((await action({error:"",success:""},data)).error);assert.equal(calls.length,0);
+ }
+ data.set("files",JSON.stringify([{path:"p",name:"voice.mp3",type:"audio/mpeg",size:200}]));assert.equal((await action({error:"",success:""},data)).error,"");assert.equal(calls[0].name,"send_case_message");assert.equal(calls[0].args.files[0].type,"audio/mpeg");
 });
 
 test("resolution requires a meaningful Support response before a database write",async()=>{

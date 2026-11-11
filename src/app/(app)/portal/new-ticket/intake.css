@@ -69,3 +69,5 @@
 .intake-field:has(#school_name) > label { min-height:21px; }
 @media(min-width:851px) and (max-width:1100px) { .intake-field > label { min-height:21px; } }
 @media(max-width:640px) { .intake-field > label,.intake-fixed-label { min-height:21px; }.intake-choice > legend { min-height:42px; }.intake-field > label > .intake-field-status { align-self:flex-end; } }
+
+.intake-owner-select {margin-top:18px;align-items:center}.intake-owner-select .intake-owner {border:0;margin:0;padding:0;line-height:1.7}.intake-evidence-body>.attachment-grid {margin-top:16px}

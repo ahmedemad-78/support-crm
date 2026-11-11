@@ -56,6 +56,7 @@ export function portalTicketSchemaFor(source: string) {
 }
 export const supportTicketSchema = portalTicketSchema.extend({
   source: z.string().trim().min(1, "Choose a source"),
+  reporter_id: z.string().optional().transform(value=>value||null).pipe(z.uuid("Choose a reporting owner").nullable()),
 }).superRefine((value, ctx) => schoolCheck(value.source, value.school_name, ctx));
 
 export type PortalTicketInput = z.input<typeof portalTicketSchema>;

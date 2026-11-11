@@ -22,7 +22,7 @@ try {
     create function storage.foldername(text) returns text[] language sql immutable as $$select string_to_array($1,'/')$$;
   `);
   const files=readdirSync('supabase/migrations').filter(f=>f.endsWith('.sql')).sort();
-  for(const file of files.filter(f=>!f.includes('case_lifecycle') && !f.includes('intake_optional_contacts'))) await db.exec(readFileSync(`supabase/migrations/${file}`,'utf8'));
+  for(const file of files.filter(f=>!f.includes('case_lifecycle') && !f.includes('intake_optional_contacts') && !f.includes('conversation_media_and_reporter_notifications'))) await db.exec(readFileSync(`supabase/migrations/${file}`,'utf8'));
   const names=['Ahmed Emad','sonia','kabany','Olaa','Yasser Arab','Manager'];
   const roles=['support_agent','moderation','call_center','business_development','june_schools','manager'];
   const ids=names.map((_,i)=>`10000000-0000-4000-8000-${String(i+1).padStart(12,'0')}`);
@@ -98,7 +98,71 @@ try {
   }
   await denied(`insert into ticket_attachments(ticket_id,storage_path,file_name,mime_type,size_bytes) values('${optional.id}','too-large','large.pdf','application/pdf',10485761)`,/size_bytes_check/);
   await denied(`insert into ticket_attachments(ticket_id,storage_path,file_name,mime_type,size_bytes) values('${optional.id}','script','bad.html','text/html',200)`,/mime_type_check/);
-  await db.exec('reset role');await db.exec(`update profiles set is_active=false where id='${ids[2]}'`);await signIn(2);
+  await db.exec('reset role');
+  await db.exec('alter table storage.objects add column owner_id text, add column metadata jsonb; grant usage on schema storage to authenticated; grant select,insert on storage.objects to authenticated;');
+  await db.exec(readFileSync('supabase/migrations/20261111191028_conversation_media_and_reporter_notifications.sql','utf8'));
+  const mailCount=await scalar('select count(*)::int v from email_outbox');
+  const noticeCount=await scalar('select count(*)::int v from notifications');
+  await signIn(0);
+  const mediaId='30000000-0000-4000-8000-000000000001';
+  const mediaPath=`${ticket.id}/${ids[0]}/${mediaId}/evidence.png`;
+  await db.query('insert into storage.objects(id,bucket_id,name,owner_id,metadata) values(gen_random_uuid(),$1,$2,$3,$4)',['ticket-attachments',mediaPath,ids[0],{size:200,mimetype:'image/png'}]);
+  const mediaFiles=[{path:mediaPath,name:'evidence.png',type:'image/png',size:200}];
+  const messageVersion=await scalar(`select updated_at::text v from tickets where id='${ticket.id}'`);
+  const send=async(id,mode,body,attachments=[],expected=messageVersion)=>db.query('select public.send_case_message($1,$2,$3,$4,$5,$6)',[ticket.id,id,mode,body,expected,JSON.stringify(attachments)]);
+  await send(mediaId,'comment','Please review this image.',mediaFiles);
+  await send(mediaId,'comment','Please review this image.',mediaFiles);
+  check(await scalar(`select count(*)::int v from ticket_attachments where event_id='${mediaId}'`),1);
+  await db.exec('reset role');
+  check(await scalar('select count(*)::int v from notifications'),noticeCount+1);
+  check(await scalar(`select recipient_id::text v from notifications where event_id='${mediaId}'`),ids[2]);
+  check(await scalar('select count(*)::int v from email_outbox'),mailCount);
+  await signIn(1);
+  await denied(`select public.send_case_message('${ticket.id}',gen_random_uuid(),'comment','Unrelated person',now(),'[]')`,/not available/);
+  await signIn(2);
+  const replyId='30000000-0000-4000-8000-000000000002';
+  await send(replyId,'comment','Customer will try again.');
+  await db.exec('reset role');check(await scalar(`select recipient_id::text v from notifications where event_id='${replyId}'`),ids[0]);
+  await signIn(2);
+  const reopenId='30000000-0000-4000-8000-000000000003';
+  await send(reopenId,'reopen','Same problem persists.');
+  await send(reopenId,'reopen','Same problem persists.');
+  check(await scalar(`select reopen_count v from tickets where id='${ticket.id}'`),2);
+  await signIn(0);
+  await denied(`insert into ticket_attachments(ticket_id,event_id,storage_path,file_name,mime_type,size_bytes) values('${ticket.id}','${mediaId}','forged','bad.png','image/png',200)`,/row-level security/);
+  const rejected='30000000-0000-4000-8000-000000000004';
+  try { await send(rejected,'comment','Missing upload',[{...mediaFiles[0],path:`${ticket.id}/${ids[0]}/${rejected}/missing.png`}]);assert.fail('Expected missing file rejection'); }
+  catch(error) { assert.match(error.message,/incomplete/);assertions++; }
+  check(await scalar(`select count(*)::int v from ticket_workflow_events where id='${rejected}'`),0);
+  await denied(`insert into tickets(ticket_number,source,reporter_id,customer_name,issue_date,city_id,end_user_type,platform,issue_description) values('pending','call_center','${ids[1]}','Wrong team',current_date,(select id from cities limit 1),'parent','web','Must reject cross team')`,/selected source team/);
+  await denied(`select public.send_case_message('${ticket.id}','${mediaId}','comment','Changed retry content',now(),'[]')`,/new message request/);
+  const badSizeId='30000000-0000-4000-8000-000000000005';
+  const badSizePath=`${ticket.id}/${ids[0]}/${badSizeId}/bad-size.mp3`;
+  await db.query('insert into storage.objects(id,bucket_id,name,owner_id,metadata) values(gen_random_uuid(),$1,$2,$3,$4)',['ticket-attachments',badSizePath,ids[0],{size:200,mimetype:'audio/mpeg'}]);
+  try {await send(badSizeId,'comment','Forged size',[{path:badSizePath,name:'voice.mp3',type:'audio/mpeg',size:100}]);assert.fail('Expected metadata validation');}catch(error){assert.match(error.message,/incomplete/);assertions++;}
+  const tooMany=Array(6).fill(mediaFiles[0]);
+  try {await send(badSizeId,'comment','Too many files',tooMany);assert.fail('Expected file limit');}catch(error){assert.match(error.message,/5 files/);assertions++;}
+  await signIn(2);
+  check(await scalar(`select count(*)::int v from storage.objects where name='${badSizePath}'`),0);
+  check(await scalar(`select count(*)::int v from storage.objects where name='${mediaPath}'`),1);
+  await denied(`insert into storage.objects(id,bucket_id,name,owner_id,metadata) values(gen_random_uuid(),'ticket-attachments','${ticket.id}/${ids[0]}/${badSizeId}/forged.png','${ids[2]}','{"size":200,"mimetype":"image/png"}')`,/row-level security/);
+  await signIn(0);
+  await db.exec(`update tickets set status='awaiting_customer' where id='${ticket.id}'`);
+  const statusEvent=await scalar(`select id::text v from ticket_workflow_events where ticket_id='${ticket.id}' and to_status='awaiting_customer' order by created_at desc limit 1`);
+  await db.exec('reset role');check(await scalar(`select recipient_id::text v from notifications where event_id='${statusEvent}'`),ids[2]);
+  // A second real team member can be chosen independently of the source default.
+  const colleague='10000000-0000-4000-8000-000000000007';
+  await db.query('insert into auth.users(id,email,raw_app_meta_data) values($1,$2,$3)',[colleague,'second-call@example.com',{full_name:'Second Call Center',role:'call_center'}]);
+  await signIn(0);
+  const selected=(await db.query(`insert into tickets(ticket_number,source,reporter_id,customer_name,issue_date,city_id,end_user_type,platform,issue_description) values('pending','call_center',$1,'Selected owner',current_date,(select id from cities limit 1),'parent','web','Selected team reporter') returning reporter_id`,[colleague])).rows[0];
+  check(selected.reporter_id,colleague);
+  await db.exec('reset role');await db.query('update profiles set is_active=false where id=$1',[colleague]);await signIn(0);
+  await denied(`insert into tickets(ticket_number,source,reporter_id,customer_name,issue_date,city_id,end_user_type,platform,issue_description) values('pending','call_center','${colleague}','Inactive owner',current_date,(select id from cities limit 1),'parent','web','Inactive must be rejected')`,/active reporting owner/);
+  await signIn(2);
+  const spoofed=(await db.query(`insert into tickets(ticket_number,source,reporter_id,customer_name,issue_date,city_id,end_user_type,platform,issue_description) values('pending','whatsapp','${ids[1]}','Portal fixture',current_date,(select id from cities limit 1),'parent','web','Portal identity remains fixed') returning source,reporter_id`)).rows[0];
+  check(spoofed.source,'call_center');check(spoofed.reporter_id,ids[2]);
+  await db.exec('reset role');check(await scalar('select count(*)::int v from email_outbox'),mailCount);
+  await db.exec(`update profiles set is_active=false where id='${ids[2]}'`);await signIn(2);
   await denied(`select public.comment_on_case('${ticket.id}','Inactive accounts cannot comment',gen_random_uuid())`,/Sign in/);
-  console.log(`PostgreSQL lifecycle: ${assertions} assertions passed (create, resolve twice, reopen, duplicate protection, comments, RLS, snapshots, source mapping, central-only routing).`);
+  console.log(`PostgreSQL lifecycle: ${assertions} assertions passed (create, resolve, reopen, media ownership/atomicity, retries, RLS, source-bound reporter selection, participant notifications, email deferred).`);
 } finally {await db.close();}

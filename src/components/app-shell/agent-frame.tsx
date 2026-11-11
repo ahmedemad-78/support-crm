@@ -41,7 +41,7 @@ export async function AgentFrame({
             className="w-full bg-transparent text-sm outline-none placeholder:text-muted-foreground"
           />
         </form>}
-        <div className="ml-auto sm:ml-0">
+        <div className={hideTicketSearch ? "ml-auto" : "ml-auto sm:ml-0"}>
           <UserNotifications />
         </div>
       </header>
