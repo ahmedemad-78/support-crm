@@ -25,3 +25,5 @@
 .conversation-attachment-drafts {padding-top:14px;}
 .conversation-attachment-help {margin-top:8px;font-size:11px;color:#67755f;line-height:1.6;}
 @media(max-width:640px){.attachment-media{height:170px}.attachment-actions>a,.attachment-actions>button{width:40px;height:40px}.conversation-bubble .attachment-grid{min-width:0;width:100%}.conversation-bubble:has(.attachment-grid){min-width:min(260px,64vw)}}
+
+.conversation-attach:has(:focus-visible) {outline:2px solid #356b49;outline-offset:3px}
