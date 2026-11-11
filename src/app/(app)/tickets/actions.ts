@@ -7,6 +7,7 @@ import { createClient } from "@/lib/supabase/server";
 import { deliverPendingEmails } from "@/lib/email/deliver";
 import { TICKET_STATUSES, type TicketStatus } from "@/lib/tickets/constants";
 import { safeAppReturn } from "@/lib/tickets/filters";
+import { resolutionReadiness } from "@/lib/tickets/resolution";
 import { z } from "zod";
 
 function validUpdate(id: string, version: string) {
@@ -181,8 +182,10 @@ export async function saveCaseWorkspace(_previous: { error: string }, formData: 
   const trackerKeys = ["requestTypeId", "topicId", "trackerCauseId", "trackerActionId", "outcomeId"];
   const idKeys = [...trackerKeys, "issueCategoryId", "rootCauseId"];
   if (idKeys.some((key) => !numericId(formData.get(key)))) return { error: "Choose valid tracker and classification values." };
-  if (status === "resolved" && trackerKeys.some((key) => !formData.get(key))) return { error: "Complete request type, topic, cause, action and outcome before marking this case Resolved." };
-  if (status === "resolved" && String(formData.get("resolutionNotes") ?? "").trim().length < 5) return { error: "Write a clear Support response before resolving and closing." };
+  if (status === "resolved") {
+    const missing = resolutionReadiness({ requestTypeId:String(formData.get("requestTypeId") ?? ""), topicId:String(formData.get("topicId") ?? ""), trackerCauseId:String(formData.get("trackerCauseId") ?? ""), trackerActionId:String(formData.get("trackerActionId") ?? ""), outcomeId:String(formData.get("outcomeId") ?? ""), resolutionNotes:String(formData.get("resolutionNotes") ?? "") }).filter(field => !field.ready);
+    if (missing.length) return { error: "Still needed to resolve & close: " + missing.map(field => field.label + (field.key === "resolutionNotes" ? " (at least 5 characters)" : "")).join(", ") + ". Your draft is still here." };
+  }
   const assignee = String(formData.get("assigneeId") ?? "");
   if (assignee && !z.uuid().safeParse(assignee).success) return { error: "Choose a valid Support assignee." };
   let failure: string | undefined;

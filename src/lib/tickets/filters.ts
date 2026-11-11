@@ -1,9 +1,9 @@
 import { END_USER_TYPES, TICKET_STATUSES, type TicketStatus } from "./constants";
 import { validDay } from "./analytics";
 
-export const TICKET_VIEWS = ["all", "open", "new", "mine", "awaiting", "resolved"] as const;
+export const TICKET_VIEWS = ["open", "new", "reopened", "awaiting", "mine", "all", "resolved"] as const;
 export type TicketView = (typeof TICKET_VIEWS)[number];
-export const PAGE_SIZE = 8;
+export const PAGE_SIZE = 25;
 
 export type TicketListFilters = {
   view: TicketView;
@@ -15,7 +15,8 @@ export type TicketListFilters = {
   range: "7" | "30" | "90" | "all";
   q: string;
   page: number;
-  sort?: "newest" | "oldest" | "updated";
+  pageSize?: 25 | 50;
+  sort?: "newest" | "oldest" | "updated" | "stale";
 };
 
 function one(value: string | string[] | undefined): string {
@@ -32,7 +33,7 @@ export function parseTicketListFilters(
   const page = Number(one(searchParams.page));
 
   return {
-    view: TICKET_VIEWS.includes(view as TicketView) ? (view as TicketView) : "all",
+    view: TICKET_VIEWS.includes(view as TicketView) ? (view as TicketView) : (one(searchParams.scope) === "dashboard" || one(searchParams.scope) === "followup" ? "all" : "open"),
     status: TICKET_STATUSES.includes(status as TicketStatus) ? (status as TicketStatus) : "",
     source: /^[a-z][a-z0-9_]{1,40}$/.test(source) ? source : "",
     city: one(searchParams.city),
@@ -41,7 +42,8 @@ export function parseTicketListFilters(
     range: range === "7" || range === "30" || range === "90" ? range : "all",
     q: one(searchParams.q).slice(0, 80),
     page: Number.isFinite(page) && page > 0 ? Math.floor(page) : 1,
-    sort: one(searchParams.sort) === "oldest" ? "oldest" : one(searchParams.sort) === "updated" ? "updated" : "newest",
+    pageSize: one(searchParams.pageSize) === "50" ? 50 : 25,
+    sort: one(searchParams.sort) === "stale" ? "stale" : one(searchParams.sort) === "oldest" ? "oldest" : one(searchParams.sort) === "updated" ? "updated" : "newest",
   };
 }
 
@@ -55,7 +57,7 @@ export function rangeStart(range: TicketListFilters["range"]): string | null {
 
 export function ticketListQuery(filters: TicketListFilters, extras?: Record<string, string>): string {
   const params = new URLSearchParams();
-  if (filters.view !== "all") params.set("view", filters.view);
+  params.set("view", filters.view);
   if (filters.status) params.set("status", filters.status);
   if (filters.source) params.set("source", filters.source);
   if (filters.city) params.set("city", filters.city);
@@ -64,6 +66,7 @@ export function ticketListQuery(filters: TicketListFilters, extras?: Record<stri
   if (filters.range !== "all") params.set("range", filters.range);
   if (filters.sort && filters.sort !== "newest") params.set("sort", filters.sort);
   if (filters.q) params.set("q", filters.q);
+  if (filters.pageSize === 50) params.set("pageSize", "50");
   if (filters.page > 1) params.set("page", String(filters.page));
   for (const [key, value] of Object.entries(extras ?? {})) {
     if (value) params.set(key, value);
@@ -156,6 +159,7 @@ export function dashboardListHref(filters: DashboardFilters, scope: "followup" |
   const params = new URLSearchParams(dashboardQuery(filters).replace(/^\?/, ""));
   params.delete("view");
   params.set("scope", scope);
+  params.set("view", "all");
   return `/tickets?${params.toString()}`;
 }
 

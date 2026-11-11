@@ -150,9 +150,9 @@ test("unified case save rejects conflicts without partial writes or mail", async
   assert.match(result.error, /changed since/); assert.equal(h.writes(), 0); assert.equal(h.emails(), 0);
 });
 test("unified resolution requires every tracker field before a database write", async () => {
-  for (const key of ["requestTypeId", "topicId", "trackerCauseId", "trackerActionId", "outcomeId"]) {
+  for (const [key,label] of Object.entries({requestTypeId:"Request type",topicId:"Topic",trackerCauseId:"Cause",trackerActionId:"Action",outcomeId:"Outcome"})) {
     const h = caseHarness(); const result = await h.actions.saveCaseWorkspace({ error: "" }, fullCaseForm({ status: "resolved", [key]: "" }));
-    assert.match(result.error, /before marking this case Resolved/); assert.equal(h.writes(), 0);
+    assert.equal(result.error.includes(label),true); assert.match(result.error, /Still needed to resolve & close/); assert.equal(h.writes(), 0);
   }
 });
 test("unified save enforces actor, active owner and numeric classification", async () => {
@@ -246,7 +246,7 @@ test("central email delivery excludes all legacy jobs and other recipients", asy
 });
 
 test("resolution requires a meaningful Support response before a database write",async()=>{
-  const h=caseHarness();const result=await h.actions.saveCaseWorkspace({error:""},fullCaseForm({status:"resolved",resolutionNotes:"  "}));assert.match(result.error,/clear Support response/);assert.equal(h.writes(),0);
+  const h=caseHarness();const result=await h.actions.saveCaseWorkspace({error:""},fullCaseForm({status:"resolved",resolutionNotes:"  "}));assert.match(result.error,/Technical Support response \(at least 5 characters\)/);assert.equal(h.writes(),0);
 });
 
 test("Microsoft Graph uses app-only OAuth and sends through the configured mailbox",async()=>{
@@ -329,4 +329,12 @@ test("successful attempts within the window reset the consecutive failure count"
   const query={select(){return query;},eq(){return query;},gte(){return query;},order(){return query;},limit:async()=>({data,error:null})};
   const load=loadWith({"server-only":{},"@/lib/supabase/admin":{createAdminClient:()=>({from:()=>query})}});
   const r=await load("src/lib/auth/lockout.ts").getLockStatus("fixture@example.test");assert.deepEqual(r,{locked:false,failuresLeft:4});
+});
+
+test("a missing response can be corrected and retried to resolve the same case",async()=>{
+  const h=caseHarness();
+  const rejected=await h.actions.saveCaseWorkspace({error:""},fullCaseForm({status:"resolved",resolutionNotes:" "}));
+  assert.match(rejected.error,/Technical Support response/);assert.equal(h.writes(),0);
+  const saved=await destination(()=>h.actions.saveCaseWorkspace(rejected,fullCaseForm({status:"resolved",assigneeId:agentId})));
+  assert.equal(saved.searchParams.get("saved"),"1");assert.equal(h.writes(),1);assert.equal(h.record.status,"resolved");assert.equal(h.record.assignee_id,agentId);
 });

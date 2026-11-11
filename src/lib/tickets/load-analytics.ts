@@ -16,7 +16,7 @@ export async function loadAnalytics() {
     let query = supabase
       .from("tickets")
       .select(
-        "reopen_count, contact_channel, is_historical, workflow_events:ticket_workflow_events(kind,created_at), id, ticket_number, issue_description, status, source, created_at, updated_at, resolved_at, issue_date, customer_name, customer_email, customer_phone, school_name, end_user_type, city_id, issue_category_id, platform, assignee_id, fawry_payment, assignee:profiles!tickets_assignee_id_fkey(full_name), issue_categories(name), root_causes(name), request_types(name), topics(name), tracker_causes(name), tracker_actions(name), outcomes(name)",
+        "reopen_count, last_reopened_at, credentials_username, resolution_notes, reporter:profiles!tickets_reporter_id_fkey(full_name), creator:profiles!tickets_created_by_fkey(full_name), contact_channel, is_historical, workflow_events:ticket_workflow_events(kind,created_at), id, ticket_number, issue_description, status, source, created_at, updated_at, resolved_at, issue_date, customer_name, customer_email, customer_phone, school_name, end_user_type, city_id, issue_category_id, platform, assignee_id, fawry_payment, assignee:profiles!tickets_assignee_id_fkey(full_name), issue_categories(name), root_causes(name), request_types(name), topics(name), tracker_causes(name), tracker_actions(name), outcomes(name)",
       )
       .lte("created_at", asOf)
       .order("id")
@@ -40,6 +40,11 @@ export async function loadAnalytics() {
         source: row.source,
         contactChannel: row.contact_channel,
         reopenCount: row.reopen_count,
+        lastReopenedAt: row.last_reopened_at ?? "",
+        reporter: (Array.isArray(row.reporter) ? row.reporter[0]?.full_name : (row.reporter as {full_name?:string}|null)?.full_name) ?? "",
+        creator: (Array.isArray(row.creator) ? row.creator[0]?.full_name : (row.creator as {full_name?:string}|null)?.full_name) ?? "",
+        credential: row.credentials_username ?? "",
+        resolutionNotes: row.resolution_notes ?? "",
         workflowEvents: row.workflow_events ?? [],
         isHistorical: row.is_historical,
         sourceName: sourceNames.get(row.source),

@@ -80,7 +80,7 @@ export default async function AgentTicketPage({
   const creator = nameOf(ticket.creator);
   const idValue = (value: number | null) => value == null ? "" : String(value);
   return <AgentFrame title="Case file"><CaseWorkspace
-    ticket={{ ...ticket, status }} sourceName={ticketSource?.name || sourceLabel(ticket.source)} city={city} creator={`${creator} · Reporting owner: ${workflow.reporterName} · Reopened ${workflow.reopen_count} times`} backHref={backHref}
+    ticket={{ ...ticket, status }} sourceName={ticketSource?.name || sourceLabel(ticket.source)} city={city} creator={creator} reporterName={workflow.reporter_id ? workflow.reporterName : undefined} reopenCount={workflow.reopen_count} backHref={backHref}
     saved={saved === "1"} error={typeof errorMessage === "string" ? errorMessage : undefined}
     attachments={(attachments.data ?? []).map((file) => ({ ...file, url: urlByPath.get(file.storage_path) }))}
     notes={(notes.data ?? []).map((note) => ({ ...note, author: nameOf(note.author) }))}

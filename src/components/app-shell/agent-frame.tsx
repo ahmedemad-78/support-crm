@@ -6,9 +6,11 @@ export async function AgentFrame({
   title,
   children,
   ticketSearch,
+  hideTicketSearch = false,
 }: {
   title: string;
   children: React.ReactNode;
+  hideTicketSearch?: boolean;
   ticketSearch?: { q: string; hidden: Record<string, string> };
 }) {
   await requireUser(["support_agent", "manager"]);
@@ -22,7 +24,7 @@ export async function AgentFrame({
           </span>
           {title}
         </h1>
-        <form
+        {!hideTicketSearch && <form
           action="/tickets"
           className="ml-auto hidden h-9 w-full max-w-sm items-center gap-2 rounded-lg border bg-muted px-3 sm:flex"
         >
@@ -38,7 +40,7 @@ export async function AgentFrame({
             defaultValue={ticketSearch?.q ?? ""}
             className="w-full bg-transparent text-sm outline-none placeholder:text-muted-foreground"
           />
-        </form>
+        </form>}
         <div className="ml-auto sm:ml-0">
           <UserNotifications />
         </div>

@@ -122,7 +122,7 @@ export function matchesOverview(
   }
   if (!skip.has("q") && filters.q) {
     const needle = filters.q.trim().toLowerCase();
-    const hay = [ticket.number, ticket.customerName, ticket.schoolName, ticket.customerPhone, ticket.customerEmail, ticket.subject, ticket.topic]
+    const hay = [ticket.number, ticket.customerName, ticket.schoolName, ticket.customerPhone, ticket.customerEmail, ticket.credential, ticket.subject, ticket.topic]
       .filter(Boolean)
       .join(" ")
       .toLowerCase();

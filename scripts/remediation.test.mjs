@@ -19,6 +19,8 @@ const files = [
   "src/lib/tickets/filters.ts",
   "src/lib/tickets/schema.ts",
   "src/lib/tickets/intake.ts",
+  "src/lib/tickets/resolution.ts",
+  "src/lib/tickets/queue.ts",
 ];
 
 for (const file of files) {
@@ -44,6 +46,8 @@ const analytics = require(join(directory, "lib/tickets/analytics.js"));
 const overview = require(join(directory, "lib/tickets/overview.js"));
 const filters = require(join(directory, "lib/tickets/filters.js"));
 const intakeHelpers = require(join(directory, "lib/tickets/intake.js"));
+const resolution = require(join(directory, "lib/tickets/resolution.js"));
+const queue = require(join(directory, "lib/tickets/queue.js"));
 const schema = require(join(directory, "lib/tickets/schema.js"));
 
 after(() => rmSync(directory, { recursive: true, force: true }));
@@ -130,7 +134,7 @@ test("follow-up navigation keeps the reported-date population", () => {
   assert.match(href, /from=2026-09-01/);
   assert.match(href, /to=2026-09-30/);
   assert.equal(href.startsWith("/tickets?"), true);
-  assert.equal(filters.dashboardListHref({ ...selection, view: "created" }, "followup").includes("view="), false);
+  assert.equal(new URL(filters.dashboardListHref({ ...selection, view: "created" }, "followup"), "https://example.test").searchParams.get("view"), "all");
 });
 
 test("legacy csv neutralizes formulas and uses the same population", () => {
@@ -295,4 +299,24 @@ test("PDF and Excel are bounded attachments, including missing browser MIME", ()
   }
   assert.equal(intakeHelpers.checkIntakeFiles([],[fakeFile("bad.html","text/html")]).accepted.length,0);
   assert.equal(intakeHelpers.checkIntakeFiles([],[fakeFile("empty.pdf","application/pdf",0)]).accepted.length,0);
+});
+
+test("queue separates open reopened work from resolved history and other assignments",()=>{
+  const rows=[{status:"in_progress",reopenCount:2,assigneeId:"me"},{status:"resolved",reopenCount:3,assigneeId:"me"},{status:"closed",reopenCount:1,assigneeId:"me"},{status:"new",reopenCount:0,assigneeId:"other"}];
+  assert.deepEqual(rows.filter(row=>queue.inQueueView(row,"reopened","me")),[rows[0]]);
+  assert.deepEqual(rows.filter(row=>queue.inQueueView(row,"mine","me")),[rows[0]]);
+  assert.equal(rows.filter(row=>queue.inQueueView(row,"all","me")).length,4);
+  assert.equal(rows.filter(row=>queue.inQueueView(row,"open","me")).length,2);
+});
+test("queue defaults and links keep dashboard cohorts and explicit all-case selections",()=>{
+  assert.equal(filters.parseTicketListFilters({}).view,"open");
+  assert.equal(filters.parseTicketListFilters({scope:"dashboard"}).view,"all");
+  for(const view of ["open","all","reopened"]){const input=filters.parseTicketListFilters({view,source:"call_center",sort:"stale",pageSize:"50",page:"2"});const params=Object.fromEntries(new URLSearchParams(filters.ticketListQuery(input,{scope:"dashboard"})));const result=filters.parseTicketListFilters(params);assert.equal(result.view,view);assert.equal(result.pageSize,50);assert.equal(result.source,"call_center");assert.equal(result.sort,"stale");assert.equal(result.page,2);}
+  assert.equal(filters.parseTicketListFilters({pageSize:"99999"}).pageSize,25);
+});
+test("resolution readiness includes a meaningful response as the sixth requirement",()=>{
+  const values={requestTypeId:"1",topicId:"2",trackerCauseId:"3",trackerActionId:"4",outcomeId:"5",resolutionNotes:"  "};
+  let result=resolution.resolutionReadiness(values);assert.equal(result.filter(field=>field.ready).length,5);assert.equal(result.find(field=>!field.ready).key,"resolutionNotes");
+  result=resolution.resolutionReadiness({...values,resolutionNotes:"Fixed the account sync."});assert.equal(result.every(field=>field.ready),true);
+  assert.equal(resolution.resolutionReadiness({...values,topicId:"-1"})[1].ready,false);
 });

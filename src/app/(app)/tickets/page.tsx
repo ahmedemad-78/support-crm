@@ -17,6 +17,7 @@ import {
 import { cairoDate } from "@/lib/tickets/dashboard-model";
 import { loadAnalytics } from "@/lib/tickets/load-analytics";
 import { dashboardPopulation, reportedDay, statusGroup } from "@/lib/tickets/overview";
+import { inQueueView as inListView, OPEN_QUEUE_STATUSES } from "@/lib/tickets/queue";
 import type { AnalyticsTicket } from "@/lib/tickets/analytics";
 
 const VIEW_LABELS = QUEUE_VIEWS;
@@ -47,8 +48,8 @@ export default async function TicketsPage({
   const extras = scopeParams(rawParams, scope);
   const listHref = (next: Partial<TicketListFilters>) =>
     `/tickets${ticketListQuery({ ...filters, ...next }, extras)}`;
-  const from = (filters.page - 1) * PAGE_SIZE;
-  const preserved = preservedFields(filters, extras);
+  const pageSize = filters.pageSize ?? PAGE_SIZE;
+  const from = (filters.page - 1) * pageSize;
 
   let tickets: TicketRow[] = [];
   let total = 0;
@@ -69,14 +70,15 @@ export default async function TicketsPage({
     const viewRows = population
       .filter((ticket) => inListView(ticket, filters.view, user.id))
       .sort((a, b) =>
-        filters.sort === "updated" ? (b.updatedAt || b.createdAt).localeCompare(a.updatedAt || a.createdAt)
+        filters.sort === "stale" ? (a.updatedAt || a.createdAt).localeCompare(b.updatedAt || b.createdAt) || a.id.localeCompare(b.id)
+          : filters.sort === "updated" ? (b.updatedAt || b.createdAt).localeCompare(a.updatedAt || a.createdAt)
           : filters.sort === "oldest" ? (scope === "followup" ? reportedDay(a).localeCompare(reportedDay(b)) : a.createdAt.localeCompare(b.createdAt)) || a.number.localeCompare(b.number)
           : b.createdAt.localeCompare(a.createdAt) || a.number.localeCompare(b.number),
       );
     total = viewRows.length;
-    if (filters.page > Math.max(1, Math.ceil(total / PAGE_SIZE))) redirect(listHref({ page: Math.max(1, Math.ceil(total / PAGE_SIZE)) }));
+    if (filters.page > Math.max(1, Math.ceil(total / pageSize))) redirect(listHref({ page: Math.max(1, Math.ceil(total / pageSize)) }));
     const cityNames = new Map((cities.data ?? []).map((city) => [String(city.id), city.name]));
-    tickets = viewRows.slice(from, from + PAGE_SIZE).map((ticket) => ({
+    tickets = viewRows.slice(from, from + pageSize).map((ticket) => ({
       id: ticket.id,
       ticket_number: ticket.number,
       issue_description: ticket.subject,
@@ -88,6 +90,8 @@ export default async function TicketsPage({
       issue_date: ticket.reportedOn || null,
       cities: ticket.cityId ? { name: cityNames.get(ticket.cityId) ?? "" } : null,
       assignee: ticket.assignee ? { full_name: ticket.assignee } : null,
+      reporter: ticket.reporter ? {full_name:ticket.reporter} : null, creator: ticket.creator ? {full_name:ticket.creator} : null,
+      reopen_count:ticket.reopenCount ?? 0, last_reopened_at:ticket.lastReopenedAt || null, school_name:ticket.schoolName, resolution_notes:ticket.resolutionNotes,
     }));
   } else {
     const viewCounts = await Promise.all(
@@ -98,10 +102,10 @@ export default async function TicketsPage({
       }),
     );
     counts = Object.fromEntries(viewCounts) as Record<TicketView, number>;
-    if (filters.page > Math.max(1, Math.ceil(counts[filters.view] / PAGE_SIZE))) redirect(listHref({ page: Math.max(1, Math.ceil(counts[filters.view] / PAGE_SIZE)) }));
+    if (filters.page > Math.max(1, Math.ceil(counts[filters.view] / pageSize))) redirect(listHref({ page: Math.max(1, Math.ceil(counts[filters.view] / pageSize)) }));
     const { data, count, error } = await applyFilters(
       db,
-      "id, ticket_number, issue_description, customer_name, source, status, created_at, updated_at, issue_date, cities(name), assignee:profiles!tickets_assignee_id_fkey(full_name)",
+      "id, ticket_number, issue_description, customer_name, source, status, created_at, updated_at, issue_date, reopen_count, last_reopened_at, school_name, resolution_notes, cities(name), reporter:profiles!tickets_reporter_id_fkey(full_name), creator:profiles!tickets_created_by_fkey(full_name), assignee:profiles!tickets_assignee_id_fkey(full_name)",
       filters,
       user.id,
       false,
@@ -111,7 +115,7 @@ export default async function TicketsPage({
     tickets = data ?? [];
     total = count ?? 0;
   }
-  return <AgentFrame title="Case queue" ticketSearch={{ q: filters.q, hidden: preserved }}><TicketQueue tickets={tickets} total={total} counts={counts} filters={filters} extras={extras} cities={cities.data ?? []} categories={categories.data ?? []} agents={agents.data ?? []} sources={sourceOptions.data ?? []} canCreate={user.role === "support_agent"} reportHref={scope ? `/dashboard${dashboardQuery(dashboardFilters)}` : undefined} /></AgentFrame>;
+  return <AgentFrame title="Case queue" hideTicketSearch><TicketQueue tickets={tickets} total={total} counts={counts} filters={filters} extras={extras} cities={cities.data ?? []} categories={categories.data ?? []} agents={agents.data ?? []} sources={sourceOptions.data ?? []} canCreate={user.role === "support_agent"} reportHref={scope ? `/dashboard${dashboardQuery(dashboardFilters)}` : undefined} /></AgentFrame>;
 }
 
 const SCOPE_KEYS = [
@@ -132,28 +136,6 @@ function scopeParams(
   return extras;
 }
 
-function preservedFields(filters: TicketListFilters, extras: Record<string, string>) {
-  const hidden: Record<string, string> = { ...extras };
-  if (filters.view !== "all") hidden.view = filters.view;
-  if (filters.status) hidden.status = filters.status;
-  if (filters.source) hidden.source = filters.source;
-  if (filters.city) hidden.city = filters.city;
-  if (filters.category) hidden.category = filters.category;
-  if (filters.assignee) hidden.assignee = filters.assignee;
-  if (!extras.scope && filters.range !== "all") hidden.range = filters.range;
-  if (filters.sort && filters.sort !== "newest") hidden.sort = filters.sort;
-  return hidden;
-}
-
-function inListView(ticket: AnalyticsTicket, view: TicketView, userId: string) {
-  if (view === "open") return statusGroup(ticket.status) === "followup";
-  if (view === "new") return ticket.status === "new";
-  if (view === "mine") return ticket.assigneeId === userId;
-  if (view === "awaiting") return ticket.status === "awaiting_customer";
-  if (view === "resolved") return ticket.status === "resolved";
-  return true;
-}
-
 function listDimension(ticket: AnalyticsTicket, filters: TicketListFilters) {
   if (filters.city && ticket.cityId !== filters.city) return false;
   if (filters.category && ticket.categoryId !== filters.category) return false;
@@ -167,6 +149,7 @@ type TicketQuery = {
   eq: (column: string, value: string) => TicketQuery;
   in: (column: string, values: string[]) => TicketQuery;
   is: (column: string, value: null) => TicketQuery;
+  gt: (column: string, value: number) => TicketQuery;
   gte: (column: string, value: string) => TicketQuery;
   or: (filters: string) => TicketQuery;
   order: (column: string, options: { ascending: boolean }) => TicketQuery;
@@ -182,9 +165,10 @@ function applyFilters(
   from = 0,
 ) {
   let next = supabase.from("tickets").select(columns, { count: "exact", head });
-  if (filters.view === "open") next = next.in("status", ["new", "in_progress", "awaiting_customer"]);
+  if (filters.view === "open") next = next.in("status", OPEN_QUEUE_STATUSES);
   if (filters.view === "new") next = next.eq("status", "new");
-  if (filters.view === "mine") next = next.eq("assignee_id", userId);
+  if (filters.view === "mine") next = next.eq("assignee_id", userId).in("status", OPEN_QUEUE_STATUSES);
+  if (filters.view === "reopened") next = next.gt("reopen_count", 0).in("status", OPEN_QUEUE_STATUSES);
   if (filters.view === "awaiting") next = next.eq("status", "awaiting_customer");
   if (filters.view === "resolved") next = next.eq("status", "resolved");
   if (filters.status) next = next.eq("status", filters.status);
@@ -197,10 +181,10 @@ function applyFilters(
   if (start) next = next.gte("created_at", start);
   if (filters.q) {
     const term = filters.q.replace(/[%_,()]/g, "");
-    next = next.or(`ticket_number.ilike.%${term}%,customer_name.ilike.%${term}%,customer_phone.ilike.%${term}%,customer_email.ilike.%${term}%,issue_description.ilike.%${term}%`);
+    next = next.or(`ticket_number.ilike.%${term}%,customer_name.ilike.%${term}%,customer_phone.ilike.%${term}%,customer_email.ilike.%${term}%,credentials_username.ilike.%${term}%,school_name.ilike.%${term}%,issue_description.ilike.%${term}%`);
   }
   if (head) return next;
-  return next.order(filters.sort === "updated" ? "updated_at" : "created_at", { ascending: filters.sort === "oldest" }).order("id", { ascending: true }).range(from, from + PAGE_SIZE - 1);
+  return next.order(filters.sort === "updated" || filters.sort === "stale" ? "updated_at" : "created_at", { ascending: filters.sort === "oldest" || filters.sort === "stale" }).order("id", { ascending: true }).range(from, from + (filters.pageSize ?? PAGE_SIZE) - 1);
 }
 
 type TicketRow = QueueRow;
