@@ -1,8 +1,8 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { Bell } from "lucide-react";
+import { Bell, X } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { formatRelative } from "@/lib/format";
 import { STATUS_LABELS, STATUS_STYLES, type TicketStatus } from "@/lib/tickets/constants";
@@ -35,6 +35,15 @@ export function NotificationBell({
   const [open, setOpen] = useState(false);
   const [items, setItems] = useState(initial);
   const [unread, setUnread] = useState(unreadCount);
+  const root=useRef<HTMLDivElement>(null);
+  const trigger=useRef<HTMLButtonElement>(null);
+  useEffect(()=>{
+    if(!open)return;
+    const closeOutside=(event:PointerEvent)=>{if(event.target instanceof Node&&!root.current?.contains(event.target))setOpen(false);};
+    const escape=(event:KeyboardEvent)=>{if(event.key==="Escape"){setOpen(false);trigger.current?.focus();}};
+    document.addEventListener("pointerdown",closeOutside);document.addEventListener("keydown",escape);
+    return()=>{document.removeEventListener("pointerdown",closeOutside);document.removeEventListener("keydown",escape);};
+  },[open]);
 
   useEffect(() => {
     const supabase = createClient();
@@ -76,10 +85,12 @@ export function NotificationBell({
   }
 
   return (
-    <div className="relative">
+    <div className="relative" ref={root}>
       <button
+        ref={trigger}
         type="button"
         aria-expanded={open}
+        aria-controls={`notification-panel-${userId}`}
         aria-label={unread ? `Notifications, ${unread} unread` : "Notifications"}
         onClick={() => setOpen((value) => !value)}
         className="relative rounded-lg p-2 hover:bg-muted"
@@ -92,8 +103,8 @@ export function NotificationBell({
         )}
       </button>
       {open && (
-        <div className="absolute top-12 right-0 z-30 w-[min(92vw,400px)] overflow-hidden rounded-xl border bg-background shadow-lg">
-          <div className="flex items-center justify-between border-b px-4 py-3">
+        <div id={`notification-panel-${userId}`} className="absolute top-12 right-0 z-30 flex max-h-[min(75svh,620px)] w-[min(92vw,400px)] flex-col overflow-hidden rounded-xl border bg-background shadow-lg">
+          <div className="flex shrink-0 items-center justify-between gap-3 border-b px-4 py-3">
             <p className="text-sm font-semibold">Notifications</p>
             {unread > 0 && (
               <button
@@ -108,11 +119,12 @@ export function NotificationBell({
                 Mark all as read
               </button>
             )}
+            <button type="button" aria-label="Close notifications" className="grid size-8 shrink-0 place-items-center rounded-md hover:bg-muted" onClick={()=>{setOpen(false);trigger.current?.focus();}}><X size={16}/></button>
           </div>
           {items.length === 0 ? (
             <p className="px-4 py-8 text-center text-sm text-muted-foreground">No notifications yet.</p>
           ) : (
-            <ul>
+            <ul className="min-h-0 flex-1 overflow-y-auto overscroll-contain">
               {items.map((item) => (
                 <li key={item.id} className="border-b last:border-b-0">
                   <Link
@@ -138,7 +150,7 @@ export function NotificationBell({
               ))}
             </ul>
           )}
-          <p className="border-t bg-muted px-4 py-3 text-xs leading-5 text-muted-foreground">{hint}</p>
+          <p className="shrink-0 border-t bg-muted px-4 py-3 text-xs leading-5 text-muted-foreground">{hint}</p>
         </div>
       )}
     </div>
