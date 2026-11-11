@@ -3,189 +3,200 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
+<meta name="robots" content="noindex" />
 <title>Login book study · Support Center</title>
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:ital,wght@0,400;0,500;1,400&display=swap" rel="stylesheet" />
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet" />
 <style>
-  :root { color-scheme: light; }
-  * { box-sizing: border-box; }
-  html, body { margin: 0; min-height: 100%; }
-  body { font-family: "IBM Plex Sans", sans-serif; background: #102f24; }
-  button, input { font: inherit; }
+  :root { --font-plex-sans: "IBM Plex Sans"; --font-plex-mono: "IBM Plex Mono"; }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: var(--font-plex-sans), sans-serif; background: #102f24; -webkit-font-smoothing: antialiased; }
+  button, input { font: inherit; color: inherit; background: none; border: 0; }
   button { cursor: pointer; }
 
-  .study {
-    display: flex; align-items: center; justify-content: space-between; gap: 24px;
-    min-height: 64px; padding: 12px 28px; background: #071910; color: #e7ecdf; direction: rtl;
-  }
-  .study p { margin: 0; max-width: 760px; font-size: 13px; line-height: 1.65; color: #c9d7c4; }
-  .study strong { color: #f3f6ee; font-weight: 500; }
-  .study-actions { display: flex; gap: 8px; flex-shrink: 0; }
-  .study-actions button {
-    height: 34px; padding: 0 12px; border-radius: 999px;
-    border: 1px solid #315744; background: transparent; color: #d5e3d0; font-size: 13px;
-  }
+  .study { position: sticky; top: 0; z-index: 10; display: flex; align-items: center; justify-content: space-between; gap: 20px; padding: 10px 24px; background: #071910; color: #e7ecdf; direction: rtl; border-bottom: 1px solid #1d3a2c; }
+  .study-copy { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+  .study-copy strong { font-size: 13px; font-weight: 500; color: #f3f6ee; }
+  .study-copy span { font-size: 12px; line-height: 1.6; color: #b9c9b4; }
+  .study-actions { display: flex; gap: 6px; flex-shrink: 0; }
+  .study-actions button { height: 32px; padding: 0 13px; border-radius: 999px; border: 1px solid #315744; color: #d5e3d0; font-size: 12.5px; transition: background .2s, color .2s; }
+  .study-actions button:hover { background: #17352a; }
   .study-actions button[aria-pressed="true"] { background: #d8e5b0; border-color: #d8e5b0; color: #173c2e; }
   .study-actions button:focus-visible { outline: 2px solid #d8e5b0; outline-offset: 3px; }
 
-  .login-v2 {
-    --auth-ink: #173c2e; --auth-paper: #f5f2e9; --auth-lime: #d8e5b0;
-    display: grid; grid-template-columns: minmax(0, 55fr) minmax(0, 45fr);
-    min-height: calc(100svh - 64px); color: var(--auth-paper); background: #102f24;
-  }
-  .auth-brand-pane { min-width: 0; display: flex; flex-direction: column; padding: 36px clamp(36px, 5vw, 80px) 24px; position: relative; overflow: hidden; }
-  .auth-brand-pane::before { content: ""; position: absolute; inset: 0; z-index: -1; background: radial-gradient(ellipse at 58% 72%, #8CA96D22, transparent 62%); }
+  .login-v2 { --auth-ink: #173c2e; --auth-paper: #f5f2e9; --auth-lime: #d8e5b0; display: grid; grid-template-columns: minmax(0, 55fr) minmax(0, 45fr); min-height: calc(100svh - 53px); isolation: isolate; color: var(--auth-paper); background: #102f24; }
+  .auth-brand-pane { min-width: 0; display: flex; flex-direction: column; padding: 36px clamp(40px, 5vw, 88px) 26px; position: relative; isolation: isolate; overflow: hidden; }
+  .auth-brand-pane::before { content: ""; position: absolute; inset: 0; z-index: -1; pointer-events: none; background: radial-gradient(ellipse at 58% 72%, #8CA96D15, transparent 62%), linear-gradient(135deg, #071F1600 35%, #071F1645); }
   .auth-brand-header { display: flex; align-items: center; gap: 24px; }
-  .auth-brand-logo { width: 150px; height: auto; display: block; }
+  .auth-brand-logo { width: 160px; height: auto; display: block; flex-shrink: 0; }
   .auth-logo-ink { flood-color: #f5f2e9; }
-  .auth-wordmark { display: flex; align-items: center; gap: 8px; border-left: 1px solid #d9e6b52b; padding-left: 24px; color: #bed0ba; font: 10px/1.8 "IBM Plex Mono", monospace; letter-spacing: .05em; }
+  .auth-wordmark { display: flex; align-items: center; gap: 8px; border-left: 1px solid #d9e6b52b; padding-left: 24px; color: #bed0ba; font: 10px/1.8 var(--font-plex-mono), monospace; letter-spacing: .05em; }
   .auth-wordmark strong { display: block; color: #e8ecd9; font-weight: 500; }
   .auth-brand-body { margin-block: auto; padding-top: 28px; }
-  .auth-eyebrow { display: flex; align-items: center; gap: 10px; margin: 0 0 18px; color: #b5caab; font: 10px "IBM Plex Mono", monospace; letter-spacing: .16em; }
+  .auth-eyebrow { display: flex; align-items: center; gap: 10px; margin-bottom: 20px; color: #b5caab; font: 10px var(--font-plex-mono), monospace; letter-spacing: .16em; }
   .auth-eyebrow span { width: 5px; height: 5px; border-radius: 50%; background: var(--auth-lime); }
-  .auth-headline { margin: 0; font-size: clamp(44px, 4.2vw, 68px); line-height: 1.12; letter-spacing: -.055em; font-weight: 400; }
-  .auth-headline em { display: block; font-family: Georgia, "Times New Roman", serif; font-style: italic; font-weight: 400; color: var(--auth-lime); }
-  .auth-brand-description { margin: 14px 0 0; font-size: 14px; line-height: 1.8; color: #c0cfb7; }
-
-  .auth-artwork { margin-top: 6px; perspective: 1400px; }
-  .tilt { transform: rotateX(var(--book-x, 0deg)) rotateY(var(--book-y, 0deg)); transform-style: preserve-3d; transition: transform .55s cubic-bezier(.2, .8, .2, 1); }
-  .folio { width: min(660px, 100%); margin: 8px auto 0; position: relative; transform: rotate(-7deg); transform-style: preserve-3d; }
-  .folio-shadow { position: absolute; left: 6%; right: 8%; bottom: 6px; height: 42px; background: radial-gradient(ellipse, rgba(5, 20, 14, .55), transparent 70%); }
-  .cover {
-    position: relative; padding: 16px 16px 30px; border-radius: 18px 34px 24px 16px;
-    background: linear-gradient(120deg, #3d6b4d 0%, #1d4432 52%, #4e7451 100%);
-    box-shadow: inset 0 0 0 1px rgba(190, 210, 170, .35);
-  }
-  .cover::after {
-    content: ""; position: absolute; left: 26px; right: 20px; bottom: 11px; height: 14px;
-    background: repeating-linear-gradient(#9aae8a 0 1px, transparent 1px 3px);
-    opacity: .55;
-  }
-  .spread { position: relative; display: grid; grid-template-columns: 1fr 1fr; min-height: 286px; perspective: 1200px; }
-  .sheet { position: relative; z-index: 1; padding: 26px 24px 36px; overflow: hidden; }
-  .sheet.left { background: linear-gradient(90deg, #e6e2cb, #f7f2de 34%, #f1ead4); border-radius: 3px 0 0 3px; }
-  .sheet.right { background: linear-gradient(90deg, #c3cfb2, #f6f1e0 13%, #f8f3e4); border-radius: 0 4px 4px 0; }
-  .sheet.right::before { content: ""; position: absolute; inset: 0; background: linear-gradient(90deg, rgba(24, 48, 32, .22), transparent 46%); opacity: 0; }
-  .kicker { font: 11px "IBM Plex Mono", monospace; letter-spacing: .14em; color: #5c7356; }
-  .sheet h3 { margin: 12px 0 6px; font-size: 22px; font-weight: 500; letter-spacing: -.03em; color: #2b5038; }
-  .sheet p { margin: 0; color: #79846a; font-size: 13px; line-height: 1.45; }
-  .rules { margin-top: 22px; height: 22px; background: linear-gradient(#92a083, #92a083) 0 7px / 78% 1.5px no-repeat, linear-gradient(#92a083, #92a083) 0 18px / 58% 1.5px no-repeat; opacity: .55; }
-  .gutter { position: absolute; top: 0; bottom: 0; left: 50%; width: 14px; transform: translateX(-50%); background: linear-gradient(90deg, transparent, rgba(70, 90, 64, .28), transparent); z-index: 2; }
-  .ribbon { position: absolute; top: -18px; right: 58px; width: 18px; height: 86px; background: linear-gradient(#4d8a62, #3b7250); clip-path: polygon(0 0, 100% 0, 100% 100%, 50% 84%, 0 100%); z-index: 3; }
-  .route { position: absolute; inset: 0; z-index: 2; width: 100%; height: 100%; overflow: visible; }
-  .route path { fill: none; stroke: #397653; stroke-width: 2.4; stroke-linecap: round; }
-  .route .ghost { stroke: #a5b490; stroke-dasharray: 3 7; opacity: .7; }
-  .dot { position: absolute; z-index: 3; width: 9px; height: 9px; border-radius: 50%; background: #407454; box-shadow: 0 0 0 3px rgba(113, 149, 100, .18); }
-  .dot.one { left: 11%; bottom: 58px; }
-  .dot.two { left: 48%; bottom: 78px; }
-  .seal {
-    position: absolute; z-index: 3; right: 34px; bottom: 86px; width: 42px; height: 42px; border-radius: 50%;
-    display: grid; place-items: center; background: #285c40; color: #e7edce; font-size: 18px;
-    box-shadow: 0 0 0 5px rgba(107, 148, 100, .28); opacity: 0;
-  }
-  .stamp {
-    position: absolute; z-index: 3; right: 18px; bottom: 28px; width: 112px; height: 28px;
-    display: grid; place-items: center; border: 1.5px solid rgba(66, 118, 80, .6); color: #427650;
-    font: 11px "IBM Plex Mono", monospace; letter-spacing: .18em; opacity: 0;
-  }
-  .leaf { position: absolute; z-index: 5; top: 0; bottom: 0; left: 50%; width: 50%; transform-style: preserve-3d; transform-origin: left center; }
-  .leaf .face { position: absolute; inset: 0; backface-visibility: hidden; border-radius: 0 4px 4px 0; }
-  .leaf .front {
-    background:
-      linear-gradient(90deg, rgba(36, 64, 44, .16), transparent 18%),
-      repeating-linear-gradient(180deg, transparent 0 26px, rgba(110, 130, 96, .18) 27px),
-      linear-gradient(90deg, #d5dcc8, #fbf6e8 20%, #f3eee0);
-  }
-  .leaf .back { transform: rotateY(180deg); background: linear-gradient(270deg, rgba(36, 64, 44, .18), #e7e3d0 24%, #f6f1e2); }
-  .leaf.is-gone { visibility: hidden; }
-
-  .auth-brand-footer { display: flex; flex-direction: column; gap: 16px; padding-top: 18px; color: #a9bea6; font-size: 11px; }
-  .auth-art-caption { display: flex; align-items: center; gap: 16px; color: #c3d3bb; font: 11px "IBM Plex Mono", monospace; }
-  .auth-art-caption span { display: flex; align-items: center; gap: 8px; }
-  .auth-art-caption i { width: 4px; height: 4px; border-radius: 50%; background: #b3cb91; }
-  .auth-art-caption b { height: 1px; flex: 1; background: #d7e5b926; }
+  .auth-headline { font-size: clamp(46px, 4.3vw, 70px); line-height: 1.12; letter-spacing: -.055em; font-weight: 400; }
+  .auth-headline > * { display: block; }
+  .auth-headline em { font-family: Georgia, "Times New Roman", serif; color: var(--auth-lime); white-space: nowrap; }
+  .auth-brand-description { margin-top: 16px; font-size: 14px; line-height: 1.8; color: #c0cfb7; }
+  .auth-artwork { width: calc(100% + 128px); margin: 6px -64px 0; perspective: 1200px; }
+  .auth-book { position: relative; --folio-stage-height: clamp(300px, 38vh, 400px); height: var(--folio-stage-height); transform: rotateX(var(--book-x, 0deg)) rotateY(var(--book-y, 0deg)); transform-style: preserve-3d; transition: transform .55s cubic-bezier(.2, .8, .2, 1); }
+  .auth-book svg { position: absolute; left: 50%; top: 50%; display: block; width: 100%; max-width: calc(var(--folio-stage-height) * 2); height: auto; overflow: visible; transform: translate(-50%, -50%); }
+  .auth-casebook-object, .auth-casebook-float { transform-box: view-box; transform-origin: 50% 62%; }
+  .auth-art-caption { display: flex; align-items: center; gap: 16px; color: #c3d3bb; font: 11px var(--font-plex-mono), monospace; }
+  .auth-art-caption > span { display: flex; align-items: center; gap: 8px; white-space: nowrap; transition: color .4s; }
+  .auth-art-caption i { width: 4px; height: 4px; border-radius: 50%; background: #b3cb91; transition: background .4s, box-shadow .4s; }
+  .auth-art-caption b { height: 1px; flex: 1; background: #d7e5b926; position: relative; overflow: hidden; }
+  .auth-art-caption b::after { content: ""; position: absolute; inset: 0; background: #d8e5b0aa; transform: scaleX(0); transform-origin: left; transition: transform .7s cubic-bezier(.4, 0, .2, 1); }
+  .auth-brand-footer { display: flex; flex-direction: column; gap: 18px; padding-top: 20px; color: #a9bea6; font-size: 11px; }
   .auth-brand-legal { display: flex; justify-content: space-between; gap: 20px; }
-  .auth-brand-legal span:first-child { font: 9px/1.7 "IBM Plex Mono", monospace; letter-spacing: .07em; }
+  .auth-brand-legal > span:first-child { font: 9px/1.7 var(--font-plex-mono), monospace; letter-spacing: .07em; }
 
-  .auth-form-pane { display: flex; flex-direction: column; justify-content: space-between; min-width: 0; padding: 36px clamp(32px, 4vw, 72px) 24px; border-left: 1px solid #d5d7c8; background: var(--auth-paper); color: var(--auth-ink); }
-  .auth-form-meta { display: flex; align-items: center; gap: 8px; color: #62745e; font: 10px "IBM Plex Mono", monospace; letter-spacing: .04em; }
-  .auth-form-content { width: 100%; max-width: 400px; margin: 48px auto; }
-  .auth-form-heading h1 { margin: 0; font-size: 42px; letter-spacing: -.055em; font-weight: 500; }
+  .auth-form-pane { display: flex; flex-direction: column; justify-content: space-between; min-width: 0; padding: 36px clamp(36px, 4.4vw, 84px) 26px; border-left: 1px solid #d5d7c8; background: var(--auth-paper); color: var(--auth-ink); }
+  .auth-form-meta { color: #62745e; font: 10px var(--font-plex-mono), monospace; letter-spacing: .04em; }
+  .auth-form-content { width: 100%; max-width: 400px; margin: 40px auto; }
+  .auth-form-heading { margin-bottom: 34px; }
+  .auth-form-heading h1 { font-size: clamp(38px, 3vw, 44px); line-height: 1.14; letter-spacing: -.055em; font-weight: 500; }
   .auth-form-heading h1 span { color: #4b835a; }
-  .auth-form-heading p { margin: 12px 0 0; color: #63725e; }
-  .auth-form { display: flex; flex-direction: column; gap: 22px; margin-top: 32px; }
+  .auth-form-heading p { margin-top: 14px; font-size: 15px; line-height: 1.7; color: #63725e; }
+  .auth-form { display: flex; flex-direction: column; gap: 22px; }
   .auth-field { display: flex; flex-direction: column; gap: 8px; }
   .auth-field label { font-size: 14px; font-weight: 500; color: #294b36; }
-  .auth-form input { height: 54px; padding: 0 15px; border: 1px solid #ced8c7; border-radius: 8px; background: #fdfcf8; color: #173c2e; }
-  .auth-submit { height: 56px; border: 0; border-radius: 8px; background: #183f2c; color: white; font-size: 16px; }
-  .auth-account-help { border-top: 1px solid #dce2d3; margin-top: 26px; padding-top: 18px; color: #64715d; font-size: 13px; }
-  .auth-account-help a { color: #234f36; }
-  .inert-note { margin-top: 10px; font-size: 11px; color: #6d7866; }
+  .auth-form input { height: 54px; padding: 0 15px; border: 1px solid #ced8c7; border-radius: 8px; background: #fdfcf8; color: #173c2e; font-size: 16px; outline: none; transition: border-color .2s, box-shadow .2s; }
+  .auth-form input::placeholder { color: #7e877a; }
+  .auth-form input:hover { border-color: #92ad91; }
+  .auth-form input:focus-visible { border-color: #527f59; box-shadow: 0 0 0 4px #527f5918; }
+  .auth-submit { height: 56px; margin-top: 3px; padding: 0 16px 0 20px; border-radius: 8px; display: flex; align-items: center; justify-content: space-between; background: #183f2c; color: #fff; font-size: 16px; font-weight: 500; transition: background .2s; }
+  .auth-submit:hover { background: #2b5e40; }
+  .auth-submit:focus-visible { outline: 2px solid #426e4c; outline-offset: 4px; }
+  .auth-submit-icon { width: 30px; height: 30px; border-radius: 50%; display: grid; place-items: center; background: var(--auth-lime); color: #234630; }
+  .auth-account-help { border-top: 1px solid #dce2d3; margin-top: 28px; padding-top: 20px; font-size: 13px; color: #64715d; }
+  .auth-account-help a { display: inline-block; margin-top: 5px; color: #173c2e; font-size: 14px; font-weight: 500; text-underline-offset: 4px; }
+  .study-note { min-height: 20px; margin-top: 12px; font-size: 12px; color: #6d7866; direction: rtl; text-align: right; }
   .auth-form-footer { font-size: 11px; color: #6b7764; }
 
-  .is-playing .folio { animation: arrive .6s cubic-bezier(.16, 1, .3, 1) both; }
-  .is-playing[data-motion="current"] .leaf { transform-origin: center; animation: leaf-flat .88s .2s cubic-bezier(.36, .08, .16, 1) both; }
-  .is-playing[data-motion="current"] .route .ink { animation: ink .7s .7s cubic-bezier(.4, 0, .2, 1) both; }
-  .is-playing[data-motion="current"] .dot { animation: appear .25s .7s both; }
-  .is-playing[data-motion="current"] .dot.two { animation-delay: .95s; }
-  .is-playing[data-motion="current"] .seal { animation: seal-in .4s 1.15s both; }
-  .is-playing[data-motion="current"] .stamp { animation: appear .4s 1.25s both; }
-  .is-playing[data-motion="proposed"] .leaf { animation: turn-3d 1.05s cubic-bezier(.5, .04, .18, 1) .62s both; }
-  .is-playing[data-motion="proposed"] .sheet.right::before { animation: shade 1.05s .62s both; }
-  .is-playing[data-motion="proposed"] .route .ink { animation: ink .8s 1.2s cubic-bezier(.4, 0, .2, 1) both; }
-  .is-playing[data-motion="proposed"] .dot { animation: appear .25s 1.25s both; }
-  .is-playing[data-motion="proposed"] .dot.two { animation-delay: 1.7s; }
-  .is-playing[data-motion="proposed"] .seal { animation: seal-press .42s 1.9s cubic-bezier(.2, .7, .2, 1) both; }
-  .is-playing[data-motion="proposed"] .stamp { animation: stamp-press .48s 2s cubic-bezier(.2, .8, .2, 1) both; }
-  .is-playing[data-motion="proposed"] .ribbon { animation: sway 6.2s 2.45s ease-in-out infinite; transform-origin: top center; }
-  .is-playing[data-motion="proposed"] .cap-record { animation: light .35s .15s both; }
-  .is-playing[data-motion="proposed"] .cap-resolve { animation: light .35s 1.35s both; }
-  .is-playing[data-motion="proposed"] .cap-follow { animation: light .35s 2.15s both; }
-  .route .ink { stroke-dasharray: 1; stroke-dashoffset: 1; }
+  /* Final, at-rest state of the illustration. Every motion below starts from here. */
+  .auth-book-route { stroke-dasharray: 1; stroke-dashoffset: 0; }
+  .scribble { stroke-dasharray: 1; }
+  .auth-turning-leaf { opacity: 0; }
+  .seal-ring { opacity: 0; transform-box: fill-box; transform-origin: center; }
 
-  @keyframes arrive { from { opacity: 0; } to { opacity: 1; } }
+  /* Current production motion, reproduced for comparison. */
+  [data-motion="current"].is-playing .auth-casebook-object { animation: cur-arrive .85s .08s cubic-bezier(.16, 1, .3, 1) both; }
+  [data-motion="current"].is-playing .auth-folio-shadow { animation: appear .7s .1s ease-out both; }
+  [data-motion="current"].is-playing .copy { animation: appear .5s .4s ease-out both; }
+  [data-motion="current"].is-playing .auth-turning-leaf { transform-box: view-box; transform-origin: 49% 38%; animation: cur-leaf .88s .12s cubic-bezier(.36, .08, .16, 1) both; }
+  [data-motion="current"].is-playing .auth-book-route { animation: draw .7s .65s cubic-bezier(.4, 0, .2, 1) both; }
+  [data-motion="current"].is-playing .auth-book-ribbon { animation: appear .5s .35s ease-out both; }
+  [data-motion="current"].is-playing .auth-book-point { animation: appear .25s .65s ease-out both; }
+  [data-motion="current"].is-playing .auth-point-two { animation-delay: .92s; }
+  [data-motion="current"].is-playing .auth-book-seal { transform-box: fill-box; transform-origin: center; animation: cur-seal .4s 1.15s cubic-bezier(.16, 1, .3, 1) both; }
+  [data-motion="current"].is-playing .auth-folio-stamp { animation: appear .4s 1.25s ease-out both; }
+
+  /* Option A: the case is written in ink, then the book rests. No page flip. */
+  [data-motion="ink"].is-playing .auth-casebook-object { animation: ink-arrive 1s cubic-bezier(.16, 1, .3, 1) both; }
+  [data-motion="ink"].is-playing .auth-folio-shadow { animation: shadow-in 1s ease-out both; }
+  [data-motion="ink"].is-playing .auth-book-ribbon { transform-box: fill-box; transform-origin: 50% 0; animation: ribbon-drop .7s .25s cubic-bezier(.2, .8, .2, 1) both, sway 7s 3s ease-in-out infinite; }
+  [data-motion="ink"].is-playing .line { transform-box: fill-box; animation: line-in .55s cubic-bezier(.2, .8, .2, 1) both; }
+  [data-motion="ink"].is-playing .l1 { animation-delay: .45s; }
+  [data-motion="ink"].is-playing .l2 { animation-delay: .55s; }
+  [data-motion="ink"].is-playing .l3 { animation-delay: .65s; }
+  [data-motion="ink"].is-playing .scribble-left { animation: draw .7s .75s cubic-bezier(.4, 0, .2, 1) both; }
+  [data-motion="ink"].is-playing .auth-point-one { transform-box: fill-box; transform-origin: center; animation: dot-in .35s 1s cubic-bezier(.2, .8, .2, 1) both; }
+  [data-motion="ink"].is-playing .auth-book-route { animation: draw 1.1s 1.05s cubic-bezier(.45, 0, .2, 1) both; }
+  [data-motion="ink"].is-playing .auth-point-two { transform-box: fill-box; transform-origin: center; animation: dot-in .35s 1.5s cubic-bezier(.2, .8, .2, 1) both; }
+  [data-motion="ink"].is-playing .r1 { animation-delay: 1.45s; }
+  [data-motion="ink"].is-playing .r2 { animation-delay: 1.55s; }
+  [data-motion="ink"].is-playing .r3 { animation-delay: 1.65s; }
+  [data-motion="ink"].is-playing .scribble-right { animation: draw .7s 1.75s cubic-bezier(.4, 0, .2, 1) both; }
+  [data-motion="ink"].is-playing .auth-book-seal { transform-box: fill-box; transform-origin: center; animation: press .5s 2.1s cubic-bezier(.2, .7, .2, 1) both; }
+  [data-motion="ink"].is-playing .seal-ring { animation: ring .9s 2.25s ease-out both; }
+  [data-motion="ink"].is-playing .auth-folio-stamp { transform-box: fill-box; transform-origin: center; animation: stamp .5s 2.3s cubic-bezier(.2, .8, .2, 1) both; }
+  [data-motion="ink"].is-playing .auth-casebook-float { animation: float 8s 3s ease-in-out infinite; }
+  [data-motion="ink"].is-playing .cap-1 { animation: cap-on .4s .6s both; }
+  [data-motion="ink"].is-playing .cap-2 { animation: cap-on .4s 1.6s both; }
+  [data-motion="ink"].is-playing .cap-3 { animation: cap-on .4s 2.3s both; }
+
+  /* Option B: the case advances as the user signs in. */
+  [data-motion="live"] .auth-casebook-object { animation: ink-arrive 1s cubic-bezier(.16, 1, .3, 1) both; }
+  [data-motion="live"] .auth-casebook-float { animation: float 8s 1.2s ease-in-out infinite; }
+  [data-motion="live"] .auth-book-ribbon { transform-box: fill-box; transform-origin: 50% 0; animation: sway 7s 1.2s ease-in-out infinite; }
+  [data-motion="live"] .auth-book-route { stroke-dashoffset: var(--route-left, 1); transition: stroke-dashoffset .9s cubic-bezier(.45, 0, .2, 1); }
+  [data-motion="live"] .copy-right, [data-motion="live"] .scribble-right { opacity: .22; transition: opacity .6s ease; }
+  [data-motion="live"] .scribble-right { stroke-dashoffset: 1; transition: stroke-dashoffset .8s .2s ease, opacity .6s; }
+  [data-motion="live"] .auth-point-two, [data-motion="live"] .auth-book-seal, [data-motion="live"] .auth-folio-stamp { opacity: 0; }
+  [data-motion="live"] .auth-point-one { transform-box: fill-box; transform-origin: center; }
+  [data-motion="live"][data-focus="email"] .auth-point-one { animation: pulse 1.6s ease-in-out infinite; }
+  [data-motion="live"][data-step="1"], [data-motion="live"][data-step="2"], [data-motion="live"][data-step="3"] { --route-left: .5; }
+  [data-motion="live"][data-step="2"] { --route-left: .13; }
+  [data-motion="live"][data-step="3"] { --route-left: 0; }
+  [data-motion="live"]:is([data-step="1"], [data-step="2"], [data-step="3"]) .auth-point-two { transform-box: fill-box; transform-origin: center; animation: dot-in .35s .55s cubic-bezier(.2, .8, .2, 1) both; }
+  [data-motion="live"]:is([data-step="2"], [data-step="3"]) .copy-right, [data-motion="live"]:is([data-step="2"], [data-step="3"]) .scribble-right { opacity: 1; }
+  [data-motion="live"]:is([data-step="2"], [data-step="3"]) .scribble-right { stroke-dashoffset: 0; }
+  [data-motion="live"][data-step="3"] .auth-book-seal { transform-box: fill-box; transform-origin: center; animation: press .5s .75s cubic-bezier(.2, .7, .2, 1) both; }
+  [data-motion="live"][data-step="3"] .seal-ring { animation: ring .9s .9s ease-out both; }
+  [data-motion="live"][data-step="3"] .auth-folio-stamp { transform-box: fill-box; transform-origin: center; animation: stamp .5s .95s cubic-bezier(.2, .8, .2, 1) both; }
+  [data-motion="live"]:is([data-step="1"], [data-step="2"], [data-step="3"]) .cap-1,
+  [data-motion="live"]:is([data-step="2"], [data-step="3"]) .cap-2,
+  [data-motion="live"][data-step="3"] .cap-3 { color: #eef5d9; }
+  [data-motion="live"]:is([data-step="1"], [data-step="2"], [data-step="3"]) .cap-1 i,
+  [data-motion="live"]:is([data-step="2"], [data-step="3"]) .cap-2 i,
+  [data-motion="live"][data-step="3"] .cap-3 i { background: #d8e5b0; box-shadow: 0 0 0 4px #d8e5b01c; }
+  [data-motion="live"]:is([data-step="2"], [data-step="3"]) .bar-1::after, [data-motion="live"][data-step="3"] .bar-2::after { transform: scaleX(1); }
+
   @keyframes appear { from { opacity: 0; } to { opacity: 1; } }
-  @keyframes ink { to { stroke-dashoffset: 0; } }
-  @keyframes leaf-flat { 0% { opacity: 0; transform: scaleX(1); } 14% { opacity: 1; } 65% { transform: scaleX(.12) skewY(6deg); } 100% { opacity: 0; transform: scaleX(-1); } }
-  @keyframes turn-3d { 0% { transform: rotateY(0deg); opacity: 1; } 62% { transform: rotateY(-68deg); opacity: 1; } 100% { transform: rotateY(-74deg); opacity: 0; } }
-  @keyframes shade { from { opacity: 1; } to { opacity: 0; } }
-  @keyframes seal-in { from { opacity: 0; transform: scale(.78); } to { opacity: 1; transform: none; } }
-  @keyframes seal-press { 0% { opacity: 0; transform: scale(1.25); } 65% { opacity: 1; transform: scale(.94); } 100% { opacity: 1; transform: scale(1); } }
-  @keyframes stamp-press { 0% { opacity: 0; transform: translateY(-8px) rotate(10deg) scale(1.2); } 62% { opacity: 1; transform: translateY(1px) rotate(-2deg) scale(.96); } 100% { opacity: 1; transform: rotate(4deg) scale(1); } }
-  @keyframes sway { 50% { transform: rotate(2.2deg); } }
-  @keyframes light { to { color: #e9f3cf; } }
+  @keyframes draw { from { stroke-dashoffset: 1; } to { stroke-dashoffset: 0; } }
+  @keyframes cur-arrive { from { opacity: 0; transform: translateY(28px) rotate(3deg) scale(.96); } to { opacity: 1; transform: none; } }
+  @keyframes cur-leaf { 0% { opacity: 0; transform: scaleX(1); } 14% { opacity: 1; } 65% { opacity: .95; transform: scaleX(.12) skewY(7deg); } 90% { opacity: .5; transform: scaleX(-.82) skewY(-4deg); } 100% { opacity: 0; transform: scaleX(-1); } }
+  @keyframes cur-seal { from { opacity: 0; transform: scale(.78); } to { opacity: 1; transform: scale(1); } }
+  @keyframes ink-arrive { from { opacity: 0; transform: translateY(22px) scale(.985); } to { opacity: 1; transform: none; } }
+  @keyframes shadow-in { from { opacity: 0; transform: scaleX(.8); } to { opacity: 1; transform: none; } }
+  @keyframes ribbon-drop { from { opacity: 0; transform: scaleY(.3); } to { opacity: 1; transform: none; } }
+  @keyframes line-in { from { opacity: 0; transform: translateY(7px); } to { opacity: 1; transform: none; } }
+  @keyframes dot-in { from { opacity: 0; transform: scale(.4); } to { opacity: 1; transform: none; } }
+  @keyframes press { 0% { opacity: 0; transform: scale(1.35); } 60% { opacity: 1; transform: scale(.93); } 100% { opacity: 1; transform: scale(1); } }
+  @keyframes ring { 0% { opacity: 0; transform: scale(.9); } 12% { opacity: .7; } 100% { opacity: 0; transform: scale(1.9); } }
+  @keyframes stamp { 0% { opacity: 0; transform: translateY(-10px) rotate(9deg) scale(1.25); } 60% { opacity: 1; transform: translateY(1px) rotate(-1deg) scale(.97); } 100% { opacity: 1; transform: none; } }
+  @keyframes float { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-6px); } }
+  @keyframes sway { 0%, 100% { transform: rotate(0); } 50% { transform: rotate(2deg); } }
+  @keyframes pulse { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.35); } }
+  @keyframes cap-on { to { color: #eef5d9; } }
 
   @media (max-width: 900px) {
     .study { flex-direction: column; align-items: stretch; }
     .login-v2 { display: flex; flex-direction: column; background: var(--auth-paper); color: var(--auth-ink); }
-    .auth-brand-pane { padding: 22px 22px 0; }
+    .auth-brand-pane { padding: 22px 26px 0; overflow: visible; }
     .auth-logo-ink { flood-color: #0b8d43; }
-    .auth-wordmark, .auth-wordmark strong { color: #294b36; border: 0; padding: 0; }
-    .auth-headline, .auth-brand-description, .auth-eyebrow { color: #173c2e; }
-    .auth-headline { font-size: 40px; }
-    .auth-headline em { color: #3e7a49; }
-    .auth-form-pane { border: 0; background: transparent; padding: 8px 22px 22px; }
-    .auth-form-content { margin-block: 8px 28px; }
+    .auth-wordmark { color: #63725e; border: 0; }
+    .auth-wordmark strong { color: #294b36; }
+    .auth-brand-body, .auth-brand-footer, .auth-brand-pane::before { display: none; }
+    .auth-form-pane { border: 0; background: transparent; padding: 18px 26px 24px; }
   }
   @media (prefers-reduced-motion: reduce) {
-    .leaf { display: none !important; }
-    .folio, .ribbon, .dot, .seal, .stamp, .route .ink, .cap-record, .cap-resolve, .cap-follow { animation: none !important; }
-    .seal, .stamp { opacity: 1; }
-    .route .ink { stroke-dashoffset: 0; }
+    .login-v2 *, .login-v2 *::before, .login-v2 *::after { animation: none !important; transition: none !important; }
+    .auth-book { transform: none !important; }
+    .auth-turning-leaf { opacity: 0 !important; }
+    .auth-book-route, .scribble { stroke-dashoffset: 0 !important; }
+    .copy-right, .scribble-right, .auth-point-two, .auth-book-seal, .auth-folio-stamp { opacity: 1 !important; }
   }
 </style>
 </head>
 <body>
   <header class="study">
-    <p><strong>معاينة الكتاب فقط.</strong> الصفحة بتتفتح على المفصلة، الإجابة بتبان، والختم بينزل مرة واحدة. بعد كده الكتاب يسكن. تسجيل الدخول الحقيقي لسه ما اتغيرش.</p>
-    <div class="study-actions">
-      <button type="button" data-mode="proposed" aria-pressed="true">المقترحة</button>
+    <div class="study-copy">
+      <strong id="study-title">الفكرة الأولى: الحالة بتتكتب بالحبر</strong>
+      <span id="study-desc">من غير قلب صفحات. المشكلة بتتكتب، الخط بيمشي للحل، والختم بينزل مرة واحدة، وبعدين الكتاب يهدى.</span>
+    </div>
+    <div class="study-actions" role="group" aria-label="Motion option">
+      <button type="button" data-mode="ink" aria-pressed="true">١ · حبر هادئ</button>
+      <button type="button" data-mode="live" aria-pressed="false">٢ · بيتفاعل مع الدخول</button>
       <button type="button" data-mode="current" aria-pressed="false">الحالية</button>
       <button type="button" id="replay">إعادة</button>
     </div>
   </header>
-  <main class="login-v2" id="study-root" data-motion="proposed">
+
+  <main class="login-v2" id="root" data-motion="ink" data-step="0">
     <section class="auth-brand-pane" aria-label="Selah El Telmeez Technical Support Center">
       <header class="auth-brand-header">
         <svg class="auth-brand-logo" viewBox="0 0 1476 570" role="img" aria-label="Selah El Telmeez">
@@ -198,113 +209,164 @@
         </svg>
         <span class="auth-wordmark"><span>TECHNICAL SUPPORT<strong>CENTER</strong></span></span>
       </header>
+
       <div class="auth-brand-body">
         <p class="auth-eyebrow"><span></span> THE CASEBOOK</p>
-        <h2 class="auth-headline">Every case.<em>A clear next step.</em></h2>
+        <h2 class="auth-headline"><span>Every case.</span><em>A clear next step.</em></h2>
         <p class="auth-brand-description">One place for issues, answers and follow-up.</p>
-        <div class="auth-artwork" id="artwork">
-          <div class="tilt" id="tilt">
-            <div class="folio">
-              <div class="folio-shadow"></div>
-              <div class="cover">
-                <div class="spread">
-                  <article class="sheet left">
-                    <div class="kicker">01 / THE ISSUE</div>
-                    <h3>A little context.</h3>
-                    <p>A person. A question. A place to start.</p>
-                    <div class="rules"></div>
-                  </article>
-                  <article class="sheet right">
-                    <div class="ribbon"></div>
-                    <div class="kicker">02 / THE RESPONSE</div>
-                    <h3>A way forward.</h3>
-                    <p>Understand. Act. Keep the answer.</p>
-                    <div class="rules"></div>
-                    <div class="seal" aria-hidden="true">✓</div>
-                    <div class="stamp">RESOLVED</div>
-                  </article>
-                  <div class="gutter"></div>
-                  <svg class="route" viewBox="0 0 640 286" preserveAspectRatio="none" aria-hidden="true">
-                    <path class="ghost" d="M78 196C150 150 214 214 320 176C420 140 490 148 548 156" />
-                    <path class="ink" pathLength="1" d="M78 196C150 150 214 214 320 176C420 140 490 148 548 156" />
-                  </svg>
-                  <i class="dot one"></i>
-                  <i class="dot two"></i>
-                  <div class="leaf" id="leaf" aria-hidden="true"><div class="face front"></div><div class="face back"></div></div>
-                </div>
-              </div>
-            </div>
+        <div class="auth-artwork" id="artwork" aria-hidden="true">
+          <div class="auth-book" id="book">
+            <svg viewBox="0 0 1000 640" fill="none" focusable="false">
+              <defs>
+                <linearGradient id="folio-cover" x1="125" y1="190" x2="815" y2="535" gradientUnits="userSpaceOnUse"><stop stop-color="#365D43" /><stop offset=".5" stop-color="#1D4432" /><stop offset="1" stop-color="#4E7451" /></linearGradient>
+                <linearGradient id="folio-left" x1="125" y1="300" x2="490" y2="300" gradientUnits="userSpaceOnUse"><stop stop-color="#E9E5CC" /><stop offset=".25" stop-color="#F5F0DB" /><stop offset=".85" stop-color="#F1EBD5" /><stop offset="1" stop-color="#ABB69A" /></linearGradient>
+                <linearGradient id="folio-right" x1="490" y1="300" x2="865" y2="300" gradientUnits="userSpaceOnUse"><stop stop-color="#A9B599" /><stop offset=".09" stop-color="#E5E4CA" /><stop offset=".3" stop-color="#FAF4DF" /><stop offset="1" stop-color="#EEE8CF" /></linearGradient>
+                <linearGradient id="folio-edge" x1="490" y1="466" x2="490" y2="520" gradientUnits="userSpaceOnUse"><stop stop-color="#E0DFC5" /><stop offset="1" stop-color="#9AAE8A" /></linearGradient>
+                <linearGradient id="folio-leaf" x1="490" y1="315" x2="865" y2="290" gradientUnits="userSpaceOnUse"><stop stop-color="#A8B89C" /><stop offset=".16" stop-color="#E9E7D0" /><stop offset=".6" stop-color="#FFF8E4" /><stop offset="1" stop-color="#D9DEC0" /></linearGradient>
+                <radialGradient id="folio-shadow"><stop stop-color="#051B12" stop-opacity=".8" /><stop offset="1" stop-color="#051B12" stop-opacity="0" /></radialGradient>
+                <radialGradient id="folio-glow"><stop stop-color="#B6CD90" stop-opacity=".13" /><stop offset="1" stop-color="#B6CD90" stop-opacity="0" /></radialGradient>
+                <clipPath id="folio-paper-clip"><path d="M128 169C253 130 368 163 490 222C620 161 736 129 865 169V455C736 416 621 447 490 507C366 448 252 416 128 455V169Z" /></clipPath>
+                <pattern id="folio-paper-grain" width="13" height="11" patternUnits="userSpaceOnUse"><path d="M1 2H2M7 8H8M11 4H12" stroke="#48694D" stroke-opacity=".075" stroke-width=".6" /></pattern>
+              </defs>
+              <ellipse cx="510" cy="328" rx="480" ry="280" fill="url(#folio-glow)" />
+              <ellipse class="auth-folio-shadow" cx="510" cy="534" rx="420" ry="68" fill="url(#folio-shadow)" />
+              <g class="auth-casebook-object"><g class="auth-casebook-float">
+                <g transform="rotate(-9 500 340)">
+                  <path d="M91 207C235 162 357 197 490 258C628 194 754 159 902 204V499C758 454 630 484 490 548C354 485 231 455 91 500V207Z" fill="url(#folio-cover)" stroke="#74916B" stroke-width="1.5" />
+                  <path d="M107 194C241 151 365 185 490 246C622 182 749 151 887 192V480C748 439 621 473 490 532C363 473 240 439 107 482V194Z" fill="#B1BF9D" />
+                  <path d="M119 182C250 141 369 175 490 234C620 173 740 140 877 181V469C740 430 620 461 490 521C367 462 249 429 119 470V182Z" fill="url(#folio-edge)" />
+                  <g stroke="#6D8661" stroke-opacity=".4" stroke-width="1.1">
+                    <path d="M114 467C248 427 367 458 490 518C621 458 744 425 881 465" />
+                    <path d="M112 474C247 434 366 465 490 525C622 465 746 432 883 472" />
+                    <path d="M110 481C245 441 365 472 490 532C623 472 748 439 885 479" />
+                    <path d="M108 488C243 448 363 479 490 539C625 479 750 446 887 486" />
+                  </g>
+                  <path d="M128 169C253 130 368 163 490 222V507C366 448 252 416 128 455V169Z" fill="url(#folio-left)" />
+                  <path d="M490 222C620 161 736 129 865 169V455C736 416 621 447 490 507V222Z" fill="url(#folio-right)" />
+                  <path d="M490 223V507" stroke="#778D6C" stroke-opacity=".7" />
+                  <g clip-path="url(#folio-paper-clip)"><path fill="url(#folio-paper-grain)" d="M120 130H880V520H120Z" /></g>
+                  <g class="copy copy-left" fill="#51694C" font-family="IBM Plex Sans, sans-serif">
+                    <text class="line l1" x="171" y="213" font-size="12" letter-spacing="2.4">01 / THE ISSUE</text>
+                    <text class="line l2" x="171" y="255" font-size="28" fill="#2B5038">A little context.</text>
+                    <text class="line l3" x="171" y="283" font-size="15" fill="#79846A">A person. A question. A place to start.</text>
+                  </g>
+                  <path class="scribble scribble-left" pathLength="1" d="M171 306C251 296 330 320 417 354M171 324C250 315 322 338 385 362" fill="none" stroke="#92A083" stroke-width="1.5" stroke-linecap="round" opacity=".55" />
+                  <g class="copy copy-right" fill="#51694C" font-family="IBM Plex Sans, sans-serif">
+                    <text class="line r1" x="568" y="213" font-size="12" letter-spacing="2.4">02 / THE RESPONSE</text>
+                    <text class="line r2" x="568" y="255" font-size="28" fill="#2B5038">A way forward.</text>
+                    <text class="line r3" x="568" y="283" font-size="15" fill="#79846A">Understand. Act. Keep the answer.</text>
+                  </g>
+                  <path class="scribble scribble-right" pathLength="1" d="M568 309C640 286 722 282 804 299M568 328C642 306 712 302 777 312" fill="none" stroke="#92A083" stroke-width="1.5" stroke-linecap="round" opacity=".55" />
+                  <path class="auth-book-ribbon" d="M724 145L747 146V249L736 237L724 250V145Z" fill="#3B7250" />
+                  <path d="M195 393C293 337 382 447 490 402C588 361 660 337 787 356" stroke="#A5B490" stroke-opacity=".4" stroke-width="1.5" stroke-dasharray="3 7" />
+                  <path class="auth-book-route" d="M195 393C293 337 382 447 490 402C588 361 660 337 787 356" pathLength="1" stroke="#397653" stroke-width="2.7" stroke-linecap="round" />
+                  <g class="auth-book-point auth-point-one"><circle cx="195" cy="393" r="14" fill="#719564" fill-opacity=".12" /><circle cx="195" cy="393" r="5" fill="#407454" stroke="#F5EFD8" stroke-width="2.5" /></g>
+                  <g class="auth-book-point auth-point-two"><circle cx="490" cy="402" r="14" fill="#719564" fill-opacity=".16" /><circle cx="490" cy="402" r="5" fill="#407454" stroke="#F5EFD8" stroke-width="2.5" /></g>
+                  <circle class="seal-ring" cx="787" cy="356" r="31" stroke="#3E7A52" stroke-width="2" />
+                  <g class="auth-book-seal"><circle cx="787" cy="356" r="25" fill="#285C40" /><circle cx="787" cy="356" r="31" stroke="#6B9464" stroke-opacity=".5" /><path d="M776 356L784 364L799 348" stroke="#E7EDCE" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" /></g>
+                  <g transform="rotate(4 760 410)"><g class="auth-folio-stamp"><rect x="711" y="402" width="114" height="29" rx="2" stroke="#427650" stroke-opacity=".5" /><text x="768" y="422" text-anchor="middle" font-family="IBM Plex Mono, monospace" font-size="12" fill="#427650" letter-spacing="2">RESOLVED</text></g></g>
+                  <g class="auth-turning-leaf"><path d="M490 222C620 161 736 129 865 169V455C736 416 621 447 490 507V222Z" fill="url(#folio-leaf)" stroke="#D9DFC6" stroke-opacity=".45" /><path d="M553 257C638 221 718 209 809 230M553 278C638 242 718 230 809 251" stroke="#8B9A7C" stroke-opacity=".25" stroke-width="1.5" /></g>
+                </g>
+              </g></g>
+            </svg>
           </div>
         </div>
       </div>
+
       <footer class="auth-brand-footer">
-        <div class="auth-art-caption" aria-hidden="true"><span class="cap-record"><i></i>Record</span><b></b><span class="cap-resolve"><i></i>Resolve</span><b></b><span class="cap-follow"><i></i>Follow up</span></div>
+        <div class="auth-art-caption" aria-hidden="true"><span class="cap-1"><i></i>Record</span><b class="bar-1"></b><span class="cap-2"><i></i>Resolve</span><b class="bar-2"></b><span class="cap-3"><i></i>Follow up</span></div>
         <div class="auth-brand-legal"><span>SELAH EL TELMEEZ</span><span>People behind every case.</span></div>
       </footer>
     </section>
+
     <section class="auth-form-pane" aria-labelledby="signin-heading">
       <div class="auth-form-meta">Internal workspace</div>
       <div class="auth-form-content">
         <div class="auth-form-heading"><h1 id="signin-heading">Welcome back<span>.</span></h1><p>Sign in to your support workspace.</p></div>
-        <form class="auth-form" action="#" onsubmit="return false">
-          <div class="auth-field"><label for="email">Work email</label><input id="email" type="email" placeholder="you@company.com" disabled /></div>
-          <div class="auth-field"><label for="password">Password</label><input id="password" type="password" placeholder="Enter your password" disabled /></div>
-          <button class="auth-submit" type="button" disabled>Sign in</button>
+        <form class="auth-form" id="form" autocomplete="off" novalidate>
+          <div class="auth-field"><label for="email">Work email</label><input id="email" type="email" inputmode="email" placeholder="you@company.com" autocomplete="off" spellcheck="false" /></div>
+          <div class="auth-field"><label for="password">Password</label><input id="password" type="password" placeholder="Enter your password" autocomplete="new-password" /></div>
+          <button class="auth-submit" type="submit"><span>Sign in</span><span class="auth-submit-icon" aria-hidden="true">→</span></button>
         </form>
-        <div class="auth-account-help"><p>Need help signing in?</p><a href="mailto:ahmed.emad@selaheltelmeez.com">Email Ahmed Emad</a><p class="inert-note">المعاينة دي مش صفحة دخول. الخانات مقفولة.</p></div>
+        <p class="study-note" id="note" role="status"></p>
+        <div class="auth-account-help"><p>Need help signing in?</p><a href="mailto:ahmed.emad@selaheltelmeez.com">Email Ahmed Emad</a></div>
       </div>
       <footer class="auth-form-footer">© 2026 Selah El Telmeez</footer>
     </section>
   </main>
-  <script>
-    const root = document.getElementById("study-root");
-    const leaf = document.getElementById("leaf");
-    const tilt = document.getElementById("tilt");
-    const artwork = document.getElementById("artwork");
-    const reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
-    function play() {
-      leaf.classList.remove("is-gone");
-      root.classList.remove("is-playing");
-      void root.offsetWidth;
-      if (reduced) return;
-      root.classList.add("is-playing");
+  <script>
+    const root = document.getElementById("root");
+    const book = document.getElementById("book");
+    const artwork = document.getElementById("artwork");
+    const form = document.getElementById("form");
+    const email = document.getElementById("email");
+    const password = document.getElementById("password");
+    const note = document.getElementById("note");
+    const reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    const copy = {
+      ink: ["الفكرة الأولى: الحالة بتتكتب بالحبر", "من غير قلب صفحات. المشكلة بتتكتب، الخط بيمشي للحل، والختم بينزل مرة واحدة، وبعدين الكتاب يهدى."],
+      live: ["الفكرة التانية: الكتاب بيمشي مع الدخول", "اكتب إيميل، الخط يوصل لنص الطريق. اكتب الباسورد، الرد يظهر. اضغط Sign in، الختم ينزل. جرّب بأي بيانات، مفيش حاجة بتتبعت."],
+      current: ["الحركة الحالية على الموقع", "للمقارنة بس: الصفحة بتتضغط بالعرض، وبعدين كل حاجة بتظهر ورا بعض بسرعة."],
+    };
+
+    function setStep() {
+      const emailReady = /.+@.+\..+/.test(email.value.trim());
+      const step = root.dataset.step === "3" ? 3 : emailReady && password.value ? 2 : emailReady ? 1 : 0;
+      root.dataset.step = String(step);
     }
 
-    leaf.addEventListener("animationend", (event) => {
-      if (event.animationName === "turn-3d" || event.animationName === "leaf-flat") leaf.classList.add("is-gone");
-    });
+    function play() {
+      root.classList.remove("is-playing");
+      root.dataset.step = "0";
+      delete root.dataset.focus;
+      form.reset();
+      note.textContent = "";
+      void root.offsetWidth;
+      if (!reduced) root.classList.add("is-playing");
+      if (reduced) root.dataset.step = "3";
+    }
 
-    document.querySelectorAll("[data-mode]").forEach((button) => {
-      button.addEventListener("click", () => {
-        root.dataset.motion = button.dataset.mode;
-        document.querySelectorAll("[data-mode]").forEach((item) => item.setAttribute("aria-pressed", String(item === button)));
-        play();
-      });
-    });
+    function setMode(mode) {
+      root.dataset.motion = mode;
+      document.getElementById("study-title").textContent = copy[mode][0];
+      document.getElementById("study-desc").textContent = copy[mode][1];
+      document.querySelectorAll("[data-mode]").forEach((button) => button.setAttribute("aria-pressed", String(button.dataset.mode === mode)));
+      play();
+    }
+
+    document.querySelectorAll("[data-mode]").forEach((button) => button.addEventListener("click", () => setMode(button.dataset.mode)));
     document.getElementById("replay").addEventListener("click", play);
+    email.addEventListener("input", setStep);
+    password.addEventListener("input", setStep);
+    email.addEventListener("focus", () => { root.dataset.focus = "email"; });
+    email.addEventListener("blur", () => { delete root.dataset.focus; });
+    form.addEventListener("submit", (event) => {
+      event.preventDefault();
+      password.value = "";
+      if (root.dataset.motion === "live") root.dataset.step = "3";
+      note.textContent = "دي معاينة بس. مفيش تسجيل دخول حقيقي ومفيش بيانات بتتبعت.";
+    });
 
     artwork.addEventListener("pointermove", (event) => {
       if (event.pointerType !== "mouse" || reduced) return;
       const bounds = artwork.getBoundingClientRect();
-      tilt.style.setProperty("--book-x", ((0.5 - (event.clientY - bounds.top) / bounds.height) * 7).toFixed(2) + "deg");
-      tilt.style.setProperty("--book-y", (((event.clientX - bounds.left) / bounds.width - 0.5) * 8).toFixed(2) + "deg");
+      book.style.setProperty("--book-x", ((0.5 - (event.clientY - bounds.top) / bounds.height) * 4).toFixed(2) + "deg");
+      book.style.setProperty("--book-y", (((event.clientX - bounds.left) / bounds.width - 0.5) * 4).toFixed(2) + "deg");
     });
     artwork.addEventListener("pointerleave", () => {
-      tilt.style.setProperty("--book-x", "0deg");
-      tilt.style.setProperty("--book-y", "0deg");
+      book.style.setProperty("--book-x", "0deg");
+      book.style.setProperty("--book-y", "0deg");
     });
 
-    play();
-    const freezeAt = new URLSearchParams(location.search).get("t");
-    if (freezeAt !== null) {
-      requestAnimationFrame(() => {
-        document.getAnimations().forEach((animation) => {
-          animation.pause();
-          animation.currentTime = Number(freezeAt);
-        });
-        if (Number(freezeAt) > 1700) leaf.classList.add("is-gone");
-      });
+    const params = new URLSearchParams(location.search);
+    setMode(copy[params.get("mode")] ? params.get("mode") : "ink");
+    if (params.has("step")) root.dataset.step = params.get("step");
+    if (params.has("t")) {
+      requestAnimationFrame(() => document.getAnimations().forEach((animation) => {
+        animation.pause();
+        animation.currentTime = Number(params.get("t"));
+      }));
     }
   </script>
 </body>
