@@ -118,28 +118,3 @@ export async function setSourceActive(code: string, active: boolean): Promise<Ac
   revalidatePath("/tickets/new");
   return { ok: true, message: active ? "Restored." : "Archived. Existing tickets keep this source." };
 }
-
-const emailsSchema = z.array(z.email("One of the addresses isn't a valid email")).max(10);
-
-export async function saveNotificationEmails(raw: string): Promise<ActionResult> {
-  const me = await assertAdmin();
-  const emails = raw
-    .split(/[\s,;]+/)
-    .map((e) => e.trim().toLowerCase())
-    .filter(Boolean);
-  const parsed = emailsSchema.safeParse(Array.from(new Set(emails)));
-  if (!parsed.success) return { ok: false, error: parsed.error.issues[0].message };
-
-  const supabase = await createClient();
-  const { error } = await supabase
-    .from("app_settings")
-    .update({ value: parsed.data, updated_by: me.id, updated_at: new Date().toISOString() })
-    .eq("key", "notification_emails");
-  if (error) return { ok: false, error: error.message };
-
-  revalidatePath("/admin/settings");
-  return {
-    ok: true,
-    message: parsed.data.length ? "Notification recipients saved." : "Saved. No emails will be sent until you add an address.",
-  };
-}

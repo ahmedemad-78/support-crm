@@ -20,6 +20,6 @@ export async function sendTestNotification(): Promise<{ ok: boolean; message: st
       text: "This is a single connection test from Support CRM. No ticket was created or changed, and no queued messages were dispatched.\n\nNotifications are currently routed to Ahmed only.\n\nOpen the workspace: https://support-crm-emad25.vercel.app",
       html: '<h2>Support CRM notification test</h2><p>This is a single connection test. No ticket was created or changed, and no queued messages were dispatched.</p><p>Notifications are currently routed to Ahmed only.</p><p><a href="https://support-crm-emad25.vercel.app">Open the workspace</a></p>',
     });
-    return { ok: true, message: `Test message accepted by ${result.provider}. Check the central recipient’s Outlook Inbox and Junk folders to confirm delivery.` };
+    return { ok: true, message: `Test message accepted by ${result.provider}. Check the central recipient’s mailbox Inbox and Junk folders to confirm delivery.` };
   } catch (error) { return { ok: false, message: publicMailError(error) }; }
 }

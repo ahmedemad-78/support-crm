@@ -11,7 +11,7 @@ export default async function SettingsPage() {
   const { data: deliveryPolicy, error: deliveryPolicyError } = await supabase.from("app_settings").select("value").eq("key", "workflow_notifications").maybeSingle();
   if (deliveryPolicyError) throw deliveryPolicyError;
 
-  const [cities, categories, causes, requestTypes, topics, trackerCauses, trackerActions, outcomes, sources, emails] =
+  const [cities, categories, causes, requestTypes, topics, trackerCauses, trackerActions, outcomes, sources] =
     await Promise.all([
       supabase.from("cities").select("id, name, is_active").order("sort_order").order("name"),
       supabase.from("issue_categories").select("id, name, is_active").order("name"),
@@ -22,10 +22,9 @@ export default async function SettingsPage() {
       supabase.from("tracker_actions").select("id, name, is_active").order("name"),
       supabase.from("outcomes").select("id, name, is_active").order("name"),
       supabase.from("ticket_sources").select("code, name, is_active, bound_role").order("sort_order").order("name"),
-      supabase.from("app_settings").select("value").eq("key", "notification_emails").maybeSingle(),
     ]);
 
-  for (const result of [cities, categories, causes, requestTypes, topics, trackerCauses, trackerActions, outcomes, sources, emails]) {
+  for (const result of [cities, categories, causes, requestTypes, topics, trackerCauses, trackerActions, outcomes, sources]) {
     if (result.error) throw result.error;
   }
 
@@ -45,7 +44,7 @@ export default async function SettingsPage() {
           outcomes: outcomes.data ?? [],
         }}
         sources={sources.data ?? []}
-        notificationEmails={(emails.data?.value as string[] | undefined) ?? []}
+        notificationRecipient={String(deliveryPolicy?.value?.email || "")}
       />
     </>
   );

@@ -5,16 +5,13 @@ import { Archive, Check, Pencil, Plus, RotateCcw, X } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
 import {
   addListItem,
   addSource,
   renameListItem,
   renameSource,
-  saveNotificationEmails,
   setListItemActive,
   setSourceActive,
   type ActionResult,
@@ -88,11 +85,11 @@ const settingsServerLayout = () => false;
 export function SettingsTabs({
   lists,
   sources,
-  notificationEmails,
+  notificationRecipient,
 }: {
   lists: Record<ListTable, ListItem[]>;
   sources: SourceItem[];
-  notificationEmails: string[];
+  notificationRecipient: string;
 }) {
   const mobile = useSyncExternalStore(subscribeSettingsLayout, settingsIsMobile, settingsServerLayout);
   return (
@@ -124,7 +121,7 @@ export function SettingsTabs({
         </TabsContent>
       ))}
       <TabsContent value="notifications">
-        <NotificationEmails initial={notificationEmails} />
+        <NotificationRouting recipient={notificationRecipient} />
       </TabsContent>
     </Tabs>
   );
@@ -400,32 +397,13 @@ function SourceRow({ source }: { source: SourceItem }) {
   );
 }
 
-function NotificationEmails({ initial }: { initial: string[] }) {
-  const [value, setValue] = useState(initial.join("\n"));
-  const { pending, run } = useAction();
-
+function NotificationRouting({ recipient }: { recipient: string }) {
   return (
-    <form
-      className="flex max-w-lg flex-col gap-3"
-      onSubmit={(e) => {
-        e.preventDefault();
-        run(() => saveNotificationEmails(value));
-      }}
-    >
-      <Label htmlFor="emails" className="text-sm font-semibold">
-        Extra addresses saved for later
-      </Label>
-      <Textarea
-        id="emails"
-        value={value}
-        onChange={(e) => setValue(e.target.value)}
-        rows={4}
-        placeholder="support@selaheltelmeez.com"
-      />
-      <p className="text-xs text-muted-foreground">Not used for ticket mail yet. A new ticket alerts Technical Support in the app. A status change emails the employee who opened the ticket.</p>
-      <Button type="submit" className="w-fit" disabled={pending}>
-        {pending ? "Saving…" : "Save recipients"}
-      </Button>
-    </form>
+    <section className="flex max-w-lg flex-col gap-3" aria-labelledby="notification-routing-title">
+      <h2 id="notification-routing-title" className="text-sm font-semibold">Temporary notification routing</h2>
+      <p className="text-sm">Email recipient: <strong className="break-all">{recipient || "Not configured"}</strong></p>
+      <p className="text-sm text-muted-foreground">New case, resolution, reopening and comment notifications currently go to the central Support owner only. Reporting teams do not receive notifications during this rollout.</p>
+      <p className="text-sm text-muted-foreground">Email delivery setup is pending. In-app notifications remain available. Changing the sender or recipient is managed separately from ticket settings.</p>
+    </section>
   );
 }
