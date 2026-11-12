@@ -25,7 +25,7 @@ export function navFor(user: CurrentUser): NavSection[] {
             { href: "/tickets", label: "Case register", icon: "tickets" },
             { href: "/dashboard", label: "Analytics", icon: "dashboard" },
             { href: "/tickets/new", label: "Create case", icon: "new-ticket" },
-            { href: "/inbox", label: "Conversations", icon: "inbox", badge: "Offline" },
+            { href: "/inbox", label: "Conversations", icon: "inbox", badge: "Soon" },
           ],
         },
       ];
