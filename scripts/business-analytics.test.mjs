@@ -7,13 +7,31 @@ import {createRequire} from 'node:module';
 import vm from 'node:vm';
 import ts from 'typescript';
 const directory=mkdtempSync(join(tmpdir(),'crm-business-'));
-for(const name of ['constants','dashboard-model','analytics','business-analytics'])writeFileSync(join(directory,name+'.js'),ts.transpileModule(readFileSync(new URL('../src/lib/tickets/'+name+'.ts',import.meta.url),'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022}}).outputText);
+for(const name of ['constants','dashboard-model','analytics','business-analytics','single-page-model'])writeFileSync(join(directory,name+'.js'),ts.transpileModule(readFileSync(new URL('../src/lib/tickets/'+name+'.ts',import.meta.url),'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022,esModuleInterop:true}}).outputText);
+writeFileSync(join(directory,'world-countries.json'),readFileSync(new URL('../src/lib/tickets/world-countries.json',import.meta.url),'utf8'));
 const require=createRequire(import.meta.url),m=require(join(directory,'business-analytics.js'));
+const single=require(join(directory,'single-page-model.js'));
 after(()=>rmSync(directory,{recursive:true,force:true}));
 const asOf='2026-11-12T12:00:00Z';
 const event=(id,kind,date,status,role='support_agent')=>({id,kind,created_at:date,to_status:status,actorRole:role});
 const ticket=(overrides={})=>({id:'one',number:'CASE-1',subject:'مشكلة تجريبية',source:'call_center',sourceName:'Call Center',status:'resolved',createdOn:'2026-11-01',createdAt:'2026-11-01T08:00:00Z',reportedOn:'2026-10-29',resolvedAt:'2026-11-02T08:00:00Z',cityId:'1',categoryId:'2',endUserType:'parent',category:'App',cause:'',requestType:'Complaint',topic:'Content',trackerCause:'Content delay',trackerAction:'Publish content',outcome:'Fixed',fawry:'',reporterId:'kabany',reporter:'Kabany',creatorId:'ahmed',creator:'Ahmed',reopenCount:0,isHistorical:false,workflowEvents:[event('e1','created','2026-11-01T08:00:00Z','new'),event('e2','resolved','2026-11-02T08:00:00Z','resolved')],...overrides});
 const f=(overrides={})=>m.parseBusinessFilters(overrides);
+
+test('map coverage accounts for missing, explicit unknown, unrecognized and international locations without assigning Egypt',()=>{
+ const data=[ticket(),ticket({id:'alex',cityId:'3'}),ticket({id:'kw',cityId:'29'}),ticket({id:'unknown',cityId:'28'}),ticket({id:'missing',cityId:''}),ticket({id:'new-place',cityId:'999'})];
+ const cities=[{id:'1',name:'Cairo'},{id:'3',name:'Alexandria'},{id:'29',name:'Kuwait'},{id:'28',name:'Not recorded'},{id:'999',name:'New unverified city'}];
+ const result=single.geographicCases(data,cities);assert.equal(result.mapped,3);assert.equal(result.missing,2);assert.equal(result.unmapped,1);assert.equal(result.mapped+result.missing+result.unmapped,result.total);
+ const international=result.locations.find(p=>p.name==='Kuwait');assert.equal(international.place.country,'Kuwait');assert.equal(international.place.level,'country');assert.ok(international.place.lon>46&&international.place.lon<49);assert.equal(result.locations.find(p=>p.id==='999').place,null);
+ assert.equal(single.resolvePlace('Red Sea').country,'Egypt');assert.equal(single.resolvePlace('never geocode this customer address'),null);
+});
+test('clustered source series preserve every case through other request types and missing classification',()=>{
+ const data=Array.from({length:70},(_,i)=>ticket({id:String(i),source:['call_center','moderation','whatsapp'][i%3],requestType:i%7?'Type '+i%6:''}));
+ const result=single.clusteredSources(data,new Map());assert.equal(result.groups.reduce((n,g)=>n+g.values.reduce((a,b)=>a+b,0),0),70);assert.equal(result.groups.reduce((n,g)=>n+g.count,0),70);assert.ok(result.series.some(s=>s.id===m.MISSING));assert.ok(result.series.some(s=>s.id==='__other__'));assert.equal(new Set(result.series.flatMap(s=>s.members)).size,7);
+});
+test('record review flags count cases once and do not redefine resolved or reopen counts',()=>{
+ const data=[ticket({outcome:'Issue Persists'}),ticket({id:'two',status:'closed',outcome:'Issue Persists',reporterId:''}),ticket({id:'three',topic:'',trackerCause:'',trackerAction:''})];
+ const review=single.recordReview(data);assert.equal(review.inconsistent.length,1);assert.equal(review.incomplete.length,1);assert.equal(review.missingReporter.length,1);assert.equal(data.filter(t=>t.status==='resolved').length,2);
+});
 test('full population, source, tracker action and outcome filters share one denominator',()=>{
  const data=[ticket(),ticket({id:'two',source:'moderation',status:'closed',outcome:'',trackerAction:'',reporterId:'sonia'}),ticket({id:'three',status:'new',resolvedAt:null})];
  assert.equal(m.filterBusinessTickets(data,f()).length,3);
