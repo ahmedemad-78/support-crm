@@ -2,10 +2,11 @@
 
 ## What changed
 
-- My tickets now separates open work, waiting for the reporting owner, tickets with unread Support replies, historical reopening and finished tickets. Summary counts cover all owned tickets; search/view result counts cover the selected filter.
+- My tickets now shows an All tickets total and separates open work, waiting for the reporting owner, tickets with unread Support replies, historical reopening and finished tickets. Summary counts cover all owned tickets; search/view result counts cover the selected filter.
 - Desktop uses a readable table; narrow workspaces use cards. Every row/card shows current status, unread reply count, reopen count and latest actual workflow activity. A finished ticket can still show its historical reopen count.
 - Search covers ticket number, customer and issue text. Sorting and 25-row server pagination retain URL context. The old silent 200-row limit is removed.
-- Portal details now separate issue/evidence, customer/account, Support response, shared conversation and collapsed classification/history. Previous responses are identified when a case has reopened. Credentials stay masked by default. Internal support notes remain private.
+- Portal details now separate issue/evidence, customer/account, Support response, shared conversation and collapsed status history. Previous responses are identified when a case has reopened. Credentials stay masked by default. Internal support notes remain private.
+- Classification & follow-up was removed from employee pages by user request, and its fields/relations are no longer selected by the portal detail query. The Technical Support tracker/editor remains unchanged. Shared status badges now use quiet outline icons instead of colored dots.
 - Reporting owner and recorded-by identity remain distinct. The reporting account cannot change status or select a resolution assignee.
 
 ## Reply/read semantics

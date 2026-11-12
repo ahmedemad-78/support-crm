@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ArrowDownLeft, ArrowUpRight, Check, CheckCircle2, ChevronLeft, ChevronRight, Clock3, MessageSquare, Plus, RotateCcw, Search } from "lucide-react";
+import { ArrowDownLeft, ArrowUpRight, Check, CheckCircle2, ChevronLeft, ChevronRight, Clock3, ListChecks, MessageSquare, Plus, RotateCcw, Search } from "lucide-react";
 import { StatusBadge } from "./status-badge";
 import { PortalTicketRefresh } from "./portal-ticket-refresh";
 import { formatDateTime, formatRelative } from "@/lib/format";
@@ -11,7 +11,7 @@ const views:{key:PortalView;label:string}[]=[{key:"all",label:"All tickets"},{ke
 export function PortalTicketList({data,filters,team,userId,submitted,baseHref="/portal/my-tickets",preview=false,detailHref,newTicketHref="/portal/new-ticket"}:Props){
   const f={...filters,page:data.page};const link=(patch:Partial<PortalFilters>)=>baseHref+portalQuery(f,patch);
   const ticketHref=(ticket:PortalTicketRow)=>detailHref||`/portal/my-tickets/${ticket.id}?returnTo=${encodeURIComponent(baseHref+portalQuery(f))}${ticket.unread_replies?"#case-followup":""}`;
-  const summary=[{key:"open" as const,label:"Open tickets",hint:"Still being worked on",icon:Clock3},{key:"waiting" as const,label:"Waiting for you",hint:"Support needs your response",icon:ArrowDownLeft},{key:"unread" as const,label:"Tickets with new replies",hint:`${data.summary.unread_replies} unread replies across your tickets`,icon:MessageSquare},{key:"reopened" as const,label:"Reopened tickets",hint:"Reopened at least once",icon:RotateCcw}];
+  const summary=[{key:"all" as const,label:"All tickets",hint:"Total cases reported by you or on your behalf",icon:ListChecks},{key:"open" as const,label:"Open tickets",hint:"Still being worked on",icon:Clock3},{key:"waiting" as const,label:"Waiting for you",hint:"Support needs your response",icon:ArrowDownLeft},{key:"unread" as const,label:"Tickets with new replies",hint:`${data.summary.unread_replies} unread replies across your tickets`,icon:MessageSquare},{key:"reopened" as const,label:"Reopened tickets",hint:"Reopened at least once",icon:RotateCcw}];
   return <div className="portal-workspace"><div className="portal-view">
     <header className="portal-heading"><div><span className="portal-eyebrow">{team} / YOUR CASES</span><h1>My tickets<span>.</span></h1><p>Follow the response. Keep the customer informed.</p></div><Link className="portal-primary" href={newTicketHref}><Plus size={17}/>New ticket</Link></header>
     {submitted&&<div className="portal-submitted" role="status"><CheckCircle2 size={19}/><p><strong>{submitted} submitted.</strong> Technical Support has been notified.</p></div>}

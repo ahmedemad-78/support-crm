@@ -4,3 +4,5 @@
 
 .portal-case [dir=auto]:dir(rtl){font-family:"Segoe UI",Tahoma,Arial,sans-serif}
 .portal-case-conversation > .case-conversation{background:#fff;border:1px solid #d8e1cf;border-radius:9px}
+
+.portal-case-secondary{grid-template-columns:minmax(0,1fr)}
