@@ -12,8 +12,9 @@
     "test:remediation": "node --test scripts/remediation.test.mjs",
     "test:workflow": "node --test scripts/workflow.test.mjs",
     "create-admin": "node --env-file=.env.local scripts/create-admin.mjs",
-    "test": "node --test --experimental-test-isolation=none scripts/analytics.test.mjs scripts/remediation.test.mjs scripts/workflow.test.mjs",
-    "test:lifecycle": "node scripts/lifecycle-db.test.mjs"
+    "test": "node --test --experimental-test-isolation=none scripts/analytics.test.mjs scripts/remediation.test.mjs scripts/workflow.test.mjs scripts/business-analytics.test.mjs",
+    "test:lifecycle": "node scripts/lifecycle-db.test.mjs",
+    "test:business": "node --test --experimental-test-isolation=none scripts/business-analytics.test.mjs"
   },
   "dependencies": {
     "@base-ui/react": "^1.8.0",

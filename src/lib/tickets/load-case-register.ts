@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import type { QueueRow } from "@/components/tickets/ticket-queue";
 import "server-only";
+import { filterBusinessTickets, parseBusinessFilters, businessQuery } from "./business-analytics";
 import { collectExportRows } from "./export-batches";
 
 import type { CurrentUser } from "@/lib/auth/roles";
@@ -54,7 +55,7 @@ export async function loadCaseRegister(rawParams: Record<string,string|string[]|
   if (scope) {
     const loaded = await loadAnalytics();
     const today = cairoDate(loaded.asOf);
-    let population = dashboardPopulation(loaded.tickets, dashboardFilters, today);
+    let population = rawParams.bi === "1" ? filterBusinessTickets(loaded.tickets,parseBusinessFilters(rawParams),scope === "followup") : dashboardPopulation(loaded.tickets, dashboardFilters, today);
     if (scope === "followup") population = population.filter((ticket) => statusGroup(ticket.status) === "followup");
     population = population.filter((ticket) => listDimension(ticket, filters));
     counts = Object.fromEntries(
@@ -127,6 +128,7 @@ function scopeParams(
   scope: string,
 ) {
   if (!scope) return {};
+  if(raw.bi === "1"){const extra=Object.fromEntries(new URLSearchParams(businessQuery(parseBusinessFilters(raw))));for(const key of ["source","status","city","category","assignee","q"])delete extra[key];return {...extra,scope,...(raw.tab==="operations"||raw.tab==="analysis"?{tab:raw.tab}:{})};}
   const extras: Record<string, string> = { scope };
   for (const key of SCOPE_KEYS) {
     const value = Array.isArray(raw[key]) ? raw[key][0] : raw[key];

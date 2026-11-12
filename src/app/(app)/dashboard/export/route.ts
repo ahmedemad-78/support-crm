@@ -1,3 +1,4 @@
+import { businessCsv, filterBusinessTickets, parseBusinessFilters } from "@/lib/tickets/business-analytics";
 import { NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth/session";
 import { cairoDate } from "@/lib/tickets/dashboard-model";
@@ -14,6 +15,7 @@ export async function GET(request: Request) {
   const url = new URL(request.url);
   const filters = parseDashboardFilters(Object.fromEntries(url.searchParams.entries()));
   const { tickets, asOf } = await loadAnalytics();
+  if(url.searchParams.get("bi")==="1"){const selected=filterBusinessTickets(tickets,parseBusinessFilters(Object.fromEntries(url.searchParams)));return new NextResponse(businessCsv(selected),{headers:{"Content-Type":"text/csv; charset=utf-8","Content-Disposition":"attachment; filename=support-analytics.csv","Cache-Control":"private, no-store"}});}
   const today = cairoDate(asOf);
   let rows = dashboardPopulation(tickets, filters, today);
   if (url.searchParams.get("scope") === "followup") {
