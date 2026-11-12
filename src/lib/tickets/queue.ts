@@ -11,4 +11,6 @@ export function inQueueView(ticket: {status:string; reopenCount?:number; assigne
   return true;
 }
 
-export const QUEUE_VIEWS: Record<TicketView,string> = { open:"Open", new:"New", reopened:"Reopened", awaiting:"Waiting for customer", mine:"Assigned to me", all:"All cases", resolved:"Resolved" };
+export const QUEUE_VIEWS: Record<TicketView,string> = { all:"All cases", open:"Open", new:"New", reopened:"Reopened", awaiting:"Waiting for customer", mine:"Assigned to me", resolved:"Resolved" };
+
+export function relationName(value:unknown):string { const row=Array.isArray(value)?value[0]:value; if(row&&typeof row==="object") { if("name" in row&&typeof row.name==="string")return row.name; if("full_name" in row&&typeof row.full_name==="string")return row.full_name; } return ""; }

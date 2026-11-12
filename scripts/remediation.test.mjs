@@ -21,6 +21,8 @@ const files = [
   "src/lib/tickets/intake.ts",
   "src/lib/tickets/resolution.ts",
   "src/lib/tickets/queue.ts",
+  "src/lib/tickets/register-export.ts",
+  "src/lib/tickets/export-batches.ts",
   "src/lib/tickets/conversation.ts",
   "src/lib/tickets/portal-workspace.ts",
 ];
@@ -312,7 +314,7 @@ test("queue separates open reopened work from resolved history and other assignm
   assert.equal(rows.filter(row=>queue.inQueueView(row,"open","me")).length,2);
 });
 test("queue defaults and links keep dashboard cohorts and explicit all-case selections",()=>{
-  assert.equal(filters.parseTicketListFilters({}).view,"open");
+  assert.equal(filters.parseTicketListFilters({}).view,"all");
   assert.equal(filters.parseTicketListFilters({scope:"dashboard"}).view,"all");
   for(const view of ["open","all","reopened"]){const input=filters.parseTicketListFilters({view,source:"call_center",sort:"stale",pageSize:"50",page:"2"});const params=Object.fromEntries(new URLSearchParams(filters.ticketListQuery(input,{scope:"dashboard"})));const result=filters.parseTicketListFilters(params);assert.equal(result.view,view);assert.equal(result.pageSize,50);assert.equal(result.source,"call_center");assert.equal(result.sort,"stale");assert.equal(result.page,2);}
   assert.equal(filters.parseTicketListFilters({pageSize:"99999"}).pageSize,25);
@@ -361,4 +363,22 @@ test("portal return links keep valid list context and reject external or other r
  const portal=createRequire(import.meta.url)(join(directory,"lib/tickets/portal-workspace.js"));
  assert.equal(portal.portalReturnHref("/portal/my-tickets?view=unread&page=2&sort=unread&q=case"),"/portal/my-tickets?view=unread&q=case&sort=unread&page=2");
  for(const raw of ["https://evil.example", "//evil.example", "/portal/my-tickets/../../admin/users", "/portal/my-tickets-evil", "/portal/my-tickets/other",undefined])assert.equal(portal.portalReturnHref(raw),"/portal/my-tickets");
+});
+
+
+test("case register export includes all rows and preserves Arabic while neutralizing formulas",()=>{
+ const {registerCsv}=require(join(directory,"lib/tickets/register-export.js"));
+ const rows=Array.from({length:51},(_,i)=>({id:String(i),ticket_number:"CASE-"+i,customer_name:i===0?"=HYPERLINK(1)":"أحمد",issue_description:'سطر، أول\n"تفاصيل"',source:"call_center",status:"resolved",created_at:"2026-11-12T00:00:00Z",cities:{name:"القاهرة"},reporter:{full_name:"قباني"},creator:{full_name:"أحمد"},assignee:null,reopen_count:2}));
+ const csv=registerCsv(rows,[{code:"call_center",name:"كول سنتر"}]);
+ assert.ok(csv.startsWith("\uFEFF")); assert.ok(csv.includes("CASE-50"));assert.ok(csv.includes("أحمد"));assert.ok(csv.includes("كول سنتر"));assert.ok(csv.includes("Unassigned"));assert.ok(csv.includes("Resolved & closed"));assert.ok(csv.includes('"\'=HYPERLINK(1)"'));assert.ok(csv.includes('""تفاصيل""'));
+ assert.equal(registerCsv([],[]).split("\r\n").length,2);
+});
+test("full exports respect server row caps and never stop at the visible page",async()=>{
+ const {collectExportRows}=require(join(directory,"lib/tickets/export-batches.js"));
+ for(const size of [0,25,500,1201]){
+   const rows=Array.from({length:size},(_,id)=>({id})); const offsets=[];
+   const actual=await collectExportRows(async offset=>{offsets.push(offset);return {data:rows.slice(offset,offset+200),count:size};});
+   assert.deepEqual(actual,rows); assert.equal(offsets[0],0);assert.ok(offsets.every((o,i)=>!i||o>offsets[i-1]));
+ }
+ await assert.rejects(()=>collectExportRows(async()=>{throw new Error("database unavailable")}),/database unavailable/);
 });

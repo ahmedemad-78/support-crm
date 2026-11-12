@@ -17,7 +17,7 @@ type Attachment = { id: string; file_name: string; mime_type: string; url?: stri
 export type CaseWorkspaceProps = { ticket: CaseRecord; sourceName: string; city: string; creator: string; reporterName?: string; reopenCount?: number; editor: CaseEditorProps; notes: Note[]; history: History[]; attachments: Attachment[]; backHref: string; saved?: boolean; error?: string };
 
 export function CaseWorkspace({ ticket, sourceName, city, creator, reporterName, reopenCount = 0, editor, notes, history, attachments, backHref, saved, error }: CaseWorkspaceProps) {
-  const owner = editor.agents.find((agent) => agent.id === editor.initial.assigneeId)?.full_name || (editor.initial.assigneeId ? "Assigned owner" : "Support pool");
+  const owner = editor.agents.find((agent) => agent.id === editor.initial.assigneeId)?.full_name || (editor.initial.assigneeId ? "Assigned owner" : "Unassigned");
   const customerFields = [
     ["School", ticket.school_name || "Not recorded"], ["City", city || "Not recorded"],
     ["User type", ticket.end_user_type ? END_USER_TYPE_LABELS[ticket.end_user_type as keyof typeof END_USER_TYPE_LABELS] || ticket.end_user_type : "Not recorded"],

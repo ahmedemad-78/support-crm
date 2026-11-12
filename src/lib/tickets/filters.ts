@@ -33,7 +33,7 @@ export function parseTicketListFilters(
   const page = Number(one(searchParams.page));
 
   return {
-    view: TICKET_VIEWS.includes(view as TicketView) ? (view as TicketView) : (one(searchParams.scope) === "dashboard" || one(searchParams.scope) === "followup" ? "all" : "open"),
+    view: TICKET_VIEWS.includes(view as TicketView) ? (view as TicketView) : "all",
     status: TICKET_STATUSES.includes(status as TicketStatus) ? (status as TicketStatus) : "",
     source: /^[a-z][a-z0-9_]{1,40}$/.test(source) ? source : "",
     city: one(searchParams.city),
