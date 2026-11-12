@@ -22,7 +22,7 @@ try {
     create function storage.foldername(text) returns text[] language sql immutable as $$select string_to_array($1,'/')$$;
   `);
   const files=readdirSync('supabase/migrations').filter(f=>f.endsWith('.sql')).sort();
-  for(const file of files.filter(f=>!f.includes('case_lifecycle') && !f.includes('intake_optional_contacts') && !f.includes('conversation_media_and_reporter_notifications'))) await db.exec(readFileSync(`supabase/migrations/${file}`,'utf8'));
+  for(const file of files.filter(f=>!f.includes('case_lifecycle') && !f.includes('intake_optional_contacts') && !f.includes('conversation_media_and_reporter_notifications') && !f.includes('portal_ticket_workspace'))) await db.exec(readFileSync(`supabase/migrations/${file}`,'utf8'));
   const names=['Ahmed Emad','sonia','kabany','Olaa','Yasser Arab','Manager'];
   const roles=['support_agent','moderation','call_center','business_development','june_schools','manager'];
   const ids=names.map((_,i)=>`10000000-0000-4000-8000-${String(i+1).padStart(12,'0')}`);
@@ -101,6 +101,7 @@ try {
   await db.exec('reset role');
   await db.exec('alter table storage.objects add column owner_id text, add column metadata jsonb; grant usage on schema storage to authenticated; grant select,insert on storage.objects to authenticated;');
   await db.exec(readFileSync('supabase/migrations/20261111191028_conversation_media_and_reporter_notifications.sql','utf8'));
+  await db.exec(readFileSync('supabase/migrations/20261111200033_portal_ticket_workspace.sql','utf8'));
   const mailCount=await scalar('select count(*)::int v from email_outbox');
   const noticeCount=await scalar('select count(*)::int v from notifications');
   await signIn(0);
@@ -242,10 +243,46 @@ try {
     await signIn(0);check(await scalar(`select count(*)::int v from notifications where event_id='${request}'`),1);
     await db.exec(`update tickets set status='resolved',resolution_notes='Second synthetic resolution.' where id='${own.id}'`);
     await signIn(ownerIndex);check(await scalar(`select count(*)::int v from ticket_workflow_events where ticket_id='${own.id}' and kind='resolved'`),2);
+    const workspace=async(view='all',search='',page=1)=>(await db.query('select public.my_ticket_workspace($1,$2,$3) v',[view,search,page])).rows[0].v;
+    const register=await workspace('all',own.ticket_number);
+    check(register.matched,1);check(register.rows[0].id,own.id);check(register.rows[0].reopen_count,1);
+    check(register.rows[0].status,'resolved');check(register.rows[0].unread_replies,2);
+    check((await workspace('reopened',own.ticket_number)).matched,1);
+    check((await workspace('open',own.ticket_number)).matched,0);
+    const captured=(await db.query(`select n.event_id from notifications n join ticket_workflow_events e on e.id=n.event_id where n.ticket_id=$1 and n.read_at is null and e.kind in ('comment','resolved')`,[own.id])).rows.map(row=>row.event_id);
+    await signIn(0);
+    const late=(await db.query('select gen_random_uuid() id')).rows[0].id;
+    await db.query('select public.send_case_message($1,$2,$3,$4,now(),$5)',[own.id,late,'comment','A reply arriving after the page loaded.','[]']);
+    await signIn(ownerIndex);
+    check((await db.query('select public.mark_ticket_replies_read($1,$2) v',[own.id,Array(501).fill(captured[0])])).rows[0].v,0);
+    check((await db.query('select public.mark_ticket_replies_read($1,$2) v',[own.id,captured])).rows[0].v,2);
+    check((await workspace('unread',own.ticket_number)).rows[0].unread_replies,1);
+    check((await db.query('select public.mark_ticket_replies_read($1,$2) v',[own.id,captured])).rows[0].v,0);
+    const waiting=await create();
+    await signIn(0);await db.query("update tickets set status='awaiting_customer' where id=$1",[waiting.id]);
+    await signIn(ownerIndex);const waitingRegister=await workspace('waiting',waiting.ticket_number);
+    check(waitingRegister.matched,1);check(waitingRegister.rows[0].unread_replies,0);
+    const statusNotice=(await db.query('select event_id from notifications where ticket_id=$1',[waiting.id])).rows[0].event_id;
+    check((await db.query('select public.mark_ticket_replies_read($1,$2) v',[waiting.id,[statusNotice]])).rows[0].v,0);
     await signIn(peerIndex);check(await scalar(`select count(*)::int v from tickets where id='${own.id}'`),0);
+    check((await workspace('all',own.ticket_number)).matched,0);
+    check((await db.query('select public.mark_ticket_replies_read($1,$2) v',[own.id,[late]])).rows[0].v,0);
+    await signIn(ownerIndex);check((await workspace('unread',own.ticket_number)).rows[0].unread_replies,1);
     await db.exec('reset role');check(await scalar('select count(*)::int v from email_outbox'),mailCount);
   }
-  await db.exec(`update profiles set is_active=false where id='${ids[2]}'`);await signIn(2);
+  await signIn(2);
+  await db.exec(`insert into tickets(ticket_number,source,customer_name,issue_date,city_id,end_user_type,platform,issue_description)
+    select 'pending','call_center','Pagination customer',current_date,(select id from cities limit 1),'parent','web','Pagination fixture '||n from generate_series(1,205) n`);
+  const pageResult=(await db.query("select public.my_ticket_workspace('all','Pagination fixture',999999,'oldest') v")).rows[0].v;
+  check(pageResult.matched,205);check(pageResult.pages,9);check(pageResult.page,9);check(pageResult.rows.length,5);
+  check((await db.query("select public.my_ticket_workspace('all','Pagination fixture',1) v")).rows[0].v.rows.length,25);
+  await db.exec(`insert into tickets(ticket_number,source,customer_name,issue_date,city_id,end_user_type,platform,issue_description) values('pending','call_center','100% literal _customer',current_date,(select id from cities limit 1),'parent','web','Literal search check')`);
+  check((await db.query("select public.my_ticket_workspace('all','%') v")).rows[0].v.matched,1);
+  await signIn(0);check((await db.query('select public.my_ticket_workspace() v')).rows[0].v.summary.all,0);
+  await db.exec('reset role');await db.exec("select set_config('request.jwt.claim.sub','',false);set role anon");
+  await denied('select public.my_ticket_workspace()',/permission denied/);
+  await db.exec('reset role');await db.exec(`update profiles set is_active=false where id='${ids[2]}'`);await signIn(2);
+  check((await db.query('select public.my_ticket_workspace() v')).rows[0].v.summary.all,0);
   await denied(`select public.comment_on_case('${ticket.id}','Inactive accounts cannot comment',gen_random_uuid())`,/Sign in/);
   console.log(`PostgreSQL lifecycle: ${assertions} assertions passed (create, resolve, reopen, media ownership/atomicity, retries, RLS, source-bound reporter selection, participant notifications, email deferred).`);
 } finally {await db.close();}

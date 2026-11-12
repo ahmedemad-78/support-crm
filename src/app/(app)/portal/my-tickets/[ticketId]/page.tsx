@@ -1,193 +1,31 @@
-import { AttachmentPreview } from "@/components/tickets/attachment-preview";
-import { CaseFollowup } from "@/components/tickets/case-followup";
-import { loadCaseWorkflow } from "@/lib/tickets/workflow";
-import "@/app/(app)/tickets/workspace.css";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { ChevronRight, Lock } from "lucide-react";
+import { z } from "zod";
 import { UserNotifications } from "@/components/app-shell/user-notifications";
-import { StatusBadge } from "@/components/tickets/status-badge";
+import { PortalCaseFile } from "@/components/tickets/portal-case-file";
+import type { CaseRecord } from "@/components/tickets/case-workspace";
 import { PORTAL_ROLES } from "@/lib/auth/roles";
 import { requireUser } from "@/lib/auth/session";
 import { createClient } from "@/lib/supabase/server";
-import { formatDate, formatDateTime } from "@/lib/format";
-import { cn } from "@/lib/utils";
-import {
-  ATTACHMENTS_BUCKET,
-  END_USER_TYPE_LABELS,
-  PLATFORM_LABELS,
-  STATUS_LABELS,
-  STATUS_STYLES,
-  type TicketStatus,
-} from "@/lib/tickets/constants";
-
-export default async function PortalTicketPage({ params }: PageProps<"/portal/my-tickets/[ticketId]">) {
-  const user = await requireUser([...PORTAL_ROLES]);
-  const { ticketId } = await params;
-  const supabase = await createClient();
-
-  const { data: ticket } = await supabase
-    .from("tickets")
-    .select(
-      "id, ticket_number, status, created_at, updated_at, customer_name, customer_email, customer_phone, school_name, credentials_username, issue_date, end_user_type, platform, is_latest_version, app_version, device_type, page_screen, steps, issue_description, fawry_payment, resolution_notes, follow_up_notes, tracker_notes, cities(name), request_types(name), topics(name), tracker_causes(name), tracker_actions(name), outcomes(name)",
-    )
-    .eq("id", ticketId)
-    .or(`reporter_id.eq.${user.id},and(reporter_id.is.null,created_by.eq.${user.id})`)
-    .maybeSingle();
-  if (!ticket) notFound();
-
-  const [{ data: history }, { data: attachments }] = await Promise.all([
-    supabase
-      .from("ticket_status_history")
-      .select("id, to_status, changed_at")
-      .eq("ticket_id", ticket.id)
-      .order("changed_at", { ascending: false }),
-    supabase.from("ticket_attachments").select("id, file_name, mime_type, storage_path").eq("ticket_id", ticket.id).is("event_id",null),
-  ]);
-
-  const signed = attachments?.length
-    ? await supabase.storage
-        .from(ATTACHMENTS_BUCKET)
-        .createSignedUrls(attachments.map((a) => a.storage_path), 60 * 10)
-    : { data: [] };
-  const urlByPath = new Map(signed.data?.map((s) => [s.path, s.signedUrl]));
-
-  const city = (ticket.cities as unknown as { name: string } | null)?.name ?? "—";
-  const fields: [string, string][] = [
-    ["Customer name", ticket.customer_name],
-    ["Email", ticket.customer_email ?? "—"],
-    ["Phone", ticket.customer_phone ?? "—"],
-    ["User type", ticket.end_user_type ? END_USER_TYPE_LABELS[ticket.end_user_type as keyof typeof END_USER_TYPE_LABELS] : "—"],
-    ["Account credential", ticket.credentials_username ?? "—"],
-    ["School", ticket.school_name ?? "—"],
-    ["City", city],
-    ["Platform", ticket.platform ? PLATFORM_LABELS[ticket.platform as keyof typeof PLATFORM_LABELS] : "—"],
-    ["Device", ticket.device_type ?? "—"],
-    ["Latest app version", ticket.is_latest_version === true ? "Yes" : ticket.is_latest_version === false ? "No" : "Unknown"], ["App version", `${ticket.app_version ?? "—"}${ticket.is_latest_version === false ? " (not latest)" : ""}`],
-    ["Date of issue", ticket.issue_date ? formatDate(ticket.issue_date) : "—"],
-    ["Page / screen", ticket.page_screen ?? "—"],
-    ["Fawry payment", ticket.fawry_payment === true ? "Yes" : ticket.fawry_payment === false ? "No" : "Not recorded"],
-  ];
-  const classification: [string, string][] = [
-    ["Request type", relationName(ticket.request_types)],
-    ["Topic", relationName(ticket.topics)],
-    ["Cause", relationName(ticket.tracker_causes)],
-    ["Action", relationName(ticket.tracker_actions)],
-    ["Outcome", relationName(ticket.outcomes)],
-  ];
-
-  const workflow = await loadCaseWorkflow(ticket.id);
-  const status = ticket.status as TicketStatus;
-  const reached = new Map((history ?? []).map((h) => [h.to_status as TicketStatus, h.changed_at]));
-  const nextStep: TicketStatus | null = status === "resolved" || status === "closed" ? null : "resolved";
-
-  return (
-    <>
-      <header className="flex flex-col gap-3 border-b bg-background px-8 py-5">
-        <div className="flex items-center justify-between gap-3">
-        <nav className="flex items-center gap-1.5 text-[13px]">
-          <Link href="/portal/my-tickets" className="font-medium text-muted-foreground hover:text-foreground">
-            My tickets
-          </Link>
-          <ChevronRight className="size-3.5 text-muted-foreground" />
-          <span className="font-mono font-medium">{ticket.ticket_number}</span>
-        </nav>
-        <UserNotifications />
-        </div>
-        <div className="flex flex-wrap items-center gap-4">
-          <h1 className="min-w-0 flex-1 break-words text-2xl font-semibold tracking-tight">{ticket.issue_description}</h1>
-          <StatusBadge status={status} size="lg" />
-        </div>
-        <p className="flex items-center gap-1.5 text-[13px] text-muted-foreground">
-          <Lock className="size-3.5" />
-          Submitted {formatDateTime(ticket.created_at)} · Support resolves cases. You can comment or reopen the same problem.
-        </p>
-      </header>
-
-      <div className="flex flex-1 flex-col items-stretch gap-6 px-4 py-6 sm:px-8 xl:flex-row xl:items-start">
-        <section className="flex min-w-0 flex-1 flex-col gap-5 rounded-xl border bg-background p-6">
-          <h2 className="text-base font-semibold">What you submitted</h2>
-          <dl className="grid grid-cols-1 gap-x-6 gap-y-4 sm:grid-cols-2 2xl:grid-cols-3">
-            {fields.map(([label, value]) => (
-              <div key={label} className="flex flex-col gap-1">
-                <dt className="text-xs font-medium text-muted-foreground">{label}</dt>
-                <dd className="break-words text-sm">{value}</dd>
-              </div>
-            ))}
-          </dl>
-          <hr />
-          <div className="flex flex-col gap-1.5">
-            <p className="text-xs font-medium text-muted-foreground">Steps to reproduce</p>
-            <p className="max-w-2xl text-sm leading-[22px] whitespace-pre-wrap">{ticket.steps}</p>
-          </div>
-          <hr />
-          <h2 className="text-base font-semibold">Support update</h2>
-          <dl className="grid grid-cols-1 gap-x-6 gap-y-4 sm:grid-cols-2">
-            {classification.map(([label, value]) => (
-              <div key={label} className="flex flex-col gap-1">
-                <dt className="text-xs font-medium text-muted-foreground">{label}</dt>
-                <dd className="break-words text-sm">{value}</dd>
-              </div>
-            ))}
-          </dl>
-          <Note label="Technical Support response" value={ticket.resolution_notes} />
-          <Note label="Follow-up notes" value={ticket.follow_up_notes} />
-          <Note label="Tracker notes" value={ticket.tracker_notes} />
-          {attachments && attachments.length > 0 && (
-            <div className="attachment-grid">{attachments.map(file=><AttachmentPreview key={file.id} attachment={{...file,url:urlByPath.get(file.storage_path)}}/>)}</div>
-          )}
-        </section>
-
-        <aside className="flex w-full shrink-0 xl:w-[300px] flex-col gap-4 rounded-xl border bg-background p-5">
-          <h2 className="text-base font-semibold">Status updates</h2>
-          {nextStep && <TimelineStep status={nextStep} meta="Waiting" done={false} />}
-          {(history ?? []).map((h) => (
-            <TimelineStep
-              key={h.id}
-              status={h.to_status as TicketStatus}
-              meta={formatDateTime(h.changed_at)}
-              done
-            />
-          ))}
-          {reached.size === 0 && <p className="text-sm text-muted-foreground">No updates yet.</p>}
-          <p className="pt-1 text-xs leading-[18px] text-muted-foreground">
-            Assignee and internal notes stay with the Support team. The classification above is the tracker record for this ticket.
-          </p>
-        </aside>
-      </div>
-      <div className="case-file desk-case"><CaseFollowup perspective="reporter" reporterName={user.fullName} ticketId={ticket.id} version={ticket.updated_at} status={status} count={workflow.reopen_count} events={workflow.events} canReply={true} relatedHref={`/portal/new-ticket?linked=${ticket.id}`} /></div>
-    </>
-  );
+import { ATTACHMENTS_BUCKET, type TicketStatus } from "@/lib/tickets/constants";
+import { loadCaseWorkflow } from "@/lib/tickets/workflow";
+import { portalReturnHref } from "@/lib/tickets/portal-workspace";
+export default async function PortalTicketPage({params,searchParams}:PageProps<"/portal/my-tickets/[ticketId]">){
+ const user=await requireUser([...PORTAL_ROLES]);const {ticketId}=await params;const query=await searchParams;
+ if(!z.uuid().safeParse(ticketId).success)notFound();
+ const db=await createClient();
+ const {data:ticket,error}=await db.from("tickets").select("id,ticket_number,status,source,created_at,updated_at,customer_name,customer_email,customer_phone,school_name,credentials_username,issue_date,end_user_type,platform,is_latest_version,app_version,device_type,page_screen,steps,issue_description,fawry_payment,resolution_notes,follow_up_notes,tracker_notes,cities(name),request_types(name),topics(name),tracker_causes(name),tracker_actions(name),outcomes(name)").eq("id",ticketId).or(`reporter_id.eq.${user.id},and(reporter_id.is.null,created_by.eq.${user.id})`).maybeSingle();
+ if(error)throw error;if(!ticket)notFound();
+ const [history,attachments,workflow]=await Promise.all([
+  db.from("ticket_status_history").select("id,to_status,changed_at").eq("ticket_id",ticket.id).order("changed_at",{ascending:false}),
+  db.from("ticket_attachments").select("id,file_name,mime_type,size_bytes,storage_path").eq("ticket_id",ticket.id).is("event_id",null).order("created_at"),
+  loadCaseWorkflow(ticket.id),
+ ]);
+ if(history.error)throw history.error;if(attachments.error)throw attachments.error;
+ const signed=attachments.data.length?await db.storage.from(ATTACHMENTS_BUCKET).createSignedUrls(attachments.data.map(file=>file.storage_path),600):{data:[]};
+ const urls=new Map(signed.data?.map(file=>[file.path,file.signedUrl]));
+ const classification:[string,string][]=[["Request type",relationName(ticket.request_types)],["Topic",relationName(ticket.topics)],["Cause",relationName(ticket.tracker_causes)],["Action",relationName(ticket.tracker_actions)],["Outcome",relationName(ticket.outcomes)]];
+ const backHref=portalReturnHref(query.returnTo);
+ return <><header className="flex min-h-16 items-center justify-between gap-4 border-b bg-background px-5 py-3 sm:px-8"><nav className="flex min-w-0 flex-wrap items-center gap-2 text-xs text-muted-foreground" aria-label="Breadcrumb"><Link href={backHref}>My tickets</Link><span>/</span><span className="font-mono">{ticket.ticket_number}</span></nav><UserNotifications/></header><PortalCaseFile ticket={{...ticket,status:ticket.status as TicketStatus} as CaseRecord&{resolution_notes:string|null;follow_up_notes:string|null;tracker_notes:string|null}} city={relationName(ticket.cities)} classification={classification} attachments={attachments.data.map(file=>({...file,url:urls.get(file.storage_path)}))} history={history.data??[]} reporter={user.fullName} recordedBy={workflow.recordedByName} reopenCount={workflow.reopen_count} events={workflow.events} unreadReplyEvents={workflow.unreadReplyEvents} backHref={backHref} relatedHref={`/portal/new-ticket?linked=${ticket.id}`}/></>;
 }
-
-function relationName(value: unknown): string {
-  const row = Array.isArray(value) ? value[0] : value;
-  if (row && typeof row === "object" && "name" in row && typeof row.name === "string" && row.name) return row.name;
-  return "Not recorded";
-}
-
-function Note({ label, value }: { label: string; value: string | null }) {
-  return (
-    <div className="flex flex-col gap-1.5">
-      <p className="text-xs font-medium text-muted-foreground">{label}</p>
-      <p className="max-w-2xl text-sm leading-[22px] whitespace-pre-wrap">{value || "Not recorded"}</p>
-    </div>
-  );
-}
-
-function TimelineStep({ status, meta, done }: { status: TicketStatus; meta: string; done: boolean }) {
-  return (
-    <div className="flex items-start gap-3">
-      <span
-        className={cn(
-          "mt-[5px] size-2.5 shrink-0 rounded-full",
-          done ? STATUS_STYLES[status].dot : "border-2 border-border bg-background",
-        )}
-      />
-      <div className="flex flex-col">
-        <span className="text-sm font-medium">{STATUS_LABELS[status]}</span>
-        <span className="text-xs text-muted-foreground">{meta}</span>
-      </div>
-    </div>
-  );
-}
+function relationName(value:unknown):string{const row=Array.isArray(value)?value[0]:value;return row&&typeof row==="object"&&"name" in row&&typeof row.name==="string"&&row.name?row.name:"Not recorded";}

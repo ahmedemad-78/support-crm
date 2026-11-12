@@ -22,6 +22,7 @@ const files = [
   "src/lib/tickets/resolution.ts",
   "src/lib/tickets/queue.ts",
   "src/lib/tickets/conversation.ts",
+  "src/lib/tickets/portal-workspace.ts",
 ];
 
 for (const file of files) {
@@ -345,4 +346,19 @@ test("audio attachments infer common formats and enforce the shared 10 MB limit"
  }
  assert.equal(intakeHelpers.attachmentMime({name:"voice.m4a",type:"audio/x-m4a"}),"audio/mp4");
  assert.equal(intakeHelpers.checkIntakeFiles([],[{name:"empty.mp3",type:"audio/mpeg",size:0,lastModified:1}]).accepted.length,0);
+});
+
+test("portal list filters bound inputs and round-trip Arabic search and pagination",()=>{
+ const portal=createRequire(import.meta.url)(join(directory,"lib/tickets/portal-workspace.js"));
+ const input=portal.portalFilters({view:"reopened",sort:"unread",q:"  العميل %_ ",page:"9999999999999"});
+ assert.equal(input.page,1000000);assert.equal(input.q,"العميل %_");
+ const query=portal.portalQuery(input,{page:2});const parsed=portal.portalFilters(Object.fromEntries(new URLSearchParams(query)));
+ assert.deepEqual(parsed,{...input,page:2});
+ assert.deepEqual(portal.portalFilters({view:["unread"],sort:"anything",page:"-2",q:"a".repeat(200)}),{view:"all",sort:"activity",page:1,q:"a".repeat(120)});
+});
+
+test("portal return links keep valid list context and reject external or other routes",()=>{
+ const portal=createRequire(import.meta.url)(join(directory,"lib/tickets/portal-workspace.js"));
+ assert.equal(portal.portalReturnHref("/portal/my-tickets?view=unread&page=2&sort=unread&q=case"),"/portal/my-tickets?view=unread&q=case&sort=unread&page=2");
+ for(const raw of ["https://evil.example", "//evil.example", "/portal/my-tickets/../../admin/users", "/portal/my-tickets-evil", "/portal/my-tickets/other",undefined])assert.equal(portal.portalReturnHref(raw),"/portal/my-tickets");
 });

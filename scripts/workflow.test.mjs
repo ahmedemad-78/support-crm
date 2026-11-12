@@ -262,6 +262,23 @@ test("follow-up rejects invalid media before any database call and never dispatc
  data.set("files",JSON.stringify([{path:"p",name:"voice.mp3",type:"audio/mpeg",size:200}]));assert.equal((await action({error:"",success:""},data)).error,"");assert.equal(calls[0].name,"send_case_message");assert.equal(calls[0].args.files[0].type,"audio/mpeg");
 });
 
+test("reply-read actions acknowledge only validated captured events for portal users",async()=>{
+ for(const role of [null,"support_agent","manager","moderation","call_center"]){
+  const calls=[],revalidations=[];
+  const load=loadWith({"next/cache":{revalidatePath:path=>revalidations.push(path)},"@/lib/auth/session":{getCurrentUser:async()=>role?{id:agentId,role}:null},"@/lib/supabase/server":{createClient:async()=>({rpc:async(name,args)=>{calls.push({name,args});return {error:null};}})}});
+  const action=load("src/app/(app)/notifications/actions.ts").markTicketRepliesRead;
+  const allowed=["moderation","call_center"].includes(role);
+  assert.equal((await action(caseId,[agentId])).ok,allowed);assert.equal(calls.length,allowed?1:0);
+  if(allowed){assert.equal(calls[0].name,"mark_ticket_replies_read");assert.deepEqual(calls[0].args,{p_ticket:caseId,p_events:[agentId]});assert.ok(revalidations.includes("/portal/my-tickets"));}
+  const before=calls.length;for(const events of [[],["bad"],Array(501).fill(agentId)])assert.equal((await action(caseId,events)).ok,false);assert.equal(calls.length,before);
+ }
+});
+
+test("failed reply-read writes do not report success or invalidate views",async()=>{
+ const load=loadWith({"next/cache":{revalidatePath(){throw Error("Must not invalidate a failed write");}},"@/lib/auth/session":{getCurrentUser:async()=>({id:agentId,role:"call_center"})},"@/lib/supabase/server":{createClient:async()=>({rpc:async()=>({error:{message:"offline"}})})}});
+ assert.equal((await load("src/app/(app)/notifications/actions.ts").markTicketRepliesRead(caseId,[agentId])).ok,false);
+});
+
 test("resolution requires a meaningful Support response before a database write",async()=>{
   const h=caseHarness();const result=await h.actions.saveCaseWorkspace({error:""},fullCaseForm({status:"resolved",resolutionNotes:"  "}));assert.match(result.error,/Technical Support response \(at least 5 characters\)/);assert.equal(h.writes(),0);
 });

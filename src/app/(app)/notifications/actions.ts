@@ -3,6 +3,21 @@
 import { revalidatePath } from "next/cache";
 import { getCurrentUser } from "@/lib/auth/session";
 import { createClient } from "@/lib/supabase/server";
+import { isPortalRole } from "@/lib/auth/roles";
+import { z } from "zod";
+
+export async function markTicketRepliesRead(ticketId:string,eventIds:string[]){
+ const user=await getCurrentUser();
+ if(!user||!isPortalRole(user.role))return {ok:false};
+ const input=z.object({ticketId:z.uuid(),eventIds:z.array(z.uuid()).min(1).max(500)}).safeParse({ticketId,eventIds});
+ if(!input.success)return {ok:false};
+ try{
+  const db=await createClient();const {error}=await db.rpc("mark_ticket_replies_read",{p_ticket:input.data.ticketId,p_events:input.data.eventIds});
+  if(error)return {ok:false};
+  revalidatePath("/portal/my-tickets");revalidatePath(`/portal/my-tickets/${ticketId}`);
+  return {ok:true};
+ }catch{return {ok:false};}
+}
 
 export async function markNotificationRead(id: string) {
   const user = await getCurrentUser();
