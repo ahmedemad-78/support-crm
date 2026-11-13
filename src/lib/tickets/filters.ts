@@ -1,7 +1,7 @@
 import { END_USER_TYPES, TICKET_STATUSES, type TicketStatus } from "./constants";
 import { validDay } from "./analytics";
 
-export const TICKET_VIEWS = ["open", "new", "reopened", "awaiting", "mine", "all", "resolved"] as const;
+export const TICKET_VIEWS = ["open", "new", "unread", "reopened", "awaiting", "mine", "all", "resolved", "finished"] as const;
 export type TicketView = (typeof TICKET_VIEWS)[number];
 export const PAGE_SIZE = 25;
 

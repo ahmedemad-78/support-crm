@@ -382,3 +382,12 @@ test("full exports respect server row caps and never stop at the visible page",a
  }
  await assert.rejects(()=>collectExportRows(async()=>{throw new Error("database unavailable")}),/database unavailable/);
 });
+
+test("queue separates finished, currently reopened and viewer unread cases",()=>{
+ const rows=[{status:"in_progress",reopenCount:2,unreadReplies:1},{status:"resolved",reopenCount:2,unreadReplies:0},{status:"closed",unreadReplies:1},{status:"new",unreadReplies:0}];
+ assert.deepEqual(rows.filter(r=>queue.inQueueView(r,"unread","me")),[rows[0],rows[2]]);
+ assert.deepEqual(rows.filter(r=>queue.inQueueView(r,"finished","me")),[rows[1],rows[2]]);
+ assert.deepEqual(rows.filter(r=>queue.inQueueView(r,"reopened","me")),[rows[0]]);
+ assert.equal(filters.parseTicketListFilters({view:"unread"}).view,"unread");
+ assert.equal(filters.parseTicketListFilters({view:"finished"}).view,"finished");
+});

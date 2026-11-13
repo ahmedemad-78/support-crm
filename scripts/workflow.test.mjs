@@ -262,20 +262,20 @@ test("follow-up rejects invalid media before any database call and never dispatc
  data.set("files",JSON.stringify([{path:"p",name:"voice.mp3",type:"audio/mpeg",size:200}]));assert.equal((await action({error:"",success:""},data)).error,"");assert.equal(calls[0].name,"send_case_message");assert.equal(calls[0].args.files[0].type,"audio/mpeg");
 });
 
-test("reply-read actions acknowledge only validated captured events for portal users",async()=>{
+test("reply acknowledgements are scoped to the authenticated recipient, case and captured events",async()=>{
  for(const role of [null,"support_agent","manager","moderation","call_center"]){
   const calls=[],revalidations=[];
-  const load=loadWith({"next/cache":{revalidatePath:path=>revalidations.push(path)},"@/lib/auth/session":{getCurrentUser:async()=>role?{id:agentId,role}:null},"@/lib/supabase/server":{createClient:async()=>({rpc:async(name,args)=>{calls.push({name,args});return {error:null};}})}});
+  const client={from(table){calls.push(["from",table]);return this;},update(patch){calls.push(["update",patch]);return this;},eq(key,value){calls.push(["eq",key,value]);return this;},in(key,ids){calls.push(["in",key,ids]);return this;},is(key,value){calls.push(["is",key,value]);return Promise.resolve({error:null});}};
+  const load=loadWith({"next/cache":{revalidatePath:path=>revalidations.push(path)},"@/lib/auth/session":{getCurrentUser:async()=>role?{id:agentId,role}:null},"@/lib/supabase/server":{createClient:async()=>client}});
   const action=load("src/app/(app)/notifications/actions.ts").markTicketRepliesRead;
-  const allowed=["moderation","call_center"].includes(role);
-  assert.equal((await action(caseId,[agentId])).ok,allowed);assert.equal(calls.length,allowed?1:0);
-  if(allowed){assert.equal(calls[0].name,"mark_ticket_replies_read");assert.deepEqual(calls[0].args,{p_ticket:caseId,p_events:[agentId]});assert.ok(revalidations.includes("/portal/my-tickets"));}
+  assert.equal((await action(caseId,[agentId])).ok,Boolean(role));
+  if(role){assert.ok(calls.some(c=>c[0]==="eq"&&c[1]==="recipient_id"&&c[2]===agentId));assert.ok(calls.some(c=>c[0]==="eq"&&c[1]==="ticket_id"&&c[2]===caseId));assert.deepEqual(calls.find(c=>c[0]==="in"),["in","event_id",[agentId]]);assert.ok(revalidations.includes("/tickets"));}
   const before=calls.length;for(const events of [[],["bad"],Array(501).fill(agentId)])assert.equal((await action(caseId,events)).ok,false);assert.equal(calls.length,before);
  }
 });
-
-test("failed reply-read writes do not report success or invalidate views",async()=>{
- const load=loadWith({"next/cache":{revalidatePath(){throw Error("Must not invalidate a failed write");}},"@/lib/auth/session":{getCurrentUser:async()=>({id:agentId,role:"call_center"})},"@/lib/supabase/server":{createClient:async()=>({rpc:async()=>({error:{message:"offline"}})})}});
+test("failed read acknowledgement preserves unread state",async()=>{
+ const client={from(){return this;},update(){return this;},eq(){return this;},in(){return this;},is:async()=>({error:{message:"offline"}})};
+ const load=loadWith({"next/cache":{revalidatePath(){throw Error("Must not invalidate a failed write");}},"@/lib/auth/session":{getCurrentUser:async()=>({id:agentId,role:"support_agent"})},"@/lib/supabase/server":{createClient:async()=>client}});
  assert.equal((await load("src/app/(app)/notifications/actions.ts").markTicketRepliesRead(caseId,[agentId])).ok,false);
 });
 
@@ -371,4 +371,14 @@ test("a missing response can be corrected and retried to resolve the same case",
   assert.match(rejected.error,/Technical Support response/);assert.equal(h.writes(),0);
   const saved=await destination(()=>h.actions.saveCaseWorkspace(rejected,fullCaseForm({status:"resolved",assigneeId:agentId})));
   assert.equal(saved.searchParams.get("saved"),"1");assert.equal(h.writes(),1);assert.equal(h.record.status,"resolved");assert.equal(h.record.assignee_id,agentId);
+});
+
+test("independent internal-note save authenticates, validates and does not navigate/reset the editor",async()=>{
+ for(const role of [null,"call_center","support_agent"]){
+  const inserts=[];const load=loadWith({"next/navigation":{redirect(){throw Error("Independent note must not navigate");}},"next/cache":{revalidatePath(){throw Error("Independent note must not remount an editor draft");}},"@/lib/auth/session":{getCurrentUser:async()=>role?{id:agentId,role}:null},"@/lib/supabase/server":{createClient:async()=>({from(table){assert.equal(table,"ticket_notes");return {insert:async value=>{inserts.push(value);return {error:null};}};}})},"@/lib/email/deliver":{deliverPendingEmails:async()=>{throw Error("No email for internal notes");}}});
+  const action=load("src/app/(app)/tickets/actions.ts").saveInternalNote;
+  const invalid=await action({error:"",saved:""},form({body:"x"}));assert.ok(invalid.error);assert.equal(inserts.length,0);
+  const result=await action({error:"",saved:""},form({body:"Payment reference verified."}));
+  if(role==="support_agent"){assert.equal(result.saved,"Payment reference verified.");assert.deepEqual(inserts,[{ticket_id:caseId,author_id:agentId,body:"Payment reference verified."}]);}else{assert.ok(result.error);assert.equal(inserts.length,0);}
+ }
 });

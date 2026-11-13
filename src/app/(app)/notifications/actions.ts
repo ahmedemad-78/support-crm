@@ -8,12 +8,15 @@ import { z } from "zod";
 
 export async function markTicketRepliesRead(ticketId:string,eventIds:string[]){
  const user=await getCurrentUser();
- if(!user||!isPortalRole(user.role))return {ok:false};
+ if(!user||(!isPortalRole(user.role)&&user.role!=="support_agent"&&user.role!=="manager"))return {ok:false};
  const input=z.object({ticketId:z.uuid(),eventIds:z.array(z.uuid()).min(1).max(500)}).safeParse({ticketId,eventIds});
  if(!input.success)return {ok:false};
  try{
-  const db=await createClient();const {error}=await db.rpc("mark_ticket_replies_read",{p_ticket:input.data.ticketId,p_events:input.data.eventIds});
+  const db=await createClient();
+  const {error}=await db.from("notifications").update({read_at:new Date().toISOString()})
+    .eq("recipient_id",user.id).eq("ticket_id",input.data.ticketId).in("event_id",input.data.eventIds).is("read_at",null);
   if(error)return {ok:false};
+  revalidatePath("/tickets");
   revalidatePath("/portal/my-tickets");revalidatePath(`/portal/my-tickets/${ticketId}`);
   return {ok:true};
  }catch{return {ok:false};}

@@ -213,3 +213,13 @@ export async function saveCaseWorkspace(_previous: { error: string }, formData: 
   revalidatePath("/dashboard");
   redirect(ticketPath(id, undefined, requestedReturn(formData)));
 }
+
+/** Saves an independent note without navigating or resetting another editor draft. */
+export async function saveInternalNote(_previous:{error:string;saved:string},formData:FormData):Promise<{error:string;saved:string}>{
+ const user=await supportAgent();if(!user)return {error:"Only Technical Support can add an internal note.",saved:""};
+ const id=String(formData.get("ticketId")??"");const body=String(formData.get("body")??"").trim();
+ if(!z.uuid().safeParse(id).success||body.length<2||body.length>4000)return {error:"Write an internal note of 2–4,000 characters.",saved:""};
+ try{const db=await createClient();const {error}=await db.from("ticket_notes").insert({ticket_id:id,author_id:user.id,body});
+ if(error)return {error:"Could not save the note. Your draft is preserved.",saved:""};
+ return {error:"",saved:body};}catch{return {error:"Could not save the note. Retry when connected.",saved:""};}
+}

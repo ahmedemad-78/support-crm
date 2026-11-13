@@ -41,6 +41,17 @@ export async function loadCaseRegister(rawParams: Record<string,string|string[]|
     if (result.error) throw result.error;
   }
 
+  // RLS and explicit recipient scope keep unread state private to this viewer.
+  const unread = new Map<string, Set<string>>();
+  for (let offset=0;;offset+=500) {
+    const batch=await supabase.from("notifications").select("id,ticket_id,event_id,event:ticket_workflow_events!inner(kind)")
+      .eq("recipient_id",user.id).is("read_at",null).in("event.kind",["comment","resolved","reopened"])
+      .order("id").range(offset,offset+499);
+    if(batch.error)throw batch.error;
+    for(const row of batch.data??[])if(row.ticket_id&&row.event_id){const ids=unread.get(row.ticket_id)??new Set<string>();ids.add(row.event_id);unread.set(row.ticket_id,ids);}
+    if((batch.data?.length??0)<500)break;
+  }
+  const unreadIds=[...unread.keys()];
   const db = supabase as unknown as { from: (table: string) => TicketQuery };
   const extras = scopeParams(rawParams, scope);
   const listHref = (next: Partial<TicketListFilters>) =>
@@ -61,11 +72,11 @@ export async function loadCaseRegister(rawParams: Record<string,string|string[]|
     counts = Object.fromEntries(
       (Object.keys(VIEW_LABELS) as TicketView[]).map((view) => [
         view,
-        population.filter((ticket) => inListView(ticket, view, user.id)).length,
+        population.filter((ticket) => inListView({...ticket,unreadReplies:unread.get(ticket.id)?.size??0}, view, user.id)).length,
       ]),
     ) as Record<TicketView, number>;
     const viewRows = population
-      .filter((ticket) => inListView(ticket, filters.view, user.id))
+      .filter((ticket) => inListView({...ticket,unreadReplies:unread.get(ticket.id)?.size??0}, filters.view, user.id))
       .sort((a, b) =>
         filters.sort === "stale" ? (a.updatedAt || a.createdAt).localeCompare(b.updatedAt || b.createdAt) || a.id.localeCompare(b.id)
           : filters.sort === "updated" ? (b.updatedAt || b.createdAt).localeCompare(a.updatedAt || a.createdAt)
@@ -93,7 +104,7 @@ export async function loadCaseRegister(rawParams: Record<string,string|string[]|
   } else {
     const viewCounts = await Promise.all(
       (Object.keys(VIEW_LABELS) as TicketView[]).map(async (view) => {
-        const { count, error } = await applyFilters(db, "id", { ...filters, view, page: 1 }, user.id, true);
+        const { count, error } = await applyFilters(db, "id", { ...filters, view, page: 1 }, user.id, true, 0, undefined, unreadIds);
         if (error) throw error;
         return [view, count ?? 0] as const;
       }),
@@ -104,17 +115,18 @@ export async function loadCaseRegister(rawParams: Record<string,string|string[]|
     if (exportAll) {
       // Stable ordering and explicit batches prevent the API row cap from truncating exports.
       tickets=await collectExportRows(async offset=>{
-        const {data,count,error}=await applyFilters(db,columns,filters,user.id,false,offset,500);
+        const {data,count,error}=await applyFilters(db,columns,filters,user.id,false,offset,500,unreadIds);
         if(error)throw error;
         return {data:data??[],count};
       });
       total=tickets.length;
     } else {
-      const {data,count,error}=await applyFilters(db,columns,filters,user.id,false,from);
+      const {data,count,error}=await applyFilters(db,columns,filters,user.id,false,from,undefined,unreadIds);
       if (error) throw error;
       tickets=data ?? []; total=count ?? 0;
     }
   }
+  tickets=tickets.map(ticket=>({...ticket,unread_replies:unread.get(ticket.id)?.size??0}));
   return {tickets,total,counts,filters,extras,scope,dashboardFilters,cities:cities.data ?? [],categories:categories.data ?? [],agents:agents.data ?? [],sources:sourceOptions.data ?? []};
 }
 
@@ -165,8 +177,11 @@ function applyFilters(
   head: boolean,
   from = 0,
   batchSize?: number,
+  unreadIds: string[] = [],
 ) {
   let next = supabase.from("tickets").select(columns, { count: "exact", head });
+  if (filters.view === "unread") next = next.in("id", unreadIds.length ? unreadIds : ["00000000-0000-4000-8000-000000000000"]);
+  if (filters.view === "finished") next = next.in("status", ["resolved","closed"]);
   if (filters.view === "open") next = next.in("status", OPEN_QUEUE_STATUSES);
   if (filters.view === "new") next = next.eq("status", "new");
   if (filters.view === "mine") next = next.eq("assignee_id", userId).in("status", OPEN_QUEUE_STATUSES);

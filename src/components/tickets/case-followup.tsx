@@ -1,6 +1,7 @@
 "use client";
 import { startTransition, useActionState, useEffect, useRef, useState, useTransition, type FormEvent } from "react";
 import Link from "next/link";
+import { useCaseDraft } from "./case-session";
 import { useRouter } from "next/navigation";
 import { ArrowDown, ArrowUpRight, CheckCircle2, Headphones, LoaderCircle, LockKeyhole, MessageSquare, Paperclip, RefreshCw, RotateCcw, Send, UserRound } from "lucide-react";
 import { submitCaseFollowup } from "@/app/(app)/tickets/lifecycle-actions";
@@ -14,9 +15,10 @@ import { createClient } from "@/lib/supabase/client";
 import { ATTACHMENT_RULES, ATTACHMENTS_BUCKET } from "@/lib/tickets/constants";
 import { attachmentMime, checkIntakeFiles, type IntakeFile } from "@/lib/tickets/intake";
 export type WorkflowEvent = { id:string; kind:string; body:string|null; created_at:string; actor_id:string|null; actorName?:string; actorRole?:string|null; to_status:string|null; resolution_snapshot:unknown; attachments?:MediaAttachment[] };
-type Props = { ticketId:string; version:string; status:TicketStatus; count:number; events:WorkflowEvent[]; canReply:boolean; relatedHref:string; preview?:boolean; reporterName?:string; perspective?:"support"|"reporter" };
+type Props = { ticketId:string; version:string; status:TicketStatus; count:number; events:WorkflowEvent[]; canReply:boolean; relatedHref:string; preview?:boolean; reporterName?:string; unreadEventIds?:string[]; perspective?:"support"|"reporter" };
 const dayOf=(iso:string)=>new Intl.DateTimeFormat("en-CA",{timeZone:"Africa/Cairo",year:"numeric",month:"2-digit",day:"2-digit"}).format(new Date(iso));
-export function CaseFollowup({ticketId,version,status,count,events,canReply,relatedHref,preview=false,reporterName,perspective="support"}:Props) {
+export function CaseFollowup({ticketId,version,status,count,events,canReply,relatedHref,preview=false,reporterName,unreadEventIds=[],perspective="support"}:Props) {
+  const {dirty:caseDirty}=useCaseDraft();
   const [ready,setReady]=useState(false);
   useEffect(()=>{const frame=requestAnimationFrame(()=>setReady(true));return()=>cancelAnimationFrame(frame);},[]);
   const router=useRouter(); const logRef=useRef<HTMLDivElement>(null); const stickToBottom=useRef(true);
@@ -46,19 +48,20 @@ export function CaseFollowup({ticketId,version,status,count,events,canReply,rela
     if(next.success){setBody("");setFiles([]);uploads.current.clear();setRequestId("");setMode("comment");stickToBottom.current=true;}
     return next;
   },{error:"",success:""});
-  const ordered=chronologicalEvents(events); const finished=status==="resolved"||status==="closed"; const minimum=mode==="reopen"?5:2;
+  const ordered=chronologicalEvents(events); const firstUnread=ordered.find(event=>unreadEventIds.includes(event.id))?.id; const finished=status==="resolved"||status==="closed"; const minimum=mode==="reopen"?5:2;
   const draftKey=JSON.stringify({body,mode,files:files.map(item=>item.id)}); const visibleError=validation||(submitted===draftKey?result.error:"");
-  useEffect(()=>{if(stickToBottom.current&&logRef.current)logRef.current.scrollTop=logRef.current.scrollHeight;},[events.length]);
+  useEffect(()=>{if(stickToBottom.current&&logRef.current){const marker=firstUnread?logRef.current.querySelector<HTMLElement>(".conversation-unread-divider"):null;logRef.current.scrollTop=marker?marker.offsetTop-logRef.current.offsetTop:logRef.current.scrollHeight;}},[events.length,firstUnread]);
   function latest(){stickToBottom.current=true;setNearBottom(true);if(logRef.current)logRef.current.scrollTop=logRef.current.scrollHeight;}
   function submit(event:FormEvent<HTMLFormElement>){
     event.preventDefault(); if(!ready||pending)return;
+    if(caseDirty){setValidation("Save or discard case changes before sending a reply. Your reply draft stays here.");return;}
     if(body.trim().length<minimum){setValidation(mode==="reopen"?"Explain why the same problem continues (at least 5 characters).":"Write a message of at least 2 characters.");document.getElementById(`followup-${ticketId}`)?.focus();return;}
     setValidation("");setSubmitted(draftKey);
     const data=new FormData(event.currentTarget); const id=requestId||crypto.randomUUID();setRequestId(id);data.set("requestId",id);
     startTransition(()=>action(data));
   }
   return <section className="desk-panel case-conversation" id="case-followup" aria-labelledby={`conversation-title-${ticketId}`}>
-    <header className="conversation-header"><div className="conversation-heading"><span className="conversation-symbol"><MessageSquare size={21}/></span><div><span className="conversation-eyebrow">CASE CONVERSATION</span><h3 id={`conversation-title-${ticketId}`}>Support & reporting team</h3><p>{reporterName?`${reporterName} · Technical Support`:"Messages shared with the reporting owner and Technical Support"}</p></div></div><div className="conversation-header-actions">{count>0&&<span className="conversation-reopen-count"><RotateCcw size={13}/>Reopened ×{count}</span>}<button type="button" aria-label="Refresh conversation" title="Refresh conversation" disabled={refreshing||pending} onClick={()=>{if(!preview)refresh(()=>router.refresh());}}><RefreshCw size={17} className={refreshing?"animate-spin":""}/><span>Refresh</span></button></div></header>
+    <header className="conversation-header"><div className="conversation-heading"><span className="conversation-symbol"><MessageSquare size={21}/></span><div><span className="conversation-eyebrow">CASE CONVERSATION</span><h3 id={`conversation-title-${ticketId}`}>Support & reporting team</h3><p>{reporterName?`Reporter: ${reporterName} · Resolution team: Technical Support`:"Messages shared with the reporting owner and Technical Support"}</p></div></div><div className="conversation-header-actions">{count>0&&<span className="conversation-reopen-count"><RotateCcw size={13}/>Reopened ×{count}</span>}<button type="button" aria-label="Refresh conversation" title="Refresh conversation" disabled={refreshing||pending} onClick={()=>{if(!preview)refresh(()=>router.refresh());}}><RefreshCw size={17} className={refreshing?"animate-spin":""}/><span>Refresh</span></button></div></header>
     <div className="conversation-visibility"><LockKeyhole size={13}/><span>Shared conversation · Internal notes stay separate.</span><span className="conversation-current-status">{STATUS_LABELS[status]}</span></div>
     <div className="conversation-thread" ref={logRef} role="log" aria-label="Case conversation messages" aria-live="polite" aria-relevant="additions text" tabIndex={0} onScroll={event=>{const node=event.currentTarget;const atBottom=node.scrollHeight-node.scrollTop-node.clientHeight<72;stickToBottom.current=atBottom;setNearBottom(atBottom);}}>
       {!ordered.length?<div className="conversation-empty"><MessageSquare size={28}/><h4>No messages yet</h4><p>Use this conversation to exchange updates about this case. Earlier status changes remain in the case timeline.</p></div>:<ol className="conversation-messages">{ordered.map((event,index)=>{
@@ -66,7 +69,7 @@ export function CaseFollowup({ticketId,version,status,count,events,canReply,rela
         const system=event.kind==="created"||event.kind==="status_changed";
         const side=conversationSide(event.actorRole);const actor=event.actorName||"Team member"; const role=ROLE_LABELS[event.actorRole as Role]||"Participant";
         const snapshot=resolutionSnapshot(event.resolution_snapshot);const message=event.kind==="resolved"?(snapshot.response||event.body?.split("\nCause:")[0]):event.body;
-        return <li key={event.id} className="conversation-entry">{showDay&&<div className="conversation-day"><span>{formatDate(day)}</span></div>}{system?<div className="conversation-system"><span className="conversation-system-dot"/><div><p><strong>{event.kind==="created"?"Case created":STATUS_LABELS[event.to_status as TicketStatus]||"Status updated"}</strong><span> · {actor}</span></p>{event.kind==="created"&&message&&<p className="conversation-system-body" dir="auto">{message}</p>}<time dateTime={event.created_at}>{formatDateTime(event.created_at)}</time></div></div>:<article className={`conversation-message is-${side}${event.kind==="reopened"?" is-reopening":""}${event.kind==="resolved"?" is-resolution":""}`}>
+        return <li key={event.id} className="conversation-entry">{event.id===firstUnread&&<div className="conversation-unread-divider">New replies</div>}{showDay&&<div className="conversation-day"><span>{formatDate(day)}</span></div>}{system?<div className="conversation-system"><span className="conversation-system-dot"/><div><p><strong>{event.kind==="created"?"Case created":STATUS_LABELS[event.to_status as TicketStatus]||"Status updated"}</strong><span> · {actor}</span></p>{event.kind==="created"&&message&&<p className="conversation-system-body" dir="auto">{message}</p>}<time dateTime={event.created_at}>{formatDateTime(event.created_at)}</time></div></div>:<article className={`conversation-message is-${side}${event.kind==="reopened"?" is-reopening":""}${event.kind==="resolved"?" is-resolution":""}`}>
           <div className="conversation-avatar" aria-hidden="true">{side==="support"?<Headphones size={17}/>:<UserRound size={17}/>}</div><div className="conversation-message-content"><div className="conversation-author"><strong dir="auto">{actor}</strong><span>{role}</span></div><div className="conversation-bubble">{event.kind==="resolved"&&<div className="conversation-event-label"><CheckCircle2 size={15}/>Resolved & closed</div>}{event.kind==="reopened"&&<div className="conversation-event-label"><RotateCcw size={15}/>Same problem · case reopened</div>}{message&&<p dir="auto">{message}</p>}{Boolean(event.attachments?.length)&&<div className="attachment-grid">{event.attachments!.map(file=><AttachmentPreview key={file.id} attachment={file}/>)}</div>}</div><time dateTime={event.created_at}>{formatDateTime(event.created_at)}</time></div>
         </article>}</li>;
       })}</ol>}

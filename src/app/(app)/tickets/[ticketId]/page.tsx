@@ -9,6 +9,7 @@ import {
 } from "@/lib/tickets/constants";
 import { safeAppReturn } from "@/lib/tickets/filters";
 import { CaseWorkspace } from "@/components/tickets/case-workspace";
+import { ReplyReadMarker } from "@/components/tickets/reply-read-marker";
 import { CaseFollowup } from "@/components/tickets/case-followup";
 import { loadCaseWorkflow } from "@/lib/tickets/workflow";
 import { z } from "zod";
@@ -89,7 +90,7 @@ export default async function AgentTicketPage({
       initial: { status, assigneeId: ticket.assignee_id || "", requestTypeId: idValue(ticket.request_type_id), topicId: idValue(ticket.topic_id), trackerCauseId: idValue(ticket.tracker_cause_id), trackerActionId: idValue(ticket.tracker_action_id), outcomeId: idValue(ticket.outcome_id), issueCategoryId: idValue(ticket.issue_category_id), rootCauseId: idValue(ticket.root_cause_id), resolutionNotes: ticket.resolution_notes || "", followUpNotes: ticket.follow_up_notes || "", trackerNotes: ticket.tracker_notes || "", actionTaken: ticket.action_taken || "" },
       options: { requestTypes: requestTypes.data ?? [], topics: topics.data ?? [], causes: trackerCauses.data ?? [], actions: trackerActions.data ?? [], outcomes: outcomes.data ?? [], categories: categories.data ?? [], rootCauses: causes.data ?? [] }
     }}
-  /><div className="case-file desk-case"><CaseFollowup perspective="support" reporterName={workflow.reporter_id ? workflow.reporterName : undefined} ticketId={ticket.id} version={ticket.updated_at} status={status} count={workflow.reopen_count} events={workflow.events} canReply={canEdit} relatedHref={`/tickets/new?linked=${ticket.id}`} />{workflow.linked_ticket_id && <p>Related case: <a href={`/tickets/${workflow.linked_ticket_id}`}>Open related case ↗</a></p>}</div></AgentFrame>;
+    conversation={<><ReplyReadMarker ticketId={ticket.id} eventIds={workflow.unreadReplyEvents}/><CaseFollowup perspective="support" reporterName={workflow.reporter_id ? workflow.reporterName : undefined} ticketId={ticket.id} version={ticket.updated_at} status={status} count={workflow.reopen_count} events={workflow.events} unreadEventIds={workflow.unreadReplyEvents} canReply={canEdit} relatedHref={`/tickets/new?linked=${ticket.id}`} />{workflow.linked_ticket_id && <p>Related case: <a href={`/tickets/${workflow.linked_ticket_id}`}>Open related case ↗</a></p>}</>} /></AgentFrame>;
 }
 
 function nameOf(value: unknown): string {
