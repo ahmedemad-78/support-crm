@@ -17,6 +17,15 @@ const event=(id,kind,date,status,role='support_agent')=>({id,kind,created_at:dat
 const ticket=(overrides={})=>({id:'one',number:'CASE-1',subject:'مشكلة تجريبية',source:'call_center',sourceName:'Call Center',status:'resolved',createdOn:'2026-11-01',createdAt:'2026-11-01T08:00:00Z',reportedOn:'2026-10-29',resolvedAt:'2026-11-02T08:00:00Z',cityId:'1',categoryId:'2',endUserType:'parent',category:'App',cause:'',requestType:'Complaint',topic:'Content',trackerCause:'Content delay',trackerAction:'Publish content',outcome:'Fixed',fawry:'',reporterId:'kabany',reporter:'Kabany',creatorId:'ahmed',creator:'Ahmed',reopenCount:0,isHistorical:false,workflowEvents:[event('e1','created','2026-11-01T08:00:00Z','new'),event('e2','resolved','2026-11-02T08:00:00Z','resolved')],...overrides});
 const f=(overrides={})=>m.parseBusinessFilters(overrides);
 
+test('chart tooltips contain the same text in server HTML instead of empty SVG titles',()=>{
+ const React=require('react'),{renderToStaticMarkup}=require('react-dom/server');
+ const compiled=ts.transpileModule(readFileSync(new URL('../src/app/(app)/dashboard/single-page-charts.tsx',import.meta.url),'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022,jsx:ts.JsxEmit.ReactJSX,esModuleInterop:true}}).outputText;
+ const module={exports:{}};const localRequire=(name)=>name==='@/lib/tickets/business-analytics'?m:name==='@/lib/tickets/single-page-model'?single:name==='@/lib/tickets/world-countries.json'?require(join(directory,'world-countries.json')):require(name);
+ vm.runInNewContext(compiled,{require:localRequire,exports:module.exports,module});
+ const charts=module.exports,tickets=[ticket()];const components=[['DemandArea',{tickets,filters:f(),asOf}],['SourceColumns',{tickets,sources:new Map(),onPick:()=>{}}],['OutcomeDonut',{tickets,onPick:()=>{}}],['LocationMap',{tickets,cities:[{id:'1',name:'Cairo'}],onPick:()=>{}}]];
+ for(const [name,props]of components){const html=renderToStaticMarkup(React.createElement(charts[name],props)),titles=[...html.matchAll(/<title>(.*?)<\/title>/g)].map(x=>x[1]);assert.ok(titles.length>0,name);assert.ok(titles.every(text=>text.trim().length>0),name+' must serialize nonempty SVG titles');}
+});
+
 test('map coverage accounts for missing, explicit unknown, unrecognized and international locations without assigning Egypt',()=>{
  const data=[ticket(),ticket({id:'alex',cityId:'3'}),ticket({id:'kw',cityId:'29'}),ticket({id:'unknown',cityId:'28'}),ticket({id:'missing',cityId:''}),ticket({id:'new-place',cityId:'999'})];
  const cities=[{id:'1',name:'Cairo'},{id:'3',name:'Alexandria'},{id:'29',name:'Kuwait'},{id:'28',name:'Not recorded'},{id:'999',name:'New unverified city'}];
