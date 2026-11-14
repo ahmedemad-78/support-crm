@@ -55,7 +55,7 @@ export function LoginForm({ deactivated, initialState = {} }: { deactivated: boo
           <div className="auth-input-wrap">
             <LockKeyhole aria-hidden="true" className="auth-input-icon" />
             <Input ref={passwordRef} id="password" name="password" type={showPassword ? "text" : "password"} autoComplete="current-password" required placeholder="Enter your password" className="auth-password-input" aria-describedby={[fieldErrors?.password && "password-error", capsLock && "password-caps"].filter(Boolean).join(" ") || undefined} aria-invalid={Boolean(fieldErrors?.password) || undefined} onKeyDown={(event) => setCapsLock(event.getModifierState("CapsLock"))} onKeyUp={(event) => setCapsLock(event.getModifierState("CapsLock"))} onBlur={() => setCapsLock(false)} />
-            <button type="button" className="auth-password-toggle" aria-label={showPassword ? "Hide password" : "Show password"} aria-pressed={showPassword} onClick={() => setShowPassword(!showPassword)}>{showPassword ? "Hide" : "Show"}</button>
+            <button type="button" className="auth-password-toggle" data-open={showPassword} aria-label={showPassword ? "Hide password" : "Show password"} aria-pressed={showPassword} onClick={() => setShowPassword(!showPassword)}><PasswordEye /></button>
           </div>
           {capsLock && <p id="password-caps" aria-live="polite" className="auth-caps-warning"><ArrowBigUpDash aria-hidden="true" />Caps Lock is on.</p>}
           {fieldErrors?.password && <p id="password-error" role="alert" className="auth-field-error">{fieldErrors.password}</p>}
@@ -76,4 +76,17 @@ export function LoginForm({ deactivated, initialState = {} }: { deactivated: boo
 
 function Notice({ title, body }: { title: string; body: string }) {
   return <div role="alert" className="auth-notice"><CircleAlert aria-hidden="true" /><div><p className="auth-notice-title">{title}</p><p>{body}</p></div></div>;
+}
+
+function PasswordEye() {
+  return <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.7} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" className="auth-eye">
+    <g className="auth-eye-open"><g className="auth-eye-blink">
+      <path d="M2.5 12S6 5.75 12 5.75 21.5 12 21.5 12 18 18.25 12 18.25 2.5 12 2.5 12Z" />
+      <g className="auth-eye-iris"><circle cx="12" cy="12" r="3.3" fill="currentColor" stroke="none" /><circle cx="13.2" cy="10.8" r="1" fill="#fff" stroke="none" /></g>
+    </g></g>
+    <g className="auth-eye-closed">
+      <path d="M3 10.5c2.5 3.4 5.6 5.1 9 5.1s6.5-1.7 9-5.1" />
+      <path d="M6.3 14.2 5 16.3M12 15.6v2.5M17.7 14.2l1.3 2.1" />
+    </g>
+  </svg>;
 }
