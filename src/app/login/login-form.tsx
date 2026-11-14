@@ -1,7 +1,7 @@
 "use client";
 
 import { useActionState, useEffect, useRef, useState, useSyncExternalStore } from "react";
-import { ArrowRight, ArrowBigUpDash, Eye, EyeOff, LoaderCircle, LockKeyhole, Mail, CircleAlert } from "lucide-react";
+import { ArrowRight, ArrowBigUpDash, LoaderCircle, LockKeyhole, Mail, CircleAlert } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -55,7 +55,7 @@ export function LoginForm({ deactivated, initialState = {} }: { deactivated: boo
           <div className="auth-input-wrap">
             <LockKeyhole aria-hidden="true" className="auth-input-icon" />
             <Input ref={passwordRef} id="password" name="password" type={showPassword ? "text" : "password"} autoComplete="current-password" required placeholder="Enter your password" className="auth-password-input" aria-describedby={[fieldErrors?.password && "password-error", capsLock && "password-caps"].filter(Boolean).join(" ") || undefined} aria-invalid={Boolean(fieldErrors?.password) || undefined} onKeyDown={(event) => setCapsLock(event.getModifierState("CapsLock"))} onKeyUp={(event) => setCapsLock(event.getModifierState("CapsLock"))} onBlur={() => setCapsLock(false)} />
-            <button type="button" className="auth-password-toggle" aria-label={showPassword ? "Hide password" : "Show password"} aria-pressed={showPassword} onClick={() => setShowPassword(!showPassword)}>{showPassword ? <EyeOff aria-hidden="true" /> : <Eye aria-hidden="true" />}</button>
+            <button type="button" className="auth-password-toggle" aria-label={showPassword ? "Hide password" : "Show password"} aria-pressed={showPassword} onClick={() => setShowPassword(!showPassword)}>{showPassword ? "Hide" : "Show"}</button>
           </div>
           {capsLock && <p id="password-caps" aria-live="polite" className="auth-caps-warning"><ArrowBigUpDash aria-hidden="true" />Caps Lock is on.</p>}
           {fieldErrors?.password && <p id="password-error" role="alert" className="auth-field-error">{fieldErrors.password}</p>}
