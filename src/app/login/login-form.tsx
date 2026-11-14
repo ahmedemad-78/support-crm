@@ -26,11 +26,32 @@ export function LoginForm({ deactivated, initialState = {} }: { deactivated: boo
   const emailRef = useRef<HTMLInputElement>(null);
   const passwordRef = useRef<HTMLInputElement>(null);
   const errorRef = useRef<HTMLDivElement>(null);
+  const eyeRef = useRef<HTMLButtonElement>(null);
+  const measureRef = useRef<CanvasRenderingContext2D | null>(null);
+  const lookTimer = useRef<number | null>(null);
   const sameEmail = state.email === undefined || state.email.toLowerCase() === email.trim().toLowerCase();
   const seconds = state.lockedUntil ? Math.max(0, Math.ceil((Date.parse(state.lockedUntil) - clock) / 1000)) : 0;
   const locked = sameEmail && Boolean(state.lockedUntil) && (!clock || seconds > 0);
   const fieldErrors = sameEmail ? state.fieldErrors : undefined;
   const error = sameEmail ? state.error : undefined;
+
+  useEffect(() => () => { if (lookTimer.current !== null) clearTimeout(lookTimer.current); }, []);
+
+  function lookAtCaret(input: HTMLInputElement) {
+    const eye = eyeRef.current;
+    measureRef.current ??= document.createElement("canvas").getContext("2d");
+    const ctx = measureRef.current;
+    if (!eye || !ctx) return;
+    const style = getComputedStyle(input);
+    ctx.font = `${style.fontWeight} ${style.fontSize} ${style.fontFamily}`;
+    const typed = input.value.slice(0, input.selectionStart ?? input.value.length);
+    const caret = parseFloat(style.paddingLeft) + ctx.measureText(input.type === "password" ? "\u2022".repeat(typed.length) : typed).width - input.scrollLeft;
+    const distance = Math.min(1, Math.max(0, (input.clientWidth - 30 - caret) / (input.clientWidth * 0.75)));
+    eye.style.setProperty("--look-x", `${(-4.4 * distance).toFixed(2)}px`);
+    eye.dataset.looking = "true";
+    if (lookTimer.current !== null) clearTimeout(lookTimer.current);
+    lookTimer.current = window.setTimeout(() => { delete eye.dataset.looking; }, 900);
+  }
 
   useEffect(() => {
     if (state.fieldErrors?.email) emailRef.current?.focus();
@@ -54,8 +75,8 @@ export function LoginForm({ deactivated, initialState = {} }: { deactivated: boo
           <Label htmlFor="password">Password</Label>
           <div className="auth-input-wrap">
             <LockKeyhole aria-hidden="true" className="auth-input-icon" />
-            <Input ref={passwordRef} id="password" name="password" type={showPassword ? "text" : "password"} autoComplete="current-password" required placeholder="Enter your password" className="auth-password-input" aria-describedby={[fieldErrors?.password && "password-error", capsLock && "password-caps"].filter(Boolean).join(" ") || undefined} aria-invalid={Boolean(fieldErrors?.password) || undefined} onKeyDown={(event) => setCapsLock(event.getModifierState("CapsLock"))} onKeyUp={(event) => setCapsLock(event.getModifierState("CapsLock"))} onBlur={() => setCapsLock(false)} />
-            <button type="button" className="auth-password-toggle" data-open={showPassword} aria-label={showPassword ? "Hide password" : "Show password"} aria-pressed={showPassword} onClick={() => setShowPassword(!showPassword)}><PasswordEye /></button>
+            <Input ref={passwordRef} id="password" name="password" type={showPassword ? "text" : "password"} autoComplete="current-password" required placeholder="Enter your password" className="auth-password-input" aria-describedby={[fieldErrors?.password && "password-error", capsLock && "password-caps"].filter(Boolean).join(" ") || undefined} aria-invalid={Boolean(fieldErrors?.password) || undefined} onKeyDown={(event) => setCapsLock(event.getModifierState("CapsLock"))} onKeyUp={(event) => setCapsLock(event.getModifierState("CapsLock"))} onSelect={(event) => lookAtCaret(event.currentTarget)} onBlur={() => setCapsLock(false)} />
+            <button ref={eyeRef} type="button" className="auth-password-toggle" data-open={showPassword} aria-label={showPassword ? "Hide password" : "Show password"} aria-pressed={showPassword} onClick={() => setShowPassword(!showPassword)}><PasswordEye /></button>
           </div>
           {capsLock && <p id="password-caps" aria-live="polite" className="auth-caps-warning"><ArrowBigUpDash aria-hidden="true" />Caps Lock is on.</p>}
           {fieldErrors?.password && <p id="password-error" role="alert" className="auth-field-error">{fieldErrors.password}</p>}
