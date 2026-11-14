@@ -22,6 +22,7 @@ export function LoginForm({ deactivated, initialState = {} }: { deactivated: boo
   const clock = useSyncExternalStore(state.lockedUntil ? subscribeClock : noClock, state.lockedUntil ? readClock : serverClock, serverClock);
   const [showPassword, setShowPassword] = useState(false);
   const [capsLock, setCapsLock] = useState(false);
+  const [hasPassword, setHasPassword] = useState(false);
   const [email, setEmail] = useState(state.email ?? "");
   const emailRef = useRef<HTMLInputElement>(null);
   const passwordRef = useRef<HTMLInputElement>(null);
@@ -29,6 +30,7 @@ export function LoginForm({ deactivated, initialState = {} }: { deactivated: boo
   const eyeRef = useRef<HTMLButtonElement>(null);
   const measureRef = useRef<CanvasRenderingContext2D | null>(null);
   const lookTimer = useRef<number | null>(null);
+  const formRef = useRef<HTMLFormElement>(null);
   const sameEmail = state.email === undefined || state.email.toLowerCase() === email.trim().toLowerCase();
   const seconds = state.lockedUntil ? Math.max(0, Math.ceil((Date.parse(state.lockedUntil) - clock) / 1000)) : 0;
   const locked = sameEmail && Boolean(state.lockedUntil) && (!clock || seconds > 0);
@@ -37,7 +39,7 @@ export function LoginForm({ deactivated, initialState = {} }: { deactivated: boo
 
   useEffect(() => () => { if (lookTimer.current !== null) clearTimeout(lookTimer.current); }, []);
 
-  function lookAtCaret(input: HTMLInputElement) {
+  function lookAtCaret(input: HTMLInputElement, up = false) {
     const eye = eyeRef.current;
     measureRef.current ??= document.createElement("canvas").getContext("2d");
     const ctx = measureRef.current;
@@ -48,10 +50,34 @@ export function LoginForm({ deactivated, initialState = {} }: { deactivated: boo
     const caret = parseFloat(style.paddingLeft) + ctx.measureText(input.type === "password" ? "\u2022".repeat(typed.length) : typed).width - input.scrollLeft;
     const distance = Math.min(1, Math.max(0, (input.clientWidth - 30 - caret) / (input.clientWidth * 0.75)));
     eye.style.setProperty("--look-x", `${(-4.4 * distance).toFixed(2)}px`);
+    eye.style.setProperty("--look-y", up ? "-1.6px" : ".7px");
     eye.dataset.looking = "true";
     if (lookTimer.current !== null) clearTimeout(lookTimer.current);
     lookTimer.current = window.setTimeout(() => { delete eye.dataset.looking; }, 900);
   }
+
+  const progress = /^\S+@\S+\.\S+$/.test(email.trim()) ? (hasPassword ? 2 : 1) : 0;
+  useEffect(() => {
+    const stage = formRef.current?.closest<HTMLElement>(".login-v2");
+    if (!stage) return;
+    stage.dataset.progress = String(progress);
+    if (pending) stage.dataset.stage = "submitting";
+    else if (stage.dataset.stage === "submitting") delete stage.dataset.stage;
+  }, [progress, pending]);
+
+  useEffect(() => {
+    setHasPassword(Boolean(passwordRef.current?.value));
+    if (state.kind !== "credentials" && !state.lockedUntil) return;
+    const stage = formRef.current?.closest<HTMLElement>(".login-v2");
+    const eye = eyeRef.current;
+    if (stage) stage.dataset.stage = "rejected";
+    if (eye) eye.dataset.reject = "true";
+    const timer = window.setTimeout(() => {
+      if (stage?.dataset.stage === "rejected") delete stage.dataset.stage;
+      if (eye) delete eye.dataset.reject;
+    }, 700);
+    return () => clearTimeout(timer);
+  }, [state]);
 
   useEffect(() => {
     if (state.fieldErrors?.email) emailRef.current?.focus();
@@ -60,14 +86,14 @@ export function LoginForm({ deactivated, initialState = {} }: { deactivated: boo
   }, [state]);
 
   return (
-    <form action={formAction} noValidate aria-busy={pending} className="auth-form" onSubmit={() => setShowPassword(false)}>
+    <form ref={formRef} action={formAction} noValidate aria-busy={pending} className="auth-form" onSubmit={() => setShowPassword(false)}>
       {deactivated && !error && <Notice title="Account deactivated" body="Contact Ahmed Emad to request access again." />}
       <fieldset disabled={pending} className="auth-fields">
         <div className="auth-field">
           <Label htmlFor="email">Work email</Label>
           <div className="auth-input-wrap">
             <Mail aria-hidden="true" className="auth-input-icon" />
-            <Input ref={emailRef} id="email" name="email" type="email" autoComplete="username" inputMode="email" placeholder="you@company.com" required spellCheck={false} autoCapitalize="none" value={email} onChange={(event) => setEmail(event.target.value)} aria-invalid={Boolean(fieldErrors?.email) || undefined} aria-describedby={fieldErrors?.email ? "email-error" : undefined} />
+            <Input ref={emailRef} id="email" name="email" type="email" autoComplete="username" inputMode="email" placeholder="you@company.com" required spellCheck={false} autoCapitalize="none" value={email} onChange={(event) => setEmail(event.target.value)} onInput={(event) => lookAtCaret(event.currentTarget, true)} onFocus={(event) => lookAtCaret(event.currentTarget, true)} aria-invalid={Boolean(fieldErrors?.email) || undefined} aria-describedby={fieldErrors?.email ? "email-error" : undefined} />
           </div>
           {fieldErrors?.email && <p id="email-error" role="alert" className="auth-field-error">{fieldErrors.email}</p>}
         </div>
@@ -75,8 +101,8 @@ export function LoginForm({ deactivated, initialState = {} }: { deactivated: boo
           <Label htmlFor="password">Password</Label>
           <div className="auth-input-wrap">
             <LockKeyhole aria-hidden="true" className="auth-input-icon" />
-            <Input ref={passwordRef} id="password" name="password" type={showPassword ? "text" : "password"} autoComplete="current-password" required placeholder="Enter your password" className="auth-password-input" aria-describedby={[fieldErrors?.password && "password-error", capsLock && "password-caps"].filter(Boolean).join(" ") || undefined} aria-invalid={Boolean(fieldErrors?.password) || undefined} onKeyDown={(event) => setCapsLock(event.getModifierState("CapsLock"))} onKeyUp={(event) => setCapsLock(event.getModifierState("CapsLock"))} onSelect={(event) => lookAtCaret(event.currentTarget)} onBlur={() => setCapsLock(false)} />
-            <button ref={eyeRef} type="button" className="auth-password-toggle" data-open={showPassword} aria-label={showPassword ? "Hide password" : "Show password"} aria-pressed={showPassword} onClick={() => setShowPassword(!showPassword)}><PasswordEye /></button>
+            <Input ref={passwordRef} id="password" name="password" type={showPassword ? "text" : "password"} autoComplete="current-password" required placeholder="Enter your password" className="auth-password-input" aria-describedby={[fieldErrors?.password && "password-error", capsLock && "password-caps"].filter(Boolean).join(" ") || undefined} aria-invalid={Boolean(fieldErrors?.password) || undefined} onKeyDown={(event) => setCapsLock(event.getModifierState("CapsLock"))} onKeyUp={(event) => setCapsLock(event.getModifierState("CapsLock"))} onInput={(event) => setHasPassword(Boolean(event.currentTarget.value))} onSelect={(event) => lookAtCaret(event.currentTarget)} onBlur={() => setCapsLock(false)} />
+            <button ref={eyeRef} type="button" className="auth-password-toggle" data-open={showPassword} data-caps={capsLock} aria-label={showPassword ? "Hide password" : "Show password"} aria-pressed={showPassword} onClick={() => setShowPassword(!showPassword)}><PasswordEye /></button>
           </div>
           {capsLock && <p id="password-caps" aria-live="polite" className="auth-caps-warning"><ArrowBigUpDash aria-hidden="true" />Caps Lock is on.</p>}
           {fieldErrors?.password && <p id="password-error" role="alert" className="auth-field-error">{fieldErrors.password}</p>}

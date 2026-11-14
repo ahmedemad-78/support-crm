@@ -83,7 +83,7 @@
 .auth-password-toggle[data-open=true] .auth-eye-blink { animation: auth-blink 5s 1.2s infinite; }
 .auth-password-toggle:hover .auth-eye-iris { transform: translateX(-2.6px); }
 .auth-password-toggle[data-open=false]:hover .auth-eye-closed { transform: translateY(-1.4px); }
-.auth-password-toggle[data-looking] .auth-eye-iris { transform: translate(var(--look-x, 0px), .7px); transition-duration: .16s; }
+.auth-password-toggle[data-looking] .auth-eye-iris { transform: translate(var(--look-x, 0px), var(--look-y, .7px)); transition-duration: .16s; }
 .auth-password-toggle:focus-visible, .auth-account-help a:focus-visible, .login-v2 .auth-submit:focus-visible { outline: 2px solid #426e4c; outline-offset: 4px; }
 .login-v2 .auth-submit { height: 56px; padding: 0 16px 0 20px; margin-top: 3px; border-radius: 8px; display: flex; justify-content: space-between; gap: 16px; background: #204d35; color: #fff; font-size: 16px; font-weight: 500; box-shadow: 0 2px 0 #153924; transition: background .2s, box-shadow .2s; }
 .login-v2 .auth-submit:hover:not(:disabled) { background: #2b5e40; box-shadow: 0 3px 8px #173c2115; }
@@ -111,6 +111,32 @@
 .auth-caps-warning { display: flex; align-items: center; gap: 6px; font-size: 13px; line-height: 1.5; color: #8a5b1d; }
 .auth-caps-warning svg { width: 15px; height: 15px; flex-shrink: 0; }
 .login-v2:has(.auth-form-pane:focus-within) .auth-book-route { stroke: #1c8b5c; }
+.auth-artwork { cursor: pointer; }
+.auth-book-glare { opacity: 0; transition: opacity .35s; pointer-events: none; }
+.auth-book-glare circle { transform: translate(var(--glare-x, 300px), var(--glare-y, 160px)); transition: transform .18s ease-out; }
+.auth-artwork:hover .auth-book-glare { opacity: .85; }
+.auth-book-curl { transform-box: fill-box; transform-origin: 100% 100%; transform: scale(0); transition: transform .4s cubic-bezier(.2, .8, .2, 1); }
+.auth-book[data-curl=true] .auth-book-curl { transform: scale(1); }
+.auth-book-point circle { transform-box: fill-box; transform-origin: center; transition: fill .3s, fill-opacity .3s, transform .35s cubic-bezier(.3, 1.4, .5, 1); }
+.login-v2[data-progress="1"] .auth-point-one circle:first-child, .login-v2[data-progress="2"] .auth-book-point circle:first-child { fill: #2b7752; fill-opacity: .32; transform: scale(1.45); }
+.login-v2[data-progress="1"] .auth-point-one circle:last-child, .login-v2[data-progress="2"] .auth-book-point circle:last-child { fill: #1c8b5c; }
+.auth-book-stamp, .auth-book-trail { transform-box: fill-box; transform-origin: center; }
+.login-v2[data-stage=submitting] .auth-book-stamp { animation: auth-stamp .9s ease-in-out infinite; }
+.login-v2[data-stage=rejected] .auth-book-trail { animation: auth-trail-shake .5s ease-in-out; }
+.login-v2[data-stage=rejected] .auth-book-route { stroke: #a6533f; }
+.auth-art-caption > span { transition: color .25s; }
+.auth-art-caption > span[data-active=true] { color: var(--auth-lime); }
+.auth-art-caption > span[data-active=true] i { background: var(--auth-lime); box-shadow: 0 0 0 4px #d9e6b522; }
+.auth-eye { transition: scale .25s cubic-bezier(.3, 1.5, .5, 1); }
+.auth-password-toggle[data-caps=true] .auth-eye { scale: 1.16; }
+.auth-password-toggle[data-caps=true] .auth-eye-iris circle:first-child { r: 2.5px; }
+.auth-password-toggle[data-caps=true][data-open=false] .auth-eye-closed { transform: translateY(-2.2px); }
+.auth-password-toggle[data-open=false][data-looking] .auth-eye-open { transform: scaleY(.32); opacity: 1; }
+.auth-password-toggle[data-open=false][data-looking] .auth-eye-closed { opacity: 0; }
+.auth-password-toggle[data-reject] .auth-eye { animation: auth-eye-no .6s ease-in-out; }
+@keyframes auth-stamp { 0%, 100% { transform: none; } 50% { transform: scale(1.18); } }
+@keyframes auth-trail-shake { 0%, 100% { translate: 0 0; } 20% { translate: -7px 0; } 40% { translate: 6px 0; } 60% { translate: -4px 0; } 80% { translate: 3px 0; } }
+@keyframes auth-eye-no { 0%, 100% { translate: 0 0; } 20% { translate: -2.5px 0; } 40% { translate: 2.5px 0; } 60% { translate: -2px 0; } 80% { translate: 1.5px 0; } }
 @keyframes auth-rise { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
 @keyframes auth-title-in { from { opacity: 0; transform: translateY(16px); filter: blur(3px); } to { opacity: 1; transform: none; filter: blur(0); } }
 @keyframes auth-pane-in { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
