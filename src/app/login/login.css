@@ -21,10 +21,10 @@
 .auth-brand-body { margin-block: auto; padding-top: 34px; }
 .auth-eyebrow { display: flex; align-items: center; gap: 10px; margin-bottom: 24px; color: #b7cdb2; font: 12px var(--font-plex-mono), monospace; letter-spacing: .1em; animation: auth-rise .5s ease-out both; }
 .auth-eyebrow span { width: 5px; height: 5px; border-radius: 50%; background: var(--auth-lime); box-shadow: 0 0 0 5px #c8dfa00b; }
-.auth-headline { margin: 0; font-size: clamp(56px, 5.3vw, 88px); line-height: 1.02; letter-spacing: -.065em; font-weight: 400; }
+.auth-headline { margin: 0; font-family: Georgia, "Times New Roman", serif; font-size: clamp(56px, 5.3vw, 88px); line-height: 1.04; letter-spacing: -.035em; font-weight: 400; }
 .auth-headline > * { display: block; animation: auth-title-in .75s cubic-bezier(.22, 1, .36, 1) both; }
 .auth-headline > :nth-child(2) { animation-delay: .07s; }
-.auth-headline em { font-family: Georgia, "Times New Roman", serif; font-weight: 400; color: var(--auth-lime); animation-delay: .14s; }
+.auth-headline em { font-weight: 400; color: var(--auth-lime); animation-delay: .14s; }
 .auth-brand-description { margin-top: 22px; font-size: 14px; line-height: 1.8; color: #bed0ba; animation: auth-rise .55s .16s ease-out both; }
 .auth-artwork { perspective: 1000px; max-width: 530px; margin: 2px -20px 16px; }
 .auth-book { transform: rotateX(var(--book-x, 0deg)) rotateY(var(--book-y, 0deg)); transform-style: preserve-3d; transition: transform .45s cubic-bezier(.2, .8, .2, 1); }
