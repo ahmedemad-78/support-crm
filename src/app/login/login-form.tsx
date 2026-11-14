@@ -132,8 +132,8 @@ function PasswordEye() {
       <g className="auth-eye-iris"><circle cx="12" cy="12" r="3.3" fill="currentColor" stroke="none" /><circle cx="13.2" cy="10.8" r="1" fill="#fff" stroke="none" /></g>
     </g></g>
     <g className="auth-eye-closed">
-      <path d="M3 10.5c2.5 3.4 5.6 5.1 9 5.1s6.5-1.7 9-5.1" />
-      <path d="M6.3 14.2 5 16.3M12 15.6v2.5M17.7 14.2l1.3 2.1" />
+      <path d="M3.5 10.2c2.4 3.8 5.2 5.7 8.5 5.7s6.1-1.9 8.5-5.7" />
+      <path d="M5.9 13.8 4.3 16M9.3 15.5l-.7 2.6M14.7 15.5l.7 2.6M18.1 13.8l1.6 2.2" />
     </g>
   </svg>;
 }

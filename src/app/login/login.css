@@ -131,8 +131,7 @@
 .auth-password-toggle[data-caps=true] .auth-eye { scale: 1.16; }
 .auth-password-toggle[data-caps=true] .auth-eye-iris circle:first-child { r: 2.5px; }
 .auth-password-toggle[data-caps=true][data-open=false] .auth-eye-closed { transform: translateY(-2.2px); }
-.auth-password-toggle[data-open=false][data-looking] .auth-eye-open { transform: scaleY(.32); opacity: 1; }
-.auth-password-toggle[data-open=false][data-looking] .auth-eye-closed { opacity: 0; }
+.auth-password-toggle[data-open=false][data-looking] .auth-eye-closed { transform: translateY(-1.2px); }
 .auth-password-toggle[data-reject] .auth-eye { animation: auth-eye-no .6s ease-in-out; }
 @keyframes auth-stamp { 0%, 100% { transform: none; } 50% { transform: scale(1.18); } }
 @keyframes auth-trail-shake { 0%, 100% { translate: 0 0; } 20% { translate: -7px 0; } 40% { translate: 6px 0; } 60% { translate: -4px 0; } 80% { translate: 3px 0; } }
