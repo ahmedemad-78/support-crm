@@ -1,6 +1,7 @@
 "use server";
 
 import { deliverPendingEmails } from "@/lib/email/deliver";
+import { intakeRecord } from "@/lib/tickets/school-context";
 import { z } from "zod";
 import { revalidatePath } from "next/cache";
 import { isPortalRole } from "@/lib/auth/roles";
@@ -34,7 +35,7 @@ export async function createPortalTicket(input: PortalTicketInput, requestId?: s
   const { data, error } = await supabase
     .from("tickets")
     // ticket_number, source, status and created_by are set by the database trigger.
-    .insert({ ...(requestId ? { id: requestId } : {}), ...parsed.data, contact_channel: "unspecified", ticket_number: "pending", source: user.role, created_by: user.id })
+    .insert({ ...(requestId ? { id: requestId } : {}), ...intakeRecord(parsed.data,user.role), contact_channel: "unspecified", ticket_number: "pending", source: user.role, created_by: user.id })
     .select("id, ticket_number")
     .single();
 
@@ -69,7 +70,7 @@ export async function createSupportTicket(input: SupportTicketInput, requestId?:
 
   const { data, error } = await supabase
     .from("tickets")
-    .insert({ ...(requestId ? { id: requestId } : {}), ...parsed.data, ticket_number: "pending", created_by: user.id })
+    .insert({ ...(requestId ? { id: requestId } : {}), ...intakeRecord(parsed.data,parsed.data.source), ticket_number: "pending", created_by: user.id })
     .select("id, ticket_number")
     .single();
 

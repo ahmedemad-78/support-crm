@@ -13,7 +13,7 @@ function todayInCairo() {
 }
 
 /** The Moderation / Call Center form (FRD §5). Same schema runs in the browser and in the server action. */
-export const portalTicketSchema = z.object({
+const rawTicketSchema = z.object({
   contact_channel: z.enum(["unspecified", "whatsapp", "phone", "email", "form", "google_play"]).optional().default("unspecified"),
   linked_ticket_id: z.string().trim().optional().transform(value => value || null).pipe(z.uuid().nullable()),
   customer_name: z.string().trim().min(2, "Name needs at least 2 characters"),
@@ -37,27 +37,36 @@ export const portalTicketSchema = z.object({
   city_id: z.coerce.number({ error: "Choose a city" }).int().positive("Choose a city"),
   end_user_type: z.enum(END_USER_TYPES, { error: "Choose the user type" }),
   platform: z.enum(PLATFORMS, { error: "Choose the platform" }),
-  is_latest_version: yesNo("On the latest version?"),
+  is_latest_version: z.string().optional().default(""),
   fawry_payment: yesNo("Fawry payment"),
   app_version: optionalText(20),
   device_type: optionalText(80),
   page_screen: optionalText(160),
   steps: optionalText(4000),
-  issue_description: z.string().trim().min(5, "Describe the issue in a few words"),
+  school_code: optionalText(80),
+  school_user_ids: optionalText(600),
+  school_issue_area: optionalText(40),
+  school_impact: optionalText(40),
+  school_expected_grade: optionalText(80),
+  school_shown_grade: optionalText(80),
+  school_subject: optionalText(160),
+  school_section: optionalText(80),
+  issue_description: z.string().trim().min(5, "Describe the issue in a few words").max(8000,"Keep the description within 8,000 characters"),
 });
 
 export const SCHOOL_SOURCES = ["june_schools", "business_development"] as const;
 export function needsSchool(source: string) { return SCHOOL_SOURCES.some(code => code === source); }
-function schoolCheck(source: string, school: string | null | undefined, ctx: z.RefinementCtx) {
-  if (needsSchool(source) && !school?.trim()) ctx.addIssue({ code: "custom", path: ["school_name"], message: "School name is required for this source" });
-}
-export function portalTicketSchemaFor(source: string) {
-  return portalTicketSchema.superRefine((value, ctx) => schoolCheck(source, value.school_name, ctx));
-}
-export const supportTicketSchema = portalTicketSchema.extend({
-  source: z.string().trim().min(1, "Choose a source"),
-  reporter_id: z.string().optional().transform(value=>value||null).pipe(z.uuid("Choose a reporting owner").nullable()),
-}).superRefine((value, ctx) => schoolCheck(value.source, value.school_name, ctx));
+const hasSchool=(value:{school_name?:unknown})=>typeof value.school_name==="string"&&Boolean(value.school_name.trim());
+const versionReady=(value:{platform?:unknown;is_latest_version?:unknown})=>value.platform==="web"||["yes","no","unknown"].includes(String(value.is_latest_version??""));
+const versionRule={path:["is_latest_version"],message:"Choose Yes, No or Unknown for the latest app version",when:()=>true};
+const schoolRule={path:["school_name"],message:"Enter the school name for this source",when:()=>true};
+const normalizedLatest=(platform:string,value:string)=>platform==="web"||value==="unknown"?null:value==="yes";
+export const portalTicketSchema=rawTicketSchema.refine(versionReady,versionRule).transform(value=>({...value,is_latest_version:normalizedLatest(value.platform,value.is_latest_version),app_version:value.platform==="web"?null:value.app_version}));
+export function portalTicketSchemaFor(source:string){return rawTicketSchema.refine(value=>!needsSchool(source)||hasSchool(value),schoolRule).refine(versionReady,versionRule).transform(value=>({...value,is_latest_version:normalizedLatest(value.platform,value.is_latest_version),app_version:value.platform==="web"?null:value.app_version}));}
+export const supportTicketSchema=rawTicketSchema.extend({
+ source:z.string().trim().min(1,"Choose a source"),
+ reporter_id:z.string().optional().transform(value=>value||null).pipe(z.uuid("Choose a reporting owner").nullable()),
+}).refine(value=>!needsSchool(typeof value.source==="string"?value.source:"")||hasSchool(value),schoolRule).refine(versionReady,versionRule).transform(value=>({...value,is_latest_version:normalizedLatest(value.platform,value.is_latest_version),app_version:value.platform==="web"?null:value.app_version}));
 
 export type PortalTicketInput = z.input<typeof portalTicketSchema>;
 export type SupportTicketInput = z.input<typeof supportTicketSchema>;
@@ -70,4 +79,12 @@ export function fieldErrorsOf(error: z.ZodError): PortalTicketFieldErrors {
     if (key && !out[key]) out[key] = issue.message;
   }
   return out;
+}
+
+/** Collect independent missing fields together, even when another enum is empty. */
+export function intakeDraftErrors(value:Record<string,unknown>,source:string,support:boolean):PortalTicketFieldErrors{
+ const parsed=(support?supportTicketSchema:portalTicketSchemaFor(source)).safeParse(value);
+ const errors=parsed.success?{}:fieldErrorsOf(parsed.error);
+ if(support&&!value.reporter_id)errors.reporter_id="Choose who reported this case.";
+ return errors;
 }

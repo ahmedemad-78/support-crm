@@ -382,3 +382,9 @@ test("independent internal-note save authenticates, validates and does not navig
   if(role==="support_agent"){assert.equal(result.saved,"Payment reference verified.");assert.deepEqual(inserts,[{ticket_id:caseId,author_id:agentId,body:"Payment reference verified."}]);}else{assert.ok(result.error);assert.equal(inserts.length,0);}
  }
 });
+
+test("30 June intake saves MySchool facts on the same ticket without flat helper columns",async()=>{
+ const h=intakeHarness({role:"june_schools"});const input={...intakeInput,school_name:"Demo School",school_code:"110",school_user_ids:"1001, 1002",school_issue_area:"grade",school_expected_grade:"Grade 5",school_shown_grade:"Grade 4",platform:"web",is_latest_version:""};
+ const result=await h.actions.createPortalTicket(input,caseId);assert.equal(result.ok,true);
+ const row=h.records.get(caseId);assert.equal(row.source,"june_schools");assert.equal(row.school_context.school_code,"110");assert.equal(row.school_context.school_user_ids,"1001, 1002");assert.equal(row.school_code,undefined);assert.equal(row.is_latest_version,null);
+});

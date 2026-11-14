@@ -14,7 +14,7 @@ export default async function PortalTicketPage({params,searchParams}:PageProps<"
  const user=await requireUser([...PORTAL_ROLES]);const {ticketId}=await params;const query=await searchParams;
  if(!z.uuid().safeParse(ticketId).success)notFound();
  const db=await createClient();
- const {data:ticket,error}=await db.from("tickets").select("id,ticket_number,status,source,created_at,updated_at,customer_name,customer_email,customer_phone,school_name,credentials_username,issue_date,end_user_type,platform,is_latest_version,app_version,device_type,page_screen,steps,issue_description,fawry_payment,resolution_notes,cities(name)").eq("id",ticketId).or(`reporter_id.eq.${user.id},and(reporter_id.is.null,created_by.eq.${user.id})`).maybeSingle();
+ const {data:ticket,error}=await db.from("tickets").select("id,ticket_number,status,source,created_at,updated_at,customer_name,customer_email,customer_phone,school_name,school_context,credentials_username,issue_date,end_user_type,platform,is_latest_version,app_version,device_type,page_screen,steps,issue_description,fawry_payment,resolution_notes,cities(name)").eq("id",ticketId).or(`reporter_id.eq.${user.id},and(reporter_id.is.null,created_by.eq.${user.id})`).maybeSingle();
  if(error)throw error;if(!ticket)notFound();
  const [history,attachments,workflow]=await Promise.all([
   db.from("ticket_status_history").select("id,to_status,changed_at").eq("ticket_id",ticket.id).order("changed_at",{ascending:false}),

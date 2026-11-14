@@ -19,6 +19,7 @@ const files = [
   "src/lib/tickets/filters.ts",
   "src/lib/tickets/schema.ts",
   "src/lib/tickets/intake.ts",
+  "src/lib/tickets/school-context.ts",
   "src/lib/tickets/resolution.ts",
   "src/lib/tickets/queue.ts",
   "src/lib/tickets/register-export.ts",
@@ -53,6 +54,7 @@ const intakeHelpers = require(join(directory, "lib/tickets/intake.js"));
 const resolution = require(join(directory, "lib/tickets/resolution.js"));
 const queue = require(join(directory, "lib/tickets/queue.js"));
 const conversation = require(join(directory, "lib/tickets/conversation.js"));
+const schoolContext = require(join(directory, "lib/tickets/school-context.js"));
 const schema = require(join(directory, "lib/tickets/schema.js"));
 
 after(() => rmSync(directory, { recursive: true, force: true }));
@@ -390,4 +392,21 @@ test("queue separates finished, currently reopened and viewer unread cases",()=>
  assert.deepEqual(rows.filter(r=>queue.inQueueView(r,"reopened","me")),[rows[0]]);
  assert.equal(filters.parseTicketListFilters({view:"unread"}).view,"unread");
  assert.equal(filters.parseTicketListFilters({view:"finished"}).view,"finished");
+});
+
+test("school and reporter omissions appear alongside unrelated missing enum fields",()=>{
+ const draft={...intakeHelpers.initialIntakeDraft("2026-11-14"),source:"june_schools"};
+ const errors=schema.intakeDraftErrors(draft,"june_schools",true);
+ for(const key of ["reporter_id","school_name","customer_name","city_id","end_user_type","platform","is_latest_version","fawry_payment","issue_description"])assert.ok(errors[key],key);
+});
+test("Web intake does not request an installed app version or preserve stale app-version data",()=>{
+ const input={...intakeHelpers.initialIntakeDraft("2026-11-14"),source:"whatsapp",customer_name:"Demo customer",city_id:"1",end_user_type:"parent",platform:"web",is_latest_version:"",fawry_payment:"unknown",issue_description:"Web access is not working",app_version:"stale mobile version"};
+ const parsed=schema.supportTicketSchema.safeParse(input);assert.equal(parsed.success,true);assert.equal(parsed.data.is_latest_version,null);assert.equal(parsed.data.app_version,null);
+ const mobile=schema.supportTicketSchema.safeParse({...input,platform:"android"});assert.equal(mobile.success,false);assert.ok(schema.fieldErrorsOf(mobile.error).is_latest_version);
+});
+test("school context stays structured, source-specific and readable for Support",()=>{
+ const input={school_code:" 110 ",school_user_ids:"1001, 1002",school_issue_area:"grade",school_impact:"several",school_expected_grade:"Grade 5",school_shown_grade:"Grade 4",customer_name:"Demo",source:"june_schools"};
+ const school=schoolContext.intakeRecord(input,"june_schools");assert.equal(school.school_context.school_code,"110");assert.equal(school.school_code,undefined);assert.equal(school.school_context.school_shown_grade,"Grade 4");
+ assert.ok(schoolContext.schoolContextEntries(school.school_context).some(([label,text])=>label==="School issue area"&&text==="Wrong grade / outdated school data"));
+ assert.equal(schoolContext.intakeRecord(input,"call_center").school_context,null);assert.deepEqual(schoolContext.schoolContextEntries(null),[]);
 });

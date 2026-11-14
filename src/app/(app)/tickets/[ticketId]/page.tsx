@@ -29,7 +29,7 @@ export default async function AgentTicketPage({
     .from("tickets")
     .select(
       `id, ticket_number, status, source, created_at, updated_at, customer_name, customer_email, customer_phone, school_name,
-       credentials_username, issue_date, end_user_type, platform, is_latest_version, app_version,
+       school_context, credentials_username, issue_date, end_user_type, platform, is_latest_version, app_version,
        device_type, page_screen, steps, issue_description, assignee_id, issue_category_id, root_cause_id,
        action_taken, resolution_notes, follow_up_notes, tracker_notes, fawry_payment,
        request_type_id, topic_id, tracker_cause_id, tracker_action_id, outcome_id, cities(name),
