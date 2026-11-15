@@ -83,14 +83,22 @@ body { font-variant-numeric:tabular-nums; }
 
 /* Match the desktop rail's actual width to its collapsed state. */
 .support-sidebar.support-sidebar[data-collapsed=true] { width:76px; }
-.support-nav-footer { display:grid; grid-template-columns:40px minmax(0,1fr); align-items:center; gap:12px; padding:18px 2px 4px; }
-.support-nav-user .support-nav-fullname { white-space:normal; overflow-wrap:anywhere; line-height:1.45; }
-.support-nav-role { line-height:1.5; margin-top:3px; white-space:normal; }
-.support-nav-footer > form { grid-column:1 / -1; }
-.support-nav-signout { display:flex; align-items:center; justify-content:center; gap:8px; width:100%; min-height:40px; border:1px solid #cbd6c6; border-radius:5px; font-size:12px; }
-.support-sidebar[data-collapsed=true] .support-nav-footer { display:flex; flex-direction:column; gap:12px; padding-inline:0; }
-.support-sidebar[data-collapsed=true] .support-nav-footer > form { width:100%; }
-.support-sidebar[data-collapsed=true] .support-nav-signout-label { display:none; }
+.support-nav-footer { padding:14px 0 2px; border-top:1px solid #cfd8cd; }
+.support-nav-account { display:flex; align-items:center; gap:8px; padding:8px 6px 8px 8px; border:1px solid #d5ddd1; border-radius:12px; background:#f7f9f4; box-shadow:0 1px 2px rgb(24 62 46 / .05); }
+.support-nav-avatar { position:relative; display:grid; place-items:center; width:34px; height:34px; flex-shrink:0; border-radius:50%; background:#183e2e; color:#fff; font-size:12px; font-weight:600; letter-spacing:.02em; }
+.support-nav-avatar:not([data-admin])::after { content:""; position:absolute; right:-1px; bottom:-1px; width:10px; height:10px; border:2px solid #f7f9f4; border-radius:50%; background:#17a04a; }
+.support-nav-avatar > i { position:absolute; right:-4px; bottom:-4px; display:grid; place-items:center; width:16px; height:16px; border:2px solid #f7f9f4; border-radius:50%; background:#f5c21b; color:#3f2f00; }
+.support-nav-avatar > i svg { width:9px; height:9px; stroke-width:2.75; }
+.support-nav-user { display:flex; flex:1; flex-direction:column; gap:2px; min-width:0; }
+.support-nav-user .support-nav-fullname { overflow:hidden; color:#15251d; font-size:13px; font-weight:600; line-height:18px; text-overflow:ellipsis; white-space:nowrap; }
+.support-nav-role { overflow:hidden; color:#617068; font-size:11px; line-height:16px; text-overflow:ellipsis; white-space:nowrap; }
+.support-nav-account > form { display:flex; flex-shrink:0; }
+.support-nav-signout { display:grid; place-items:center; width:30px; height:30px; border-radius:8px; color:#617068; transition:background-color .16s ease, color .16s ease; }
+.support-nav-signout:hover { background:#fbe6de; color:#b8482a; }
+.support-nav-signout:focus-visible { outline:2px solid #183e2e; outline-offset:2px; }
+.support-sidebar[data-collapsed=true] .support-nav-account { flex-direction:column; gap:8px; padding:8px 0; border-color:transparent; background:transparent; box-shadow:none; }
+.support-sidebar[data-collapsed=true] .support-nav-avatar::after,.support-sidebar[data-collapsed=true] .support-nav-avatar > i { border-color:#e7ece3; }
+@media(pointer:coarse) { .support-nav-signout { width:44px; height:44px; } }
 .support-sidebar[data-collapsed=true] .nav-link { padding-inline:0; min-height:44px; }
 .support-sidebar[data-collapsed=true] .nav-link > svg { width:20px; height:20px; }
 .support-nav-collapse { width:28px; height:28px; right:-14px; }
