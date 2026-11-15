@@ -223,6 +223,7 @@
 .ov-tip li { display: flex; align-items: center; gap: 6px; color: #e6e8ec; }
 .ov-tip li i { width: 8px; height: 8px; border-radius: 2px; flex-shrink: 0; }
 .ov-tip li b { margin-left: auto; padding-left: 16px; font-weight: 600; font-variant-numeric: tabular-nums; }
+.ov-tip li em { min-width: 30px; color: #a9afbb; font-style: normal; text-align: right; font-variant-numeric: tabular-nums; }
 .ov-facts { display: flex; gap: 12px 32px; flex-wrap: wrap; margin-bottom: 12px; }
 .ov-facts dt { color: var(--ov-sub); font-size: 13px; line-height: 18px; }
 .ov-facts dd { font-size: 20px; line-height: 28px; font-weight: 600; letter-spacing: -0.02em; }
@@ -232,6 +233,13 @@
 .ov-area text { fill: #646a76; font-size: 12px; font-variant-numeric: tabular-nums; }
 .ov-area .ov-value { fill: var(--ov-ink); font-weight: 600; }
 .ov-area circle { transition: r 0.12s ease; }
+.ov-bar { transform-box: fill-box; transform-origin: 50% 100%; animation: ov-rise 0.5s cubic-bezier(0.22, 0.9, 0.24, 1) both; transition: opacity 0.16s ease; }
+.ov-bar rect { transition: opacity 0.16s ease; }
+.ov-wipe { transform-origin: 0 0; animation: ov-wipe 0.7s cubic-bezier(0.3, 0.7, 0.2, 1) both; }
+.ov-points { animation: ov-fade 0.3s 0.45s ease both; }
+@keyframes ov-rise { from { transform: scaleY(0); } to { transform: scaleY(1); } }
+@keyframes ov-wipe { from { transform: scaleX(0); } to { transform: scaleX(1); } }
+@keyframes ov-fade { from { opacity: 0; } to { opacity: 1; } }
 .ov-area-hit.is-action { cursor: pointer; }
 .ov-tip { position: absolute; z-index: 2; display: grid; gap: 1px; padding: 8px 10px; border-radius: 8px; background: #15171c; color: #fff; font-size: 12px; line-height: 16px; box-shadow: 0 8px 20px rgb(21 23 28 / 0.2); pointer-events: none; transform: translate(14px, -50%); white-space: nowrap; }
 .ov-tip[data-side="left"] { transform: translate(calc(-100% - 14px), -50%); }

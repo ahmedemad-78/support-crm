@@ -13,7 +13,7 @@ const GRID = "#e6e9e2";
 const OTHER = "#a3aa9f";
 const NOT_RECORDED = "#d9ddd4";
 const WARNING = "#d7282f";
-const SERIES = [ACCENT_STRONG, ACCENT, "#f2b90f", "#3f97d3", "#e8744f", "#a3c93a"];
+const SERIES = [ACCENT, ACCENT_STRONG, "#f2b90f", "#3f97d3", "#e8744f", "#a3c93a"];
 
 /** Colours follow rank order, so two series in one chart never share a hue. */
 export function seriesColor(id: string, index = 0) {
@@ -70,13 +70,6 @@ function smoothPath(points: number[][]) {
   if (!points.length) return "";
   return `M${at(points[0])}${curve(points).map(([a, b, c]) => `C${at(a)} ${at(b)} ${at(c)}`).join("")}`;
 }
-/** Closed band between two curves that share their x positions. */
-function bandPath(top: number[][], bottom: number[][]) {
-  if (!top.length) return "";
-  const back = curve(bottom).map(([a, b], i) => `C${at(b)} ${at(a)} ${at(bottom[i])}`).reverse().join("");
-  return `${smoothPath(top)}L${at(bottom[bottom.length - 1])}${back}Z`;
-}
-
 type SourceSeries = { id: string; name: string; color: string; total: number; counts: number[] };
 const SOURCE_LIMIT = 5;
 /** Splits the volume buckets by source. Returns nothing when the split cannot be aligned with the buckets. */
@@ -124,41 +117,43 @@ export function DemandArea({ tickets, filters, asOf, onPickRange, sources, selec
   const bins = useMemo(() => timeBuckets(tickets, filters, asOf), [tickets, filters, asOf]);
   const split = useMemo(() => (sources ? sourceSeries(tickets, filters, asOf, bins, sources) : []), [tickets, filters, asOf, bins, sources]);
   const [view, setView] = useState<"source" | "total">("source");
-  const bySource = view === "source" && split.length > 0;
+  const bars = view === "source" && split.length > 0;
   const id = useId().replaceAll(":", "");
   const [hover, setHover] = useState<number | null>(null);
+  const [focus, setFocus] = useState<string | null>(null);
   const { host, size } = useChartSize();
-  const plot = useMemo(() => ({ left: 40, right: size.width - 14, top: 22, bottom: size.height - 40 }), [size]);
+  const plot = { left: 40, right: size.width - 14, top: 26, bottom: size.height - 40 };
+  const span = Math.max(1, plot.right - plot.left);
   const unit = bins.length ? bucketUnit(bins[0]) : "month";
   const peak = Math.max(0, ...bins.map((b) => b.count));
   const ceiling = Math.max(4, Math.ceil(peak / 4) * 4);
-  const target = useMemo(
-    () => bins.map((b, i) => [bins.length > 1 ? plot.left + (i * (plot.right - plot.left)) / (bins.length - 1) : (plot.left + plot.right) / 2, plot.bottom - (b.count / ceiling) * (plot.bottom - plot.top)]),
-    [bins, ceiling, plot],
-  );
-  const x = (i: number) => target[i][0];
+  const band = span / Math.max(1, bins.length);
+  const barWidth = Math.max(2, Math.min(56, band * 0.62));
+  const x = (i: number) => (bars ? plot.left + band * (i + 0.5) : bins.length > 1 ? plot.left + (i * span) / (bins.length - 1) : (plot.left + plot.right) / 2);
   const y = (n: number) => plot.bottom - (n / ceiling) * (plot.bottom - plot.top);
-  const animated = useAreaMotion(target);
-  const line = smoothPath(animated);
   const labelIndexes = useMemo(() => {
-    const count = Math.min(bins.length, Math.max(2, Math.min(6, Math.floor((plot.right - plot.left) / 96))));
+    const count = Math.min(bins.length, Math.max(2, Math.min(bars ? 12 : 6, Math.floor(span / 96))));
     return new Set(Array.from({ length: count }, (_, k) => (count > 1 ? Math.round((k * (bins.length - 1)) / (count - 1)) : 0)));
-  }, [bins.length, plot]);
+  }, [bins.length, span, bars]);
   const peakIndex = bins.findIndex((b) => b.count === peak);
   const active = hover !== null && hover < bins.length ? hover : null;
   const total = bins.reduce((n, b) => n + b.count, 0);
   const locate = (event: Pick<PointerEvent<SVGRectElement>, "currentTarget" | "clientX">) => {
     const box = event.currentTarget.ownerSVGElement?.getBoundingClientRect();
     if (!box || !bins.length) return null;
-    const at = ((event.clientX - box.left) / box.width) * size.width;
-    return Math.max(0, Math.min(bins.length - 1, Math.round(((at - plot.left) / (plot.right - plot.left)) * (bins.length - 1))));
+    const at = ((event.clientX - box.left) / box.width) * size.width - plot.left;
+    return Math.max(0, Math.min(bins.length - 1, bars ? Math.floor(at / band) : Math.round((at / span) * (bins.length - 1))));
   };
   if (!bins.length || !total) return <Empty text="No dated cases in this selection." />;
   const latest = bins[bins.length - 1];
   const tipOnLeft = active !== null && x(active) > size.width * 0.55;
   const stacked = split.map((_, k) => bins.map((__, i) => split.slice(0, k + 1).reduce((n, r) => n + r.counts[i], 0)));
-  const floor = bins.map((_, i) => [x(i), plot.bottom]);
-  const layer = (k: number) => (k < 0 ? floor : bins.map((_, i) => [x(i), y(stacked[k][i])]));
+  const line = smoothPath(bins.map((b, i) => [x(i), y(b.count)]));
+  /* The entrance replays when the numbers change, not on a resize or an unchanged live refresh. */
+  const motion = `${bars ? "bars" : "line"}:${bars ? split.map((r) => r.counts.join(",")).join("|") : bins.map((b) => b.count).join(",")}`;
+  const everyLabel = bars && bins.length <= 16 && band >= 34;
+  const pickBucket = onPickRange ? (i: number) => onPickRange(bins[i].from, bins[i].to) : undefined;
+  const edgeAnchor = (i: number) => (bars || bins.length < 2 ? "middle" : i === 0 ? "start" : i === bins.length - 1 ? "end" : "middle");
   return (
     <>
       <div className="ov-volume-head">
@@ -170,18 +165,19 @@ export function DemandArea({ tickets, filters, asOf, onPickRange, sources, selec
         </dl>
         {split.length > 0 && (
           <div className="ov-segmented is-small no-print" role="group" aria-label="Case volume view">
-            <button type="button" aria-pressed={bySource} onClick={() => setView("source")}>By source</button>
-            <button type="button" aria-pressed={!bySource} onClick={() => setView("total")}>Total</button>
+            <button type="button" aria-pressed={bars} onClick={() => setView("source")}>By source</button>
+            <button type="button" aria-pressed={!bars} onClick={() => setView("total")}>Total</button>
           </div>
         )}
       </div>
-      {bySource && (
-        <div className="ov-volume-legend">
+      {bars && (
+        <div className="ov-volume-legend" onPointerLeave={() => setFocus(null)}>
           {split.map((r) => {
             const body = <><i style={{ background: r.color }} aria-hidden="true" /><span>{r.name}</span><b>{r.total.toLocaleString()}</b><small>{percent(r.total, total)}%</small></>;
+            const spotlight = { onPointerEnter: () => setFocus(r.id), onFocus: () => setFocus(r.id), onBlur: () => setFocus(null) };
             return onPickSource && r.id !== "__other__"
-              ? <button type="button" key={r.id} aria-pressed={selectedSource === r.id} onClick={() => onPickSource(r.id)} title={selectedSource === r.id ? "Remove this source filter" : `Show only ${r.name}`}>{body}</button>
-              : <span key={r.id}>{body}</span>;
+              ? <button type="button" key={r.id} {...spotlight} aria-pressed={selectedSource === r.id} onClick={() => onPickSource(r.id)} title={selectedSource === r.id ? "Remove this source filter" : `Show only ${r.name}`}>{body}</button>
+              : <span key={r.id} {...spotlight}>{body}</span>;
           })}
         </div>
       )}
@@ -192,6 +188,12 @@ export function DemandArea({ tickets, filters, asOf, onPickRange, sources, selec
               <stop stopColor={ACCENT} stopOpacity=".22" />
               <stop offset="1" stopColor={ACCENT} stopOpacity="0" />
             </linearGradient>
+            {!bars && <clipPath id={`${id}-wipe`}><rect key={motion} className="ov-wipe" width={size.width} height={size.height} /></clipPath>}
+            {bars && bins.map((b, i) => (
+              <clipPath key={b.id} id={`${id}-bar-${i}`}>
+                <rect x={x(i) - barWidth / 2} y={y(b.count)} width={barWidth} height={Math.max(0, plot.bottom - y(b.count)) + 8} rx={Math.min(5, barWidth / 2)} />
+              </clipPath>
+            ))}
           </defs>
           {[0, 0.25, 0.5, 0.75, 1].map((f) => (
             <g key={f}>
@@ -199,61 +201,86 @@ export function DemandArea({ tickets, filters, asOf, onPickRange, sources, selec
               <text x={plot.left - 10} y={y(ceiling * f) + 4} textAnchor="end">{ceiling * f}</text>
             </g>
           ))}
-          {bySource
-            ? split.map((r, k) => bins.length > 1
-              ? <path key={r.id} d={bandPath(layer(k), layer(k - 1))} fill={r.color} stroke="#fff" strokeWidth="1" strokeLinejoin="round" />
-              : <rect key={r.id} x={x(0) - 36} width="72" y={y(stacked[k][0])} height={Math.max(0, y(k ? stacked[k - 1][0] : 0) - y(stacked[k][0]))} fill={r.color} stroke="#fff" />)
-            : (
-              <>
+          {bars && active !== null && <rect x={x(active) - band / 2} y={plot.top - 14} width={band} height={plot.bottom - plot.top + 14} rx="6" fill={ACCENT_STRONG} fillOpacity=".05" />}
+          {bars ? (
+            <g key={motion}>
+              {bins.map((b, i) => (
+                <g key={b.id} className="ov-bar" style={{ animationDelay: `${Math.min(i * 28, 420)}ms`, opacity: active !== null && active !== i ? 0.5 : 1 }}>
+                  <g clipPath={`url(#${id}-bar-${i})`}>
+                    {split.map((r, k) => {
+                      const count = r.counts[i];
+                      if (!count) return null;
+                      const top = y(stacked[k][i]);
+                      const height = y(stacked[k][i] - count) - top;
+                      return <rect key={r.id} x={x(i) - barWidth / 2} y={top} width={barWidth} height={Math.max(0.5, height - (stacked[k][i] > count && height > 3 ? 1.5 : 0))} fill={r.color} style={{ opacity: focus && focus !== r.id ? 0.18 : 1 }} />;
+                    })}
+                  </g>
+                </g>
+              ))}
+              <g className="ov-points">
+                {bins.map((b, i) => (b.count > 0 && (everyLabel || i === peakIndex) ? <text key={b.id} x={x(i)} y={y(b.count) - 8} textAnchor="middle" className="ov-value" opacity={active !== null && active !== i ? 0.5 : 1}>{b.count}</text> : null))}
+              </g>
+            </g>
+          ) : (
+            <>
+              <g clipPath={`url(#${id}-wipe)`}>
                 <path d={`${line}L${x(bins.length - 1).toFixed(1)},${plot.bottom}L${x(0).toFixed(1)},${plot.bottom}Z`} fill={`url(#${id})`} />
                 <path d={line} fill="none" stroke={ACCENT} strokeWidth="2.25" strokeLinejoin="round" strokeLinecap="round" />
-              </>
-            )}
-          {active !== null && <line x1={x(active)} x2={x(active)} y1={plot.top} y2={plot.bottom} stroke={ACCENT_STRONG} strokeOpacity=".35" />}
-          {bins.map((b, i) => (
-            <g key={b.id}>
-              <circle
-                cx={x(i)}
-                cy={y(b.count)}
-                r={i === active ? 5 : bySource || bins.length > 40 ? 0 : 3}
-                fill={i === active ? ACCENT_STRONG : "#fff"}
-                stroke={bySource ? "#fff" : ACCENT}
-                strokeWidth="2"
-                role={onPickRange ? "button" : undefined}
-                tabIndex={onPickRange ? 0 : undefined}
-                aria-label={onPickRange ? `${bucketRange(b, unit)}: ${b.count} cases. Show only this period.` : undefined}
-                onFocus={onPickRange ? () => setHover(i) : undefined}
-                onBlur={onPickRange ? () => setHover(null) : undefined}
-                onKeyDown={onPickRange ? activate(() => onPickRange(b.from, b.to)) : undefined}
-              >
-                <title>{`${b.from} – ${b.to}: ${b.count} cases`}</title>
-              </circle>
-              {i === peakIndex && active === null && <text x={x(i)} y={y(b.count) - 11} textAnchor="middle" className="ov-value">{b.count}</text>}
-              {labelIndexes.has(i) && <text x={x(i)} y={plot.bottom + 24} textAnchor={bins.length > 1 && i === 0 ? "start" : bins.length > 1 && i === bins.length - 1 ? "end" : "middle"}>{bucketLabel(b, unit)}</text>}
-            </g>
-          ))}
+              </g>
+              {active !== null && <line x1={x(active)} x2={x(active)} y1={plot.top} y2={plot.bottom} stroke={ACCENT_STRONG} strokeOpacity=".35" />}
+            </>
+          )}
+          <g key={`points-${motion}`} className={bars ? undefined : "ov-points"}>
+            {bins.map((b, i) => (
+              <g key={b.id}>
+                <circle
+                  cx={x(i)}
+                  cy={y(b.count)}
+                  r={bars ? 0 : i === active ? 5 : bins.length > 40 ? 0 : 3}
+                  fill={i === active ? ACCENT_STRONG : "#fff"}
+                  stroke={ACCENT}
+                  strokeWidth="2"
+                  role={pickBucket ? "button" : undefined}
+                  tabIndex={pickBucket ? 0 : undefined}
+                  aria-label={pickBucket ? `${bucketRange(b, unit)}: ${b.count} cases. Show only this period.` : undefined}
+                  onFocus={pickBucket ? () => setHover(i) : undefined}
+                  onBlur={pickBucket ? () => setHover(null) : undefined}
+                  onKeyDown={pickBucket ? activate(() => pickBucket(i)) : undefined}
+                >
+                  <title>{`${b.from} – ${b.to}: ${b.count} cases`}</title>
+                </circle>
+                {!bars && i === peakIndex && active === null && <text x={x(i)} y={y(b.count) - 11} textAnchor="middle" className="ov-value">{b.count}</text>}
+              </g>
+            ))}
+          </g>
+          {bins.map((b, i) => (everyLabel && band >= 64) || labelIndexes.has(i) ? <text key={b.id} x={x(i)} y={plot.bottom + 24} textAnchor={edgeAnchor(i)}>{bucketLabel(b, unit)}</text> : null)}
           <rect
             x={plot.left - 12}
             y={plot.top - 12}
-            width={Math.max(0, plot.right - plot.left + 24)}
+            width={Math.max(0, span + 24)}
             height={Math.max(0, plot.bottom - plot.top + 12)}
             fill="transparent"
-            className={onPickRange ? "ov-area-hit is-action" : "ov-area-hit"}
+            className={pickBucket ? "ov-area-hit is-action" : "ov-area-hit"}
             onPointerMove={(event) => setHover(locate(event))}
             onPointerLeave={() => setHover(null)}
-            onClick={onPickRange ? (event) => { const i = locate(event); if (i !== null) onPickRange(bins[i].from, bins[i].to); } : undefined}
+            onClick={pickBucket ? (event) => { const i = locate(event); if (i !== null) pickBucket(i); } : undefined}
           />
         </svg>
         {active !== null && (
-          <div className="ov-tip" data-side={tipOnLeft ? "left" : "right"} style={{ left: x(active), top: bySource ? (plot.top + plot.bottom) / 2 : Math.max(34, Math.min(size.height - 74, y(bins[active].count))) }} aria-hidden="true">
+          <div
+            className="ov-tip"
+            data-side={tipOnLeft ? "left" : "right"}
+            style={{ left: x(active) + (bars ? (tipOnLeft ? -1 : 1) * (barWidth / 2) : 0), top: bars ? (plot.top + plot.bottom) / 2 : Math.max(34, Math.min(size.height - 74, y(bins[active].count))) }}
+            aria-hidden="true"
+          >
             <span>{bucketRange(bins[active], unit)}</span>
             <strong>{bins[active].count.toLocaleString()} {bins[active].count === 1 ? "case" : "cases"}</strong>
-            {bySource && (
+            {bars && (
               <ul>
-                {split.filter((r) => r.counts[active] > 0).map((r) => <li key={r.id}><i style={{ background: r.color }} />{r.name}<b>{r.counts[active].toLocaleString()}</b></li>)}
+                {split.filter((r) => r.counts[active] > 0).map((r) => <li key={r.id}><i style={{ background: r.color }} />{r.name}<b>{r.counts[active].toLocaleString()}</b><em>{percent(r.counts[active], bins[active].count)}%</em></li>)}
               </ul>
             )}
-            <small>{percent(bins[active].count, total)}% of this selection{onPickRange ? " · click to focus" : ""}</small>
+            <small>{percent(bins[active].count, total)}% of this selection{pickBucket ? " · click to focus" : ""}</small>
           </div>
         )}
       </div>
@@ -617,40 +644,4 @@ export function LocationMap({ tickets, cities, onPick }: { tickets: BusinessTick
 
 export function Empty({ text = "No cases in this selection." }: { text?: string }) {
   return <div className="ov-empty">{text}</div>;
-}
-
-function useAreaMotion(target: number[][]) {
-  const [points, setPoints] = useState(target);
-  const latest = useRef(target);
-  const signature = JSON.stringify(target);
-  useEffect(() => {
-    const goal = JSON.parse(signature) as number[][];
-    if (JSON.stringify(latest.current) === signature) return;
-    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches || !goal.length || !latest.current.length) {
-      latest.current = goal;
-      const frame = requestAnimationFrame(() => setPoints(goal));
-      return () => cancelAnimationFrame(frame);
-    }
-    const sample = (a: number[][], i: number) => {
-      const at = (i * (a.length - 1)) / 31;
-      const lo = Math.floor(at);
-      const hi = Math.ceil(at);
-      return a[lo].map((n, k) => n + (a[hi][k] - n) * (at - lo));
-    };
-    const before = Array.from({ length: 32 }, (_, i) => sample(latest.current, i));
-    const after = Array.from({ length: 32 }, (_, i) => sample(goal, i));
-    const began = performance.now();
-    let frame = 0;
-    const animate = (now: number) => {
-      const p = Math.min(1, (now - began) / 280);
-      const e = 1 - Math.pow(1 - p, 3);
-      const next = p === 1 ? goal : before.map((a, i) => a.map((n, k) => n + (after[i][k] - n) * e));
-      latest.current = next;
-      setPoints(next);
-      if (p < 1) frame = requestAnimationFrame(animate);
-    };
-    frame = requestAnimationFrame(animate);
-    return () => cancelAnimationFrame(frame);
-  }, [signature]);
-  return points;
 }
