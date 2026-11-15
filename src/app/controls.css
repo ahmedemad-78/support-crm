@@ -54,6 +54,28 @@
   .stat-card:hover { transform: none; }
 }
 
+/* Team roles: one icon badge per role, used in the users table and the role picker */
+.role-icon { display: grid; place-items: center; width: 28px; height: 28px; border-radius: 9px; background: var(--role); color: var(--role-on, #fff); box-shadow: 0 2px 6px color-mix(in srgb, var(--role) 30%, transparent); flex-shrink: 0; }
+.role-icon[data-size="sm"] { width: 22px; height: 22px; border-radius: 7px; box-shadow: none; }
+.role-icon[data-role="support_agent"] { --role: #183e2e; }
+.role-icon[data-role="moderation"] { --role: #3f97d3; }
+.role-icon[data-role="call_center"] { --role: #17a04a; }
+.role-icon[data-role="june_schools"] { --role: #f5c21b; --role-on: #3f2f00; }
+.role-icon[data-role="business_development"] { --role: #e8744f; }
+.role-icon[data-role="manager"] { --role: #7b8479; }
+.role-chip { display: inline-flex; align-items: center; gap: 8px; color: var(--ui-ink); font-size: 13px; font-weight: 500; white-space: nowrap; }
+.role-admin { display: inline-flex; align-items: center; gap: 4px; padding: 2px 8px 2px 6px; border: 1px solid var(--ui-tint-line); border-radius: 999px; background: var(--ui-tint); color: var(--ui-forest); font-size: 12px; line-height: 16px; font-weight: 600; }
+.role-option { display: flex; align-items: center; gap: 10px; width: 100%; padding: 9px 12px; border: 1px solid var(--ui-line-strong); border-radius: 10px; background: #fff; text-align: left; cursor: pointer; outline: none; transition: border-color 0.16s, background-color 0.16s, box-shadow 0.16s; }
+.role-option:hover:not([data-disabled]) { border-color: var(--ui-line-hover); background: var(--ui-quiet); }
+.role-option:focus-visible { border-color: var(--ui-forest); box-shadow: var(--ui-ring); }
+.role-option[data-checked] { border-color: var(--ui-forest); background: var(--ui-tint); box-shadow: 0 0 0 1px var(--ui-forest); }
+.role-option[data-disabled] { cursor: not-allowed; }
+.role-option[data-disabled]:not([data-checked]) { opacity: 0.55; }
+.role-option-text { display: flex; flex: 1; flex-direction: column; min-width: 0; }
+.role-option-text > span { color: var(--ui-ink); font-size: 13px; line-height: 18px; font-weight: 600; }
+.role-option-text > small { color: var(--ui-sub); font-size: 12px; line-height: 16px; }
+.role-option-check { display: grid; place-items: center; width: 20px; height: 20px; border-radius: 50%; background: var(--ui-forest); color: #fff; flex-shrink: 0; }
+
 /* Text fields, selects and text areas */
 :is(#main-content, .workspace-main, [data-slot="dialog-content"], [data-slot="sheet-content"]) :is(input:not([type="radio"], [type="checkbox"], [type="hidden"], [type="file"], [type="range"], [aria-hidden="true"]), select, textarea) {
   border: 1px solid var(--ui-line-strong);
