@@ -1,12 +1,12 @@
 "use client";
 import { useCallback, useEffect, useId, useMemo, useRef, useState, type ReactNode } from "react";
 import Link from "next/link";
-import { ArrowDownToLine, ArrowUpRight, ChevronDown, ChevronRight, FileText, Info, RefreshCw, Search, SearchX, SlidersHorizontal, Table2, X } from "lucide-react";
+import { Archive, ArrowDown, ArrowDownToLine, ArrowUpRight, Check, ChevronDown, ChevronRight, CircleCheck, FileText, Hourglass, Inbox, Info, ListFilter, RefreshCw, RotateCcw, Search, SearchX, SlidersHorizontal, Table2, TrendingDown, TrendingUp, X, type LucideIcon } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { formatDateTime } from "@/lib/format";
 import { cairoDate, shiftDay } from "@/lib/tickets/dashboard-model";
 import type { DashboardFilters } from "@/lib/tickets/filters";
-import { businessCsv, businessQuery, completeHistory, displayValue, field, filterBusinessTickets, isOpenCase, lastActivity, parseBusinessFilters, ranking, MISSING, DIMENSIONS, type BusinessFilters, type Dimension, type Snapshot } from "@/lib/tickets/business-analytics";
+import { businessCsv, businessQuery, completeHistory, displayValue, field, filterBusinessTickets, isOpenCase, lastActivity, parseBusinessFilters, ranking, timeBuckets, MISSING, DIMENSIONS, type BusinessFilters, type Dimension, type Snapshot } from "@/lib/tickets/business-analytics";
 import { recordReview } from "@/lib/tickets/single-page-model";
 import { Count } from "./business-charts";
 import { useLiveAnalytics } from "./use-live-analytics";
@@ -146,13 +146,16 @@ export function DashboardBoard({ initialSnapshot, initialFilters, cities = [], c
     setExportOpen(false);
   };
 
+  const trend = useMemo(() => timeBuckets(rows, filters, snapshot.asOf).map((b) => b.count), [rows, filters, snapshot.asOf]);
+  const change = comparison?.previous ? percent(rows.length - comparison.previous, comparison.previous) : null;
   const totalNote = comparison
     ? comparison.previous
-      ? `${rows.length >= comparison.previous ? "+" : "−"}${Math.abs(percent(rows.length - comparison.previous, comparison.previous))}% vs previous ${comparison.days} days (${comparison.previous})`
+      ? `vs ${comparison.previous.toLocaleString()} in the previous ${comparison.days} days`
       : `No cases in the previous ${comparison.days} days`
     : selectionCount
       ? `${percent(rows.length, snapshot.tickets.length)}% of all ${snapshot.tickets.length.toLocaleString()} cases`
       : "Every recorded case";
+  const share = (n: number) => percent(n, rows.length);
 
   return (
     <div className="ov-board" aria-busy={refreshing}>
@@ -241,11 +244,11 @@ export function DashboardBoard({ initialSnapshot, initialFilters, cities = [], c
       <p className="ov-print-scope">Updated {formatDateTime(snapshot.asOf)} · {filters.from || "All dates"} – {filters.to || "present"} · {filters.basis} date · {active.map((k) => `${LABELS[k]}: ${names(k, filters[k])}`).join(" · ") || "All sources and dimensions"}</p>
 
       <div className="ov-kpis">
-        <Kpi tone="total" label="Total cases" value={rows.length} note={totalNote} />
-        <Kpi tone="open" label="Needs follow-up" value={openInSelection} note={`${percent(openInSelection, rows.length)}% of selection · still open`} href="#ov-followup" action="See open cases" />
-        <Kpi tone="resolved" label="Marked resolved" value={resolved.length} note={`${percent(resolved.length, rows.length)}% of selection`} pressed={filters.status === "resolved"} onClick={() => toggle("status", "resolved")} action="Filter resolved cases" />
-        <Kpi tone="closed" label="Closed, no response" value={closed} note={`${percent(closed, rows.length)}% · separate from resolved`} pressed={filters.status === "closed"} onClick={() => toggle("status", "closed")} action="Filter closed cases" />
-        <Kpi tone="reopened" label="Ever reopened" value={reopened} note={`${percent(reopened, rows.length)}% of cases · ${reopenEvents} reopen event${reopenEvents === 1 ? "" : "s"}`} pressed={filters.reopened === "yes"} onClick={() => toggle("reopened", "yes")} action="Filter reopened cases" />
+        <Kpi tone="total" icon={Inbox} label="Total cases" value={rows.length} note={totalNote} trend={trend} change={change} />
+        <Kpi tone="open" icon={Hourglass} label="Needs follow-up" value={openInSelection} share={share(openInSelection)} note="of selection · still open" href="#ov-followup" action="See open cases" />
+        <Kpi tone="resolved" icon={CircleCheck} label="Marked resolved" value={resolved.length} share={share(resolved.length)} note="of selection" pressed={filters.status === "resolved"} onClick={() => toggle("status", "resolved")} action="Filter resolved cases" />
+        <Kpi tone="closed" icon={Archive} label="Closed, no response" value={closed} share={share(closed)} note="of selection · not counted as resolved" pressed={filters.status === "closed"} onClick={() => toggle("status", "closed")} action="Filter closed cases" />
+        <Kpi tone="reopened" icon={RotateCcw} label="Ever reopened" value={reopened} share={share(reopened)} note={`of selection · ${reopenEvents} reopen event${reopenEvents === 1 ? "" : "s"}`} pressed={filters.reopened === "yes"} onClick={() => toggle("reopened", "yes")} action="Filter reopened cases" />
       </div>
 
       {rows.length === 0 ? (
@@ -353,18 +356,47 @@ function Panel({ id, title, subtitle, meta, note, size = "half", children }: { i
   );
 }
 
-type KpiProps = { tone: "total" | "open" | "resolved" | "closed" | "reopened"; label: string; value: number; note: string; action?: string; href?: string; pressed?: boolean; onClick?: () => void };
-function Kpi({ tone, label, value, note, action, href, pressed, onClick }: KpiProps) {
+type KpiProps = { tone: "total" | "open" | "resolved" | "closed" | "reopened"; icon: LucideIcon; label: string; value: number; note: string; share?: number; trend?: number[]; change?: number | null; action?: string; href?: string; pressed?: boolean; onClick?: () => void };
+function Kpi({ tone, icon: Icon, label, value, note, share, trend, change, action, href, pressed, onClick }: KpiProps) {
   const body = (
     <>
-      <span className="ov-kpi-label"><i aria-hidden="true" />{label}</span>
-      <strong><Count value={value} /></strong>
+      <span className="ov-kpi-top">
+        <span className="ov-kpi-icon" aria-hidden="true"><Icon size={16} /></span>
+        <span className="ov-kpi-label">{label}</span>
+        {href && <span className="ov-kpi-hint" aria-hidden="true"><ArrowDown size={14} /></span>}
+        {onClick && <span className="ov-kpi-hint" aria-hidden="true">{pressed ? <Check size={14} /> : <ListFilter size={14} />}</span>}
+      </span>
+      <span className="ov-kpi-figure">
+        <strong><Count value={value} /></strong>
+        {change !== null && change !== undefined && (
+          <span className="ov-kpi-change">
+            {change < 0 ? <TrendingDown size={14} aria-hidden="true" /> : <TrendingUp size={14} aria-hidden="true" />}
+            {change > 0 ? "+" : change < 0 ? "−" : ""}{Math.abs(change)}%
+          </span>
+        )}
+        {share !== undefined && <span className="ov-kpi-share">{share}%</span>}
+      </span>
+      {share !== undefined && <span className="ov-kpi-meter" aria-hidden="true"><i style={{ width: `${Math.min(100, share)}%` }} /></span>}
+      {trend && <Sparkline values={trend} />}
       <small>{note}</small>
     </>
   );
-  if (href) return <a className="ov-kpi" data-tone={tone} href={href} aria-label={`${label}: ${value}. ${action}`}>{body}</a>;
-  if (onClick) return <button type="button" className="ov-kpi" data-tone={tone} aria-pressed={pressed} onClick={onClick} title={action}>{body}</button>;
+  if (href) return <a className="ov-kpi" data-tone={tone} href={href} aria-label={`${label}: ${value}, ${share}% ${note}. ${action}`}>{body}</a>;
+  if (onClick) return <button type="button" className="ov-kpi" data-tone={tone} aria-pressed={pressed} onClick={onClick} title={pressed ? "Remove this filter" : action}>{body}</button>;
   return <div className="ov-kpi" data-tone={tone}>{body}</div>;
+}
+
+function Sparkline({ values }: { values: number[] }) {
+  const points = values.length > 1 ? values : [values[0] ?? 0, values[0] ?? 0];
+  const top = Math.max(1, ...points);
+  const at = (v: number, i: number) => `${((i / (points.length - 1)) * 100).toFixed(2)},${(22 - (v / top) * 20).toFixed(2)}`;
+  const line = points.map(at).join(" ");
+  return (
+    <svg className="ov-kpi-spark" viewBox="0 0 100 24" preserveAspectRatio="none" aria-hidden="true">
+      <polygon points={`0,24 ${line} 100,24`} />
+      <polyline points={line} vectorEffect="non-scaling-stroke" />
+    </svg>
+  );
 }
 
 function AttentionRow({ count, title, detail, tone, onClick }: { count: number; title: string; detail: string; tone?: "warn"; onClick?: () => void }) {
