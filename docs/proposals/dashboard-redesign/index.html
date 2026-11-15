@@ -1,0 +1,539 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Support analytics — redesign proposal</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@500&family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Sans+Condensed:wght@600;700&display=swap" rel="stylesheet" />
+<style>
+  :root {
+    --paper: #ffffff;
+    --surface: #f6f7f9;
+    --line: #e4e6eb;
+    --ink: #15171c;
+    --ink-2: #5a5f6b;
+    --data: #c3c8d1;
+    --data-strong: #8a909c;
+    --green: #159d49;
+    --green-action: #0f7a39;
+    --green-tint: #e6f5ec;
+    --red: #d7282f;
+    --red-tint: #fbe9ea;
+    --yellow: #f2c200;
+    --yellow-tint: #fdf6d6;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--surface);
+    color: var(--ink);
+    font: 400 14px/20px "IBM Plex Sans", system-ui, sans-serif;
+    font-variant-numeric: tabular-nums;
+  }
+  .shell { display: grid; grid-template-columns: 232px 1fr; min-height: 100vh; }
+  aside {
+    border-right: 1px solid var(--line);
+    padding: 20px 16px;
+    display: flex; flex-direction: column; gap: 4px;
+  }
+  .logo { display: flex; align-items: center; gap: 10px; margin-bottom: 20px; padding: 0 8px; }
+  .logo b { font: 700 15px/1 "IBM Plex Sans Condensed", sans-serif; color: var(--green); letter-spacing: .02em; }
+  .logo span { width: 28px; height: 28px; border-radius: 8px; background: var(--green); display: grid; place-items: center; color: #fff; font: 700 14px/1 "IBM Plex Sans Condensed"; }
+  aside a { color: var(--ink-2); text-decoration: none; padding: 8px 10px; border-radius: 8px; font-weight: 500; }
+  aside a.on { background: var(--green-tint); color: var(--green-action); }
+  main { background: var(--paper); padding: 24px 32px 48px; min-width: 0; }
+
+  header.top { display: flex; align-items: flex-end; justify-content: space-between; gap: 24px; flex-wrap: wrap; }
+  h1 { font: 600 24px/32px "IBM Plex Sans"; margin: 0; }
+  .sub { color: var(--ink-2); margin-top: 2px; }
+  .controls { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+  .seg { display: inline-flex; background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 3px; }
+  .seg button { border: 0; background: none; font: 500 13px/18px inherit; font-family: inherit; color: var(--ink-2); padding: 6px 12px; border-radius: 7px; cursor: pointer; }
+  .seg button[aria-pressed="true"] { background: var(--paper); color: var(--ink); outline: 1px solid var(--line); }
+  .btn { border: 1px solid var(--line); background: var(--paper); font: 500 13px/18px inherit; font-family: inherit; padding: 7px 12px; border-radius: 8px; color: var(--ink); cursor: pointer; }
+  .btn.primary { background: var(--green-action); border-color: var(--green-action); color: #fff; }
+  button:focus-visible, a:focus-visible { outline: 2px solid var(--green-action); outline-offset: 2px; }
+
+  .filters { display: flex; gap: 8px; flex-wrap: wrap; margin: 16px 0 24px; padding-bottom: 16px; border-bottom: 1px solid var(--line); }
+  .chip { border: 1px solid var(--line); border-radius: 999px; padding: 4px 12px; font-size: 13px; color: var(--ink-2); background: var(--paper); }
+  .chip b { color: var(--ink); font-weight: 500; }
+
+  /* Insight sentences lead every view */
+  .insights { display: grid; grid-template-columns: repeat(3, 1fr); gap: 0; border: 1px solid var(--line); border-radius: 12px; overflow: hidden; }
+  .insight { padding: 18px 20px 16px; border-left: 1px solid var(--line); display: flex; flex-direction: column; gap: 8px; }
+  .insight:first-child { border-left: 0; }
+  .insight .mark { width: 24px; height: 4px; border-radius: 2px; background: var(--data-strong); }
+  .insight.alert .mark { background: var(--red); }
+  .insight.good .mark { background: var(--green); }
+  .insight.watch .mark { background: var(--yellow); }
+  .insight h3 { font: 600 16px/22px "IBM Plex Sans"; margin: 0; max-width: 34ch; }
+  .insight p { margin: 0; color: var(--ink-2); max-width: 46ch; }
+  .insight a { color: var(--green-action); font-weight: 500; text-decoration: none; font-size: 13px; margin-top: auto; }
+  .insight a:hover { text-decoration: underline; }
+
+  section { margin-top: 32px; }
+  .sec-head { display: flex; align-items: baseline; justify-content: space-between; gap: 16px; margin-bottom: 12px; }
+  h2 { font: 600 18px/24px "IBM Plex Sans"; margin: 0; }
+  .note { color: var(--ink-2); font-size: 13px; }
+  .grid { display: grid; gap: 24px; }
+  .g-hero { grid-template-columns: minmax(0, 1.55fr) minmax(280px, 1fr); }
+  .g-2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .g-3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .panel { border: 1px solid var(--line); border-radius: 12px; padding: 20px; min-width: 0; }
+  .panel.flat { border: 0; padding: 0; }
+  .panel h4 { font: 600 14px/20px "IBM Plex Sans"; margin: 0 0 2px; }
+  .panel .note { margin: 0 0 14px; }
+  .caption { color: var(--ink-2); font-size: 12px; margin-top: 10px; }
+
+  /* Block chart: one tile per case */
+  .blocks { display: flex; flex-direction: column; gap: 14px; }
+  .brow { display: grid; grid-template-columns: 150px 1fr 44px; align-items: center; gap: 12px; }
+  .brow .name { font-weight: 500; }
+  .brow .count { text-align: right; font: 600 15px/1 "IBM Plex Sans Condensed"; }
+  .tiles { display: flex; flex-wrap: wrap; gap: 4px; }
+  .tile { width: 24px; height: 24px; border-radius: 5px; background: var(--green); }
+  .tile.empty { background: var(--paper); box-shadow: inset 0 0 0 1.5px var(--data); }
+  .legend { display: flex; gap: 18px; flex-wrap: wrap; margin-top: 16px; font-size: 13px; color: var(--ink-2); }
+  .legend i { display: inline-block; width: 12px; height: 12px; border-radius: 3px; vertical-align: -1px; margin-right: 6px; background: var(--green); }
+  .legend i.empty { background: var(--paper); box-shadow: inset 0 0 0 1.5px var(--data); }
+  .legend i.grey { background: var(--data); }
+  .legend i.red { background: var(--red); }
+
+  /* Figures column */
+  .figures { display: flex; flex-direction: column; }
+  .fig { display: grid; grid-template-columns: 1fr auto; gap: 2px 12px; padding: 14px 0; border-top: 1px solid var(--line); }
+  .fig:first-child { border-top: 0; padding-top: 0; }
+  .fig .v { font: 700 30px/34px "IBM Plex Sans Condensed"; grid-row: span 2; align-self: center; text-align: right; }
+  .fig .v small { font: 600 15px "IBM Plex Sans Condensed"; color: var(--ink-2); margin-left: 2px; }
+  .fig .l { font-weight: 500; }
+  .fig .t { font-size: 12px; color: var(--ink-2); }
+  .trust { display: inline-flex; align-items: center; gap: 5px; font-size: 12px; color: var(--ink-2); }
+  .trust::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: var(--green); }
+  .trust.low::before { background: var(--yellow); }
+  .trust.none::before { background: var(--red); }
+
+  svg text { font-family: "IBM Plex Sans", sans-serif; font-size: 11px; fill: var(--ink-2); }
+  svg .val { fill: var(--ink); font-weight: 600; }
+  svg .ann { fill: var(--ink); font-size: 12px; font-weight: 500; }
+
+  /* Bars */
+  .bars { display: flex; flex-direction: column; gap: 8px; }
+  .bar { display: grid; grid-template-columns: minmax(120px, 40%) 1fr 34px; align-items: center; gap: 10px; font-size: 13px; }
+  .bar .track { height: 10px; border-radius: 3px; background: var(--surface); overflow: hidden; }
+  .bar .fill { height: 100%; background: var(--data); border-radius: 3px; }
+  .bar.focus .fill { background: var(--green); }
+  .bar.alert .fill { background: var(--red); }
+  .bar.muted { color: var(--ink-2); }
+  .bar.muted .fill { background: repeating-linear-gradient(45deg, var(--data) 0 3px, transparent 3px 6px); }
+  .bar .n { text-align: right; font-weight: 600; }
+  .bar .lab { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+  /* Matrix */
+  table.matrix { width: 100%; border-collapse: separate; border-spacing: 3px; font-size: 13px; }
+  .matrix th { font-weight: 500; color: var(--ink-2); text-align: center; padding: 4px; font-size: 12px; }
+  .matrix th.row { text-align: left; color: var(--ink); font-size: 13px; white-space: nowrap; }
+  .matrix td { text-align: center; height: 38px; border-radius: 6px; font-weight: 600; }
+  .matrix td.zero { color: var(--data); font-weight: 400; }
+
+  /* Playbook */
+  .play { display: grid; grid-template-columns: minmax(160px, 1fr) 40px minmax(0, 1.6fr); gap: 10px 14px; align-items: center; }
+  .play .cause { font-weight: 500; }
+  .play .cn { font: 600 15px "IBM Plex Sans Condensed"; text-align: right; }
+  .stack { display: flex; height: 22px; border-radius: 4px; overflow: hidden; gap: 2px; }
+  .stack span { display: flex; align-items: center; padding: 0 8px; font-size: 12px; white-space: nowrap; overflow: hidden; color: var(--ink); }
+  .stack .ok { background: var(--green-tint); color: var(--green-action); font-weight: 500; }
+  .stack .bad { background: var(--red-tint); color: var(--red); font-weight: 500; }
+  .stack .info { background: var(--surface); }
+  .stack .unk { background: repeating-linear-gradient(45deg, var(--surface) 0 3px, var(--paper) 3px 6px); color: var(--ink-2); }
+  .play-head { font-size: 12px; color: var(--ink-2); }
+
+  /* Coverage meters */
+  .meters { display: grid; grid-template-columns: repeat(4, 1fr); gap: 0; border: 1px solid var(--line); border-radius: 12px; overflow: hidden; }
+  .meter { padding: 16px; border-left: 1px solid var(--line); border-top: 1px solid var(--line); margin: -1px 0 0 -1px; }
+  .meter .p { font: 700 22px/26px "IBM Plex Sans Condensed"; }
+  .meter .k { font-weight: 500; }
+  .meter .o { font-size: 12px; color: var(--ink-2); }
+  .meter .line { height: 4px; background: var(--surface); border-radius: 2px; margin-top: 10px; overflow: hidden; }
+  .meter .line i { display: block; height: 100%; background: var(--green); }
+  .meter.low .line i { background: var(--yellow); }
+  .meter.bad .line i { background: var(--red); }
+
+  /* Desk view */
+  .queue { display: grid; grid-template-columns: repeat(5, 1fr); border: 1px solid var(--line); border-radius: 12px; overflow: hidden; }
+  .q { padding: 16px 18px; border-left: 1px solid var(--line); }
+  .q:first-child { border-left: 0; background: var(--green-tint); }
+  .q .v { font: 700 30px/34px "IBM Plex Sans Condensed"; }
+  .q .l { font-weight: 500; }
+  .q .t { font-size: 12px; color: var(--ink-2); }
+  .q:first-child .v { color: var(--green-action); }
+  .clear { display: flex; gap: 20px; align-items: center; padding: 16px 20px; border: 1px dashed var(--line); border-radius: 12px; margin-top: 12px; }
+  .clear img { width: 64px; height: 64px; object-fit: contain; }
+  .clear b { display: block; }
+  .todo { width: 100%; border-collapse: collapse; font-size: 13px; }
+  .todo th { text-align: left; font-weight: 500; color: var(--ink-2); padding: 8px 10px; background: var(--surface); }
+  .todo td { padding: 10px; border-top: 1px solid var(--line); }
+  .todo .mono { font: 500 13px "IBM Plex Mono", monospace; }
+  .tag { display: inline-block; font-size: 12px; padding: 1px 8px; border-radius: 999px; background: var(--surface); color: var(--ink-2); margin-right: 4px; }
+  .tag.miss { background: var(--yellow-tint); color: #7a5d00; }
+
+  .view[hidden] { display: none; }
+
+  @media (max-width: 1100px) {
+    .g-hero, .g-2, .g-3 { grid-template-columns: 1fr; }
+    .insights { grid-template-columns: 1fr; }
+    .insight { border-left: 0; border-top: 1px solid var(--line); }
+    .insight:first-child { border-top: 0; }
+    .meters { grid-template-columns: repeat(2, 1fr); }
+    .queue { grid-template-columns: repeat(2, 1fr); }
+  }
+  @media (max-width: 760px) {
+    .shell { grid-template-columns: 1fr; }
+    aside { display: none; }
+    main { padding: 20px 16px; }
+    .brow { grid-template-columns: 1fr 36px; }
+    .brow .tiles { grid-column: 1 / -1; grid-row: 2; }
+  }
+</style>
+</head>
+<body>
+<div class="shell">
+  <aside aria-label="Main navigation">
+    <div class="logo"><span>س</span><b>SELAH EL TELMEEZ</b></div>
+    <a href="#">Inbox</a>
+    <a href="#">Tickets</a>
+    <a href="#" class="on">Dashboard</a>
+  </aside>
+
+  <main>
+    <header class="top">
+      <div>
+        <h1>Support analytics</h1>
+        <div class="sub">66 cases from Sep 2025 to 15 Nov 2026 · updated 11:10 Cairo</div>
+      </div>
+      <div class="controls">
+        <div class="seg" role="group" aria-label="View">
+          <button type="button" data-view="manager" aria-pressed="true">Manager review</button>
+          <button type="button" data-view="desk" aria-pressed="false">Support desk</button>
+        </div>
+        <button class="btn" type="button">Export CSV</button>
+        <button class="btn primary" type="button">Share report</button>
+      </div>
+    </header>
+
+    <div class="filters" aria-label="Active filters">
+      <span class="chip">Period <b>All time</b></span>
+      <span class="chip">Date <b>Reported on</b></span>
+      <span class="chip">Source <b>All 5</b></span>
+      <span class="chip">Platform <b>All</b></span>
+      <span class="chip">+ Add filter</span>
+    </div>
+
+    <!-- ============ MANAGER VIEW ============ -->
+    <div class="view" id="view-manager">
+      <div class="insights">
+        <article class="insight alert">
+          <div class="mark"></div>
+          <h3>Call Center sends the most cases but tells us the least</h3>
+          <p>30 of 66 cases come from Call Center, and 24 of them have no request type, topic or cause. Most of what we can't explain starts here.</p>
+          <a href="#">Review 24 untagged cases</a>
+        </article>
+        <article class="insight watch">
+          <div class="mark"></div>
+          <h3>Content Delay is the top known cause, and it keeps coming back</h3>
+          <p>10 of 39 tagged cases. 6 ended with "Information provided" and 2 with "Issue persists". This needs the content team, not more replies.</p>
+          <a href="#">Open Content Delay cases</a>
+        </article>
+        <article class="insight good">
+          <div class="mark"></div>
+          <h3>The September launch moved work to digital channels</h3>
+          <p>28 of 32 September cases came through WhatsApp, Moderation and 30 June Schools. Before that, Call Center was the only source.</p>
+          <a href="#">Compare sources by month</a>
+        </article>
+      </div>
+
+      <section class="grid g-hero">
+        <div class="panel">
+          <div class="sec-head">
+            <div>
+              <h4>Every case, by where it came from</h4>
+              <p class="note">One block per case. Hollow blocks have no request type, so they can't feed the problem charts.</p>
+            </div>
+          </div>
+          <div class="blocks" id="blocks"></div>
+          <div class="legend"><span><i></i>Tagged (39)</span><span><i class="empty"></i>No request type (27)</span></div>
+        </div>
+
+        <div class="panel">
+          <h4>Health of the operation</h4>
+          <p class="note">Each figure shows how many cases it's based on.</p>
+          <div class="figures">
+            <div class="fig"><div class="l">Open right now</div><div class="v">0</div><div class="t"><span class="trust">All 66 cases</span></div></div>
+            <div class="fig"><div class="l">Reopened after resolving</div><div class="v">1<small>/ 66</small></div><div class="t"><span class="trust">1.5% reopen rate</span></div></div>
+            <div class="fig"><div class="l">Average time to resolve</div><div class="v">9.1<small>h</small></div><div class="t"><span class="trust low">Only 3 cases have full history</span></div></div>
+            <div class="fig"><div class="l">Ended without a confirmed fix</div><div class="v">4<small>/ 39</small></div><div class="t"><span class="trust">"Issue persists" or "Not confirmed"</span></div></div>
+            <div class="fig"><div class="l">Cases with an owner</div><div class="v">7<small>/ 66</small></div><div class="t"><span class="trust none">59 never assigned</span></div></div>
+          </div>
+        </div>
+      </section>
+
+      <section>
+        <div class="sec-head">
+          <h2>Cases per month</h2>
+          <span class="note">Reported date · Call Center against all other sources</span>
+        </div>
+        <div class="panel">
+          <svg id="months" viewBox="0 0 1000 230" width="100%" role="img" aria-label="Cases per month, September 2025 to November 2026"></svg>
+          <div class="legend"><span><i class="grey"></i>Call Center</span><span><i></i>WhatsApp, Moderation, 30 June Schools, B2B Schools</span></div>
+          <div class="caption">May to August 2026 have no recorded cases. Source: tickets table, 66 cases.</div>
+        </div>
+      </section>
+
+      <section class="grid g-2">
+        <div class="panel">
+          <h4>What each source asks for</h4>
+          <p class="note">Request type by source. Darker means more cases; the last column is the blind spot.</p>
+          <table class="matrix" id="matrix"></table>
+        </div>
+        <div class="panel">
+          <h4>Most reported topics</h4>
+          <p class="note">39 tagged cases. The long tail is 20 topics seen once each.</p>
+          <div class="bars" id="topics"></div>
+        </div>
+      </section>
+
+      <section>
+        <div class="sec-head">
+          <h2>Do our fixes work?</h2>
+          <span class="note">Top recorded causes and how those cases ended · 39 tagged cases</span>
+        </div>
+        <div class="panel">
+          <div class="play" id="play"></div>
+          <div class="legend">
+            <span><i style="background:var(--green-tint);box-shadow:inset 0 0 0 1px var(--green)"></i>Fixed or working</span>
+            <span><i class="grey" style="background:var(--surface);box-shadow:inset 0 0 0 1px var(--data)"></i>Information provided</span>
+            <span><i class="red" style="background:var(--red-tint);box-shadow:inset 0 0 0 1px var(--red)"></i>Issue persists or not confirmed</span>
+            <span><i class="empty"></i>Recorded as "Other"</span>
+          </div>
+        </div>
+      </section>
+
+      <section class="grid g-3">
+        <div class="panel">
+          <h4>Who contacts us</h4>
+          <p class="note">49 of 66 cases recorded a user type</p>
+          <div class="bars" id="users"></div>
+        </div>
+        <div class="panel">
+          <h4>Which app they use</h4>
+          <p class="note">43 of 66 recorded a platform · 3 were on an old version</p>
+          <div class="bars" id="platforms"></div>
+        </div>
+        <div class="panel">
+          <h4>Paying through Fawry</h4>
+          <p class="note">43 of 66 recorded payment method</p>
+          <div class="bars" id="fawry"></div>
+        </div>
+      </section>
+
+      <section>
+        <div class="sec-head">
+          <h2>How complete our records are</h2>
+          <span class="note">Share of the 66 cases with each field filled in</span>
+        </div>
+        <div class="meters" id="meters"></div>
+      </section>
+    </div>
+
+    <!-- ============ SUPPORT DESK VIEW ============ -->
+    <div class="view" id="view-desk" hidden>
+      <div class="queue">
+        <div class="q"><div class="v">0</div><div class="l">Open cases</div><div class="t">Queue is clear</div></div>
+        <div class="q"><div class="v">0</div><div class="l">New, not picked up</div><div class="t">Target: under 1 hour</div></div>
+        <div class="q"><div class="v">0</div><div class="l">Awaiting customer</div><div class="t">Follow up after 2 days</div></div>
+        <div class="q"><div class="v">27</div><div class="l">Need tracker fields</div><div class="t">Resolved but untagged</div></div>
+        <div class="q"><div class="v">1</div><div class="l">Reopened</div><div class="t">Check before closing</div></div>
+      </div>
+      <div class="clear">
+        <img src="../../brand/mascot.jpg" alt="" />
+        <div><b>No open cases right now.</b><span class="note">Use the quiet time to tag the 27 resolved cases below, so the manager's problem charts include them.</span></div>
+      </div>
+
+      <section class="insights" style="margin-top:24px">
+        <article class="insight watch">
+          <div class="mark"></div>
+          <h3>Old app version? Send the update first</h3>
+          <p>Outdated App Version came up 3 times. Updating fixed 2 of them, and the third only got instructions.</p>
+          <a href="#">Copy update instructions</a>
+        </article>
+        <article class="insight alert">
+          <div class="mark"></div>
+          <h3>Content Delay can't be solved from the desk</h3>
+          <p>2 of 10 cases still ended with "Issue persists". Escalate to the content team and record the expected date.</p>
+          <a href="#">Escalate Content Delay</a>
+        </article>
+        <article class="insight good">
+          <div class="mark"></div>
+          <h3>Regional access issues get fixed by the tech team</h3>
+          <p>2 of 3 Regional Access Restriction cases were fixed by the technical team. Escalate straight away.</p>
+          <a href="#">See those cases</a>
+        </article>
+      </section>
+
+      <section class="grid g-2">
+        <div class="panel">
+          <h4>Cases to finish tagging</h4>
+          <p class="note">Resolved cases missing request type, topic or cause · 27 total</p>
+          <table class="todo">
+            <thead><tr><th>Source</th><th>Untagged</th><th>Missing</th></tr></thead>
+            <tbody>
+              <tr><td>Call Center</td><td><b>24</b> of 30</td><td><span class="tag miss">Request type</span><span class="tag miss">Topic</span><span class="tag miss">Cause</span></td></tr>
+              <tr><td>30 June Schools</td><td><b>2</b> of 6</td><td><span class="tag miss">Request type</span><span class="tag miss">Topic</span></td></tr>
+              <tr><td>Moderation</td><td><b>1</b> of 11</td><td><span class="tag miss">Request type</span></td></tr>
+              <tr><td>WhatsApp</td><td><b>0</b> of 15</td><td><span class="tag">Complete</span></td></tr>
+              <tr><td>B2B Schools</td><td><b>0</b> of 4</td><td><span class="tag">Complete</span></td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="panel">
+          <h4>What worked before</h4>
+          <p class="note">Most common cause and the action that closed it · use as a quick playbook</p>
+          <div class="bars" id="causes"></div>
+          <div class="caption">10 other causes were seen once each.</div>
+        </div>
+      </section>
+
+      <section>
+        <div class="sec-head">
+          <h2>Case ownership</h2>
+          <span class="note">Assign a case when you pick it up, so response time can be measured</span>
+        </div>
+        <div class="meters">
+          <div class="meter bad"><div class="p">11%</div><div class="k">Cases with an owner</div><div class="o">7 of 66</div><div class="line"><i style="width:11%"></i></div></div>
+          <div class="meter low"><div class="p">3</div><div class="k">Cases with full history</div><div class="o">Needed for response and resolution time</div><div class="line"><i style="width:5%"></i></div></div>
+          <div class="meter"><div class="p">7</div><div class="k">Internal comments</div><div class="o">On cases handled in the CRM</div><div class="line"><i style="width:60%"></i></div></div>
+          <div class="meter"><div class="p">1.5%</div><div class="k">Reopen rate</div><div class="o">1 of 66 cases</div><div class="line"><i style="width:98%"></i></div></div>
+        </div>
+      </section>
+    </div>
+  </main>
+</div>
+
+<script>
+const SOURCES = [
+  { name: "Call Center", total: 30, untagged: 24 },
+  { name: "WhatsApp", total: 15, untagged: 0 },
+  { name: "Moderation", total: 11, untagged: 1 },
+  { name: "30 June Schools", total: 6, untagged: 2 },
+  { name: "B2B Schools", total: 4, untagged: 0 },
+];
+const MONTHS = [
+  ["Sep 25", 4, 1], ["Oct", 7, 1], ["Nov", 3, 0], ["Dec", 3, 0], ["Jan 26", 1, 0], ["Feb", 4, 0], ["Mar", 1, 0],
+  ["Apr", 2, 0], ["May", 0, 0], ["Jun", 0, 0], ["Jul", 0, 0], ["Aug", 0, 0], ["Sep", 4, 28], ["Oct", 0, 6], ["Nov", 1, 0],
+];
+const REQUEST_COLS = ["Inquiry", "Technical issue", "Complaint", "Other", "Not recorded"];
+const MATRIX = [
+  ["Call Center", 3, 1, 1, 1, 24],
+  ["WhatsApp", 8, 2, 4, 1, 0],
+  ["Moderation", 3, 4, 3, 0, 1],
+  ["30 June Schools", 0, 4, 0, 0, 2],
+  ["B2B Schools", 0, 2, 2, 0, 0],
+];
+const TOPICS = [
+  ["Content availability", 5, "focus"], ["App bug", 3], ["Teacher QR activation", 2], ["Subscription payment", 2],
+  ["Practice books purchase", 2], ["Locked content", 2], ["Subscription access", 1], ["20 other topics", 20, "muted"],
+];
+const PLAYBOOK = [
+  ["Content Delay", 10, [["info", 6, "Information provided"], ["bad", 2, "Issue persists"], ["unk", 2, "Other"]]],
+  ["Not Applicable", 7, [["info", 5, "Information provided"], ["unk", 2, "Other"]]],
+  ["MySchool data update", 4, [["unk", 4, "Other"]]],
+  ["Outdated app version", 3, [["ok", 2, "Working after update"], ["info", 1, "Info"]]],
+  ["Regional access restriction", 3, [["ok", 2, "Fixed by tech team"], ["unk", 1, ""]]],
+];
+
+const $ = (id) => document.getElementById(id);
+
+$("blocks").innerHTML = SOURCES.map((s) => {
+  const tiles = Array.from({ length: s.total }, (_, k) =>
+    `<span class="tile${k >= s.total - s.untagged ? " empty" : ""}"></span>`).join("");
+  return `<div class="brow"><span class="name">${s.name}</span><div class="tiles" aria-label="${s.total} cases, ${s.untagged} without request type">${tiles}</div><span class="count">${s.total}</span></div>`;
+}).join("");
+
+(function months() {
+  const W = 1000, H = 230, L = 34, B = 30, T = 28, max = 32;
+  const slot = (W - L) / MONTHS.length, bw = slot * 0.56;
+  const y = (v) => H - B - (v / max) * (H - B - T);
+  let s = "";
+  for (const g of [0, 10, 20, 30]) {
+    s += `<line x1="${L}" x2="${W}" y1="${y(g)}" y2="${y(g)}" stroke="#e4e6eb" />`;
+    s += `<text x="${L - 8}" y="${y(g) + 4}" text-anchor="end">${g}</text>`;
+  }
+  s += `<text x="0" y="12">Cases</text>`;
+  MONTHS.forEach(([m, cc, other], k) => {
+    const x = L + k * slot + (slot - bw) / 2;
+    const yc = y(cc), yo = y(cc + other);
+    if (cc) s += `<rect x="${x}" y="${yc}" width="${bw}" height="${H - B - yc}" rx="3" fill="#c3c8d1" />`;
+    if (other) s += `<rect x="${x}" y="${yo}" width="${bw}" height="${yc - yo - 2}" rx="3" fill="#159d49" />`;
+    const tot = cc + other;
+    if (tot) s += `<text class="val" x="${x + bw / 2}" y="${yo - 6}" text-anchor="middle">${tot}</text>`;
+    s += `<text x="${x + bw / 2}" y="${H - 10}" text-anchor="middle">${m}</text>`;
+  });
+  const kx = L + 12 * slot + slot / 2;
+  s += `<line x1="${kx - 40}" x2="${kx - 120}" y1="${y(26)}" y2="${y(26)}" stroke="#15171c" />`;
+  s += `<text class="ann" x="${kx - 126}" y="${y(26) + 4}" text-anchor="end">CRM launch: new channels bring 28 of 32</text>`;
+  $("months").innerHTML = s;
+})();
+
+(function matrix() {
+  const max = 24;
+  let h = `<thead><tr><th></th>${REQUEST_COLS.map((c) => `<th>${c}</th>`).join("")}</tr></thead><tbody>`;
+  for (const [name, ...vals] of MATRIX) {
+    h += `<tr><th class="row">${name}</th>` + vals.map((v, k) => {
+      if (!v) return `<td class="zero">0</td>`;
+      const a = 0.12 + 0.88 * (v / max);
+      const miss = k === vals.length - 1;
+      const bg = miss ? `rgba(215,40,47,${a.toFixed(2)})` : `rgba(21,157,73,${a.toFixed(2)})`;
+      const fg = a > 0.55 ? "#fff" : "#15171c";
+      return `<td style="background:${bg};color:${fg}">${v}</td>`;
+    }).join("") + `</tr>`;
+  }
+  $("matrix").innerHTML = h + "</tbody>";
+})();
+
+function bars(id, rows, max) {
+  max = max || Math.max(...rows.map((r) => r[1]));
+  $(id).innerHTML = rows.map(([l, n, cls]) =>
+    `<div class="bar ${cls || ""}"><span class="lab" title="${l}">${l}</span><div class="track"><div class="fill" style="width:${(n / max) * 100}%"></div></div><span class="n">${n}</span></div>`).join("");
+}
+bars("topics", TOPICS, 20);
+bars("users", [["Student", 36, "focus"], ["Parent", 6], ["Other", 4], ["Teacher", 3]]);
+bars("platforms", [["Android", 36, "focus"], ["Web", 4], ["iOS", 3], ["On an old version", 3, "alert"]]);
+bars("fawry", [["Paid with Fawry", 31, "focus"], ["Other payment", 12]]);
+bars("causes", [
+  ["Content Delay → escalate", 10, "alert"], ["Not applicable → answer inquiry", 7],
+  ["MySchool data → update record", 4], ["Old version → update app", 3, "focus"], ["Regional access → tech team", 3, "focus"],
+]);
+
+$("play").innerHTML = `<span class="play-head">Cause</span><span class="play-head" style="text-align:right">Cases</span><span class="play-head">How they ended</span>` +
+  PLAYBOOK.map(([c, n, parts]) => `<span class="cause">${c}</span><span class="cn">${n}</span><div class="stack">${parts.map(([k, v, l]) => `<span class="${k}" style="flex:${v}" title="${l}: ${v}">${l ? `${l} ${v}` : v}</span>`).join("")}</div>`).join("");
+
+const METERS = [
+  ["User type", 49], ["Platform", 43], ["App version", 42], ["Topic and cause", 39],
+  ["Outcome", 39], ["City", 13], ["Owner", 7], ["School", 3],
+];
+$("meters").innerHTML = METERS.map(([k, n]) => {
+  const p = Math.round((n / 66) * 100);
+  const cls = p < 25 ? "bad" : p < 60 ? "low" : "";
+  return `<div class="meter ${cls}"><div class="p">${p}%</div><div class="k">${k}</div><div class="o">${n} of 66</div><div class="line"><i style="width:${p}%"></i></div></div>`;
+}).join("");
+
+function show(view) {
+  document.querySelectorAll("[data-view]").forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.view === view)));
+  $("view-manager").hidden = view !== "manager";
+  $("view-desk").hidden = view !== "desk";
+}
+document.querySelectorAll("[data-view]").forEach((b) => b.addEventListener("click", () => { show(b.dataset.view); history.replaceState(null, "", "#" + b.dataset.view); }));
+show(location.hash === "#desk" || location.search.includes("desk") ? "desk" : "manager");
+</script>
+</body>
+</html>
