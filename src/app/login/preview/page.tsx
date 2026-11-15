@@ -5,6 +5,7 @@ import { navFor } from "@/components/app-shell/nav";
 import { cairoDate } from "@/lib/tickets/dashboard-model";
 import type { AnalyticsTicket } from "@/lib/tickets/analytics";
 import { TICKET_SOURCES, TICKET_STATUSES } from "@/lib/tickets/constants";
+import { realisticSnapshot } from "./realistic-fixture";
 
 // Development-only, synthetic fixture. Never reads Supabase or real ticket data.
 export default async function DashboardPreview({ searchParams }: PageProps<"/login/preview">) {
@@ -65,6 +66,7 @@ export default async function DashboardPreview({ searchParams }: PageProps<"/log
       updatedOn: cairoDate(createdAt),
     };
   });
+  const realistic = scenario === "realistic" ? realisticSnapshot(asOf) : null;
   const user = {
     id: "preview",
     email: "preview@example.com",
@@ -95,7 +97,7 @@ export default async function DashboardPreview({ searchParams }: PageProps<"/log
         </header>
         <DashboardBoard
           preview
-          initialSnapshot={{ tickets, asOf }}
+          initialSnapshot={realistic ?? { tickets, asOf }}
           initialFilters={{
             from: "",
             to: "",
@@ -105,10 +107,12 @@ export default async function DashboardPreview({ searchParams }: PageProps<"/log
             city: "",
             userType: "",
           }}
-          cities={[
-            { id: "1", name: "Cairo" },
-            { id: "2", name: "Alexandria" },
-          ]}
+          cities={
+            realistic?.cities ?? [
+              { id: "1", name: "Cairo" },
+              { id: "2", name: "Alexandria" },
+            ]
+          }
           categories={categories.map((name, i) => ({
             id: String(i + 1),
             name,
