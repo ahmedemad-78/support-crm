@@ -261,8 +261,8 @@ export function DashboardBoard({ initialSnapshot, initialFilters, cities = [], c
       ) : (
         <>
           <div className="ov-grid">
-            <Panel id="demand" size="lead" title="Case volume" subtitle={`By ${BASIS_LABELS[filters.basis].toLowerCase()}`} note={`${BASIS_NOTES[filters.basis]} Select a point to focus on that period.`}>
-              <DemandArea tickets={rows} filters={filters} asOf={snapshot.asOf} onPickRange={(from, to) => { setCustomOpen(true); patch({ from, to }); }} />
+            <Panel id="demand" size="lead" title="Case volume" subtitle={`By ${BASIS_LABELS[filters.basis].toLowerCase()}`} note={`${BASIS_NOTES[filters.basis]} Colours split each period by the source the case came from. Select a point to focus on that period, or a source to filter by it.`}>
+              <DemandArea tickets={rows} filters={filters} asOf={snapshot.asOf} onPickRange={(from, to) => { setCustomOpen(true); patch({ from, to }); }} sources={sources} selectedSource={filters.source} onPickSource={(id) => toggle("source", id)} />
             </Panel>
             <div className="ov-stack">
               <Panel id="status" title="Current status" subtitle="Where the selected cases stand now" note="Current status of the selected cases. Closed without response is separate from resolved.">

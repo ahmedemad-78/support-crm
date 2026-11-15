@@ -6,13 +6,14 @@ import countries from "@/lib/tickets/world-countries.json";
 
 export type PickFilter = (key: Dimension, value: string, second?: [Dimension, string]) => void;
 
-const ACCENT = "#159d49";
-const ACCENT_STRONG = "#0f7a39";
-const GRID = "#e9ebef";
-const OTHER = "#9aa3b2";
-const NOT_RECORDED = "#d5dae2";
-const WARNING = "#c2571a";
-const SERIES = [ACCENT_STRONG, "#3b82c4", "#e0a029", "#7c5cc4", "#2aa6a0"];
+/* Brand palette: logo green, the deep forest of the navigation, and the mascot's yellow, sky blue and coral. */
+const ACCENT = "#17a04a";
+const ACCENT_STRONG = "#183e2e";
+const GRID = "#e6e9e2";
+const OTHER = "#a3aa9f";
+const NOT_RECORDED = "#d9ddd4";
+const WARNING = "#d7282f";
+const SERIES = [ACCENT_STRONG, ACCENT, "#f2b90f", "#3f97d3", "#e8744f", "#a3c93a"];
 
 /** Colours follow rank order, so two series in one chart never share a hue. */
 export function seriesColor(id: string, index = 0) {
@@ -49,23 +50,51 @@ function bucketRange(bucket: Bucket, unit: Unit) {
   return `${utcDay(bucket.from, { day: "numeric", month: "short" })} – ${utcDay(bucket.to, { day: "numeric", month: "short", year: "numeric" })}`;
 }
 
-/** Monotone cubic path: smooth, and it never overshoots a recorded count. */
-function smoothPath(points: number[][]) {
-  if (points.length < 3) return points.map((p, i) => `${i ? "L" : "M"}${p[0].toFixed(1)},${p[1].toFixed(1)}`).join("");
+/** Monotone cubic segments: smooth, and they never overshoot a recorded count. */
+function curve(points: number[][]) {
+  if (points.length < 3) return points.slice(1).map((p, i) => [points[i], p, p]);
   const slopes = points.slice(1).map((p, i) => (p[1] - points[i][1]) / Math.max(1e-6, p[0] - points[i][0]));
   const tangents = points.map((_, i) => {
     if (i === 0) return slopes[0];
     if (i === points.length - 1) return slopes[i - 1];
     return slopes[i - 1] * slopes[i] <= 0 ? 0 : (2 * slopes[i - 1] * slopes[i]) / (slopes[i - 1] + slopes[i]);
   });
-  let path = `M${points[0][0].toFixed(1)},${points[0][1].toFixed(1)}`;
-  for (let i = 0; i < points.length - 1; i++) {
+  return points.slice(1).map((p, i) => {
     const [x0, y0] = points[i];
-    const [x1, y1] = points[i + 1];
-    const third = (x1 - x0) / 3;
-    path += `C${(x0 + third).toFixed(1)},${(y0 + tangents[i] * third).toFixed(1)} ${(x1 - third).toFixed(1)},${(y1 - tangents[i + 1] * third).toFixed(1)} ${x1.toFixed(1)},${y1.toFixed(1)}`;
-  }
-  return path;
+    const third = (p[0] - x0) / 3;
+    return [[x0 + third, y0 + tangents[i] * third], [p[0] - third, p[1] - tangents[i + 1] * third], p];
+  });
+}
+const at = (p: number[]) => `${p[0].toFixed(1)},${p[1].toFixed(1)}`;
+function smoothPath(points: number[][]) {
+  if (!points.length) return "";
+  return `M${at(points[0])}${curve(points).map(([a, b, c]) => `C${at(a)} ${at(b)} ${at(c)}`).join("")}`;
+}
+/** Closed band between two curves that share their x positions. */
+function bandPath(top: number[][], bottom: number[][]) {
+  if (!top.length) return "";
+  const back = curve(bottom).map(([a, b], i) => `C${at(b)} ${at(a)} ${at(bottom[i])}`).reverse().join("");
+  return `${smoothPath(top)}L${at(bottom[bottom.length - 1])}${back}Z`;
+}
+
+type SourceSeries = { id: string; name: string; color: string; total: number; counts: number[] };
+const SOURCE_LIMIT = 5;
+/** Splits the volume buckets by source. Returns nothing when the split cannot be aligned with the buckets. */
+function sourceSeries(tickets: BusinessTicket[], filters: BusinessFilters, asOf: string, bins: Bucket[], sources: Map<string, string>): SourceSeries[] {
+  if (!bins.length) return [];
+  const pinned = { ...filters, from: bins[0].from, to: bins[bins.length - 1].to };
+  const ranked = ranking(tickets, "source", sources, 100000);
+  const lead = ranked.length <= SOURCE_LIMIT + 1 ? ranked : ranked.slice(0, SOURCE_LIMIT);
+  const rest = ranked.slice(lead.length);
+  const groups = [
+    ...lead.map((r) => ({ id: r.id, name: r.name, ids: new Set([r.id]) })),
+    ...(rest.length ? [{ id: "__other__", name: `${rest.length} other sources`, ids: new Set(rest.map((r) => r.id)) }] : []),
+  ];
+  const series = groups.map((g, i) => {
+    const counts = timeBuckets(tickets.filter((t) => g.ids.has(field(t, "source"))), pinned, asOf).map((b) => b.count);
+    return { id: g.id, name: g.name, color: seriesColor(g.id, i), total: counts.reduce((n, c) => n + c, 0), counts };
+  });
+  return series.every((r) => r.counts.length === bins.length) ? series : [];
 }
 
 const AREA_DEFAULT = { width: 720, height: 300 };
@@ -90,8 +119,12 @@ function useChartSize() {
   return { host, size };
 }
 
-export function DemandArea({ tickets, filters, asOf, onPickRange }: { tickets: BusinessTicket[]; filters: BusinessFilters; asOf: string; onPickRange?: (from: string, to: string) => void }) {
+type DemandProps = { tickets: BusinessTicket[]; filters: BusinessFilters; asOf: string; onPickRange?: (from: string, to: string) => void; sources?: Map<string, string>; selectedSource?: string; onPickSource?: (id: string) => void };
+export function DemandArea({ tickets, filters, asOf, onPickRange, sources, selectedSource, onPickSource }: DemandProps) {
   const bins = useMemo(() => timeBuckets(tickets, filters, asOf), [tickets, filters, asOf]);
+  const split = useMemo(() => (sources ? sourceSeries(tickets, filters, asOf, bins, sources) : []), [tickets, filters, asOf, bins, sources]);
+  const [view, setView] = useState<"source" | "total">("source");
+  const bySource = view === "source" && split.length > 0;
   const id = useId().replaceAll(":", "");
   const [hover, setHover] = useState<number | null>(null);
   const { host, size } = useChartSize();
@@ -123,13 +156,35 @@ export function DemandArea({ tickets, filters, asOf, onPickRange }: { tickets: B
   if (!bins.length || !total) return <Empty text="No dated cases in this selection." />;
   const latest = bins[bins.length - 1];
   const tipOnLeft = active !== null && x(active) > size.width * 0.55;
+  const stacked = split.map((_, k) => bins.map((__, i) => split.slice(0, k + 1).reduce((n, r) => n + r.counts[i], 0)));
+  const floor = bins.map((_, i) => [x(i), plot.bottom]);
+  const layer = (k: number) => (k < 0 ? floor : bins.map((_, i) => [x(i), y(stacked[k][i])]));
   return (
     <>
-      <dl className="ov-facts">
-        <div><dt>Busiest {unit}</dt><dd>{peak.toLocaleString()} <span>{bucketLabel(bins[peakIndex], unit)}</span></dd></div>
-        <div><dt>Average per {unit}</dt><dd>{(total / bins.length).toLocaleString("en-GB", { maximumFractionDigits: 1 })}</dd></div>
-        <div><dt>Latest {unit}</dt><dd>{latest.count.toLocaleString()} <span>{bucketLabel(latest, unit)}</span></dd></div>
-      </dl>
+      <div className="ov-volume-head">
+        <dl className="ov-facts">
+          <div><dt>Busiest {unit}</dt><dd>{peak.toLocaleString()} <span>{bucketLabel(bins[peakIndex], unit)}</span></dd></div>
+          <div><dt>Average per {unit}</dt><dd>{(total / bins.length).toLocaleString("en-GB", { maximumFractionDigits: 1 })}</dd></div>
+          <div><dt>Latest {unit}</dt><dd>{latest.count.toLocaleString()} <span>{bucketLabel(latest, unit)}</span></dd></div>
+          {split.length > 1 && <div><dt>Top source</dt><dd>{split[0].name} <span>{percent(split[0].total, total)}%</span></dd></div>}
+        </dl>
+        {split.length > 0 && (
+          <div className="ov-segmented is-small no-print" role="group" aria-label="Case volume view">
+            <button type="button" aria-pressed={bySource} onClick={() => setView("source")}>By source</button>
+            <button type="button" aria-pressed={!bySource} onClick={() => setView("total")}>Total</button>
+          </div>
+        )}
+      </div>
+      {bySource && (
+        <div className="ov-volume-legend">
+          {split.map((r) => {
+            const body = <><i style={{ background: r.color }} aria-hidden="true" /><span>{r.name}</span><b>{r.total.toLocaleString()}</b><small>{percent(r.total, total)}%</small></>;
+            return onPickSource && r.id !== "__other__"
+              ? <button type="button" key={r.id} aria-pressed={selectedSource === r.id} onClick={() => onPickSource(r.id)} title={selectedSource === r.id ? "Remove this source filter" : `Show only ${r.name}`}>{body}</button>
+              : <span key={r.id}>{body}</span>;
+          })}
+        </div>
+      )}
       <div className="ov-area-wrap" ref={host}>
         <svg className="ov-area" viewBox={`0 0 ${size.width} ${size.height}`} role="img" aria-label={`Cases by ${filters.basis} date: ${bins.map((b) => `${b.name}: ${b.count}`).join("; ")}`}>
           <defs>
@@ -144,17 +199,25 @@ export function DemandArea({ tickets, filters, asOf, onPickRange }: { tickets: B
               <text x={plot.left - 10} y={y(ceiling * f) + 4} textAnchor="end">{ceiling * f}</text>
             </g>
           ))}
-          <path d={`${line}L${x(bins.length - 1).toFixed(1)},${plot.bottom}L${x(0).toFixed(1)},${plot.bottom}Z`} fill={`url(#${id})`} />
-          <path d={line} fill="none" stroke={ACCENT} strokeWidth="2.25" strokeLinejoin="round" strokeLinecap="round" />
+          {bySource
+            ? split.map((r, k) => bins.length > 1
+              ? <path key={r.id} d={bandPath(layer(k), layer(k - 1))} fill={r.color} stroke="#fff" strokeWidth="1" strokeLinejoin="round" />
+              : <rect key={r.id} x={x(0) - 36} width="72" y={y(stacked[k][0])} height={Math.max(0, y(k ? stacked[k - 1][0] : 0) - y(stacked[k][0]))} fill={r.color} stroke="#fff" />)
+            : (
+              <>
+                <path d={`${line}L${x(bins.length - 1).toFixed(1)},${plot.bottom}L${x(0).toFixed(1)},${plot.bottom}Z`} fill={`url(#${id})`} />
+                <path d={line} fill="none" stroke={ACCENT} strokeWidth="2.25" strokeLinejoin="round" strokeLinecap="round" />
+              </>
+            )}
           {active !== null && <line x1={x(active)} x2={x(active)} y1={plot.top} y2={plot.bottom} stroke={ACCENT_STRONG} strokeOpacity=".35" />}
           {bins.map((b, i) => (
             <g key={b.id}>
               <circle
                 cx={x(i)}
                 cy={y(b.count)}
-                r={i === active ? 5 : bins.length > 40 ? 0 : 3}
+                r={i === active ? 5 : bySource || bins.length > 40 ? 0 : 3}
                 fill={i === active ? ACCENT_STRONG : "#fff"}
-                stroke={ACCENT}
+                stroke={bySource ? "#fff" : ACCENT}
                 strokeWidth="2"
                 role={onPickRange ? "button" : undefined}
                 tabIndex={onPickRange ? 0 : undefined}
@@ -182,9 +245,14 @@ export function DemandArea({ tickets, filters, asOf, onPickRange }: { tickets: B
           />
         </svg>
         {active !== null && (
-          <div className="ov-tip" data-side={tipOnLeft ? "left" : "right"} style={{ left: x(active), top: Math.max(34, Math.min(size.height - 74, y(bins[active].count))) }} aria-hidden="true">
+          <div className="ov-tip" data-side={tipOnLeft ? "left" : "right"} style={{ left: x(active), top: bySource ? (plot.top + plot.bottom) / 2 : Math.max(34, Math.min(size.height - 74, y(bins[active].count))) }} aria-hidden="true">
             <span>{bucketRange(bins[active], unit)}</span>
             <strong>{bins[active].count.toLocaleString()} {bins[active].count === 1 ? "case" : "cases"}</strong>
+            {bySource && (
+              <ul>
+                {split.filter((r) => r.counts[active] > 0).map((r) => <li key={r.id}><i style={{ background: r.color }} />{r.name}<b>{r.counts[active].toLocaleString()}</b></li>)}
+              </ul>
+            )}
             <small>{percent(bins[active].count, total)}% of this selection{onPickRange ? " · click to focus" : ""}</small>
           </div>
         )}
@@ -373,7 +441,7 @@ export function CausePareto({ tickets, onPick }: { tickets: BusinessTicket[]; on
           ))}
           {rows.map((r, i) => (
             <g key={r.id}>
-              <rect x={x(i) - barWidth / 2} y={y(r.count)} width={barWidth} height={PARETO.bottom - y(r.count)} fill={i === 0 ? ACCENT_STRONG : "#a9d8bc"} rx="3" />
+              <rect x={x(i) - barWidth / 2} y={y(r.count)} width={barWidth} height={PARETO.bottom - y(r.count)} fill={i === 0 ? ACCENT_STRONG : "#9fd6b4"} rx="3" />
               <text x={x(i)} y={y(r.count) - 7} textAnchor="middle" className="ov-value">{r.count}</text>
               <text x={x(i)} y={PARETO.bottom + 20} textAnchor="middle">{i + 1}</text>
             </g>
@@ -510,7 +578,7 @@ export function LocationMap({ tickets, cities, onPick }: { tickets: BusinessTick
           </defs>
           <rect width="800" height="350" fill="#f4f7fa" />
           {countries.filter((c) => c.id !== "010").map((c) => (
-            <path key={`${c.id}-${c.name}`} aria-hidden="true" d={countryPath(c, project)} fill={c.id === "818" ? "#e3f1e8" : "#e9edf2"} stroke="#c5cdd8" strokeWidth={world ? 0.5 : 0.8}>
+            <path key={`${c.id}-${c.name}`} aria-hidden="true" d={countryPath(c, project)} fill={c.id === "818" ? "#e2ecd9" : "#e9edf2"} stroke="#c5cdd8" strokeWidth={world ? 0.5 : 0.8}>
               <title>{c.name}</title>
             </path>
           ))}
