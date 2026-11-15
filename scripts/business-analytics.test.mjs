@@ -22,7 +22,7 @@ test('chart tooltips contain the same text in server HTML instead of empty SVG t
  const compiled=ts.transpileModule(readFileSync(new URL('../src/app/(app)/dashboard/single-page-charts.tsx',import.meta.url),'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022,jsx:ts.JsxEmit.ReactJSX,esModuleInterop:true}}).outputText;
  const module={exports:{}};const localRequire=(name)=>name==='@/lib/tickets/business-analytics'?m:name==='@/lib/tickets/single-page-model'?single:name==='@/lib/tickets/world-countries.json'?require(join(directory,'world-countries.json')):require(name);
  vm.runInNewContext(compiled,{require:localRequire,exports:module.exports,module});
- const charts=module.exports,tickets=[ticket()];const components=[['DemandArea',{tickets,filters:f(),asOf}],['SourceColumns',{tickets,sources:new Map(),onPick:()=>{}}],['OutcomeDonut',{tickets,onPick:()=>{}}],['LocationMap',{tickets,cities:[{id:'1',name:'Cairo'}],onPick:()=>{}}]];
+ const charts=module.exports,tickets=[ticket()];const components=[['DemandArea',{tickets,filters:f(),asOf}],['SourceMix',{tickets,sources:new Map(),onPick:()=>{}}],['OutcomeDonut',{tickets,onPick:()=>{}}],['LocationMap',{tickets,cities:[{id:'1',name:'Cairo'}],onPick:()=>{}}]];
  for(const [name,props]of components){const html=renderToStaticMarkup(React.createElement(charts[name],props)),titles=[...html.matchAll(/<title>(.*?)<\/title>/g)].map(x=>x[1]);assert.ok(titles.length>0,name);assert.ok(titles.every(text=>text.trim().length>0),name+' must serialize nonempty SVG titles');}
 });
 

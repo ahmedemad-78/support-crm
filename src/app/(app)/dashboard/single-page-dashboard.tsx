@@ -1,79 +1,405 @@
 "use client";
-import { useCallback, useEffect, useId, useMemo, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useId, useMemo, useRef, useState, type ReactNode } from "react";
 import Link from "next/link";
-import { ArrowDownToLine, ArrowUpRight, ChevronDown, RefreshCw, SlidersHorizontal, X } from "lucide-react";
+import { ArrowDownToLine, ArrowUpRight, ChevronDown, ChevronRight, FileText, Info, RefreshCw, Search, SearchX, SlidersHorizontal, Table2, X } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { formatDateTime } from "@/lib/format";
+import { cairoDate, shiftDay } from "@/lib/tickets/dashboard-model";
 import type { DashboardFilters } from "@/lib/tickets/filters";
-import { businessCsv, businessQuery, completeHistory, displayValue, field, filterBusinessTickets, isOpenCase, lastActivity, parseBusinessFilters, ranking, MISSING, DIMENSIONS, type BusinessFilters, type BusinessTicket, type Dimension, type Snapshot } from "@/lib/tickets/business-analytics";
+import { businessCsv, businessQuery, completeHistory, displayValue, field, filterBusinessTickets, isOpenCase, lastActivity, parseBusinessFilters, ranking, MISSING, DIMENSIONS, type BusinessFilters, type Dimension, type Snapshot } from "@/lib/tickets/business-analytics";
 import { recordReview } from "@/lib/tickets/single-page-model";
 import { Count } from "./business-charts";
 import { useLiveAnalytics } from "./use-live-analytics";
-import { CausePareto, DemandArea, Handling, LocationMap, OutcomeDonut, Problems, SourceColumns, type PickFilter } from "./single-page-charts";
-import "./business-intelligence.css";
+import { CausePareto, DemandArea, Handling, LocationMap, OutcomeDonut, Problems, SourceMix, type PickFilter } from "./single-page-charts";
+import { CaseTable, Coverage, StatusBreakdown } from "./single-page-panels";
 import "./single-page.css";
 
-type Option={id:string;name:string};
-type Props={initialSnapshot:Snapshot;initialFilters:DashboardFilters|BusinessFilters;cities?:Option[];categories?:Option[];preview?:boolean;userId?:string;previewLoader?:()=>Promise<Snapshot>;initialTab?:string};
-const LABELS:Record<Dimension,string>={source:"Source",status:"Status",requestType:"Request type",topic:"Problem topic",trackerCause:"Recorded cause",trackerAction:"Action taken",outcome:"Resolution outcome",assignee:"Support assignee",reporterId:"Reporting owner",school:"School",fawry:"Fawry-related flag",origin:"Record origin",reopened:"Ever reopened",platform:"Platform",appVersion:"App version",latestVersion:"Latest version?",city:"City / area",userType:"Customer type",category:"Intake category"};
-const MAIN:Dimension[]=["status","topic","trackerCause","trackerAction","outcome","reopened","city","assignee","reporterId"];
-const CONTEXT:Dimension[]=["fawry","origin","school","userType","platform","appVersion","latestVersion","category"];
-export function DashboardBoard({initialSnapshot,initialFilters,cities=[],categories=[],preview=false,userId,previewLoader}:Props){
- const {snapshot,refreshing,error,refresh}=useLiveAnalytics(initialSnapshot,{preview,userId,previewLoader});
- const [filters,setFilters]=useState(()=>parseBusinessFilters(initialFilters as unknown as Record<string,unknown>));
- const [filterOpen,setFilterOpen]=useState(false),[exportOpen,setExportOpen]=useState(false);
- const sources=useMemo(()=>new Map([...(snapshot.sources??[]).map(s=>[s.code,s.name] as [string,string]),...snapshot.tickets.map(t=>[t.source,t.sourceName||displayValue("source",t.source,[])] as [string,string])]),[snapshot]);
- const names=useCallback((key:Dimension,value:string)=>key==="city"?(value===MISSING?"City not supplied":cities.find(c=>c.id===value)?.name||value):key==="category"?(categories.find(c=>c.id===value)?.name||value):displayValue(key,value,snapshot.tickets,sources),[cities,categories,snapshot.tickets,sources]);
- const patch=useCallback((update:Partial<BusinessFilters>)=>setFilters(f=>({...f,...update})),[]);
- useEffect(()=>{if(!preview)window.history.replaceState(null,"",`/dashboard?${businessQuery(filters)}`);},[filters,preview]);
- useEffect(()=>{if(preview)return;const restore=()=>setFilters(parseBusinessFilters(Object.fromEntries(new URLSearchParams(window.location.search))));window.addEventListener("popstate",restore);return()=>{window.removeEventListener("popstate",restore);};},[preview]);
- const rows=useMemo(()=>filterBusinessTickets(snapshot.tickets,filters),[snapshot.tickets,filters]);
- const open=useMemo(()=>filterBusinessTickets(snapshot.tickets,filters,true).filter(isOpenCase).sort((a,b)=>lastActivity(a).localeCompare(lastActivity(b))),[snapshot.tickets,filters]);
- const resolved=useMemo(()=>rows.filter(t=>t.status==="resolved"),[rows]),review=useMemo(()=>recordReview(rows),[rows]);
- const reopened=rows.filter(t=>(t.reopenCount??0)>0).length,reopenEvents=rows.reduce((n,t)=>n+(t.reopenCount??0),0),eligible=rows.filter(t=>completeHistory(t,snapshot.asOf)).length;
- const active=DIMENSIONS.filter(k=>filters[k]),hasDates=!!(filters.from||filters.to),selectionCount=active.length+Number(hasDates)+Number(!!filters.q)+Number(filters.basis!=="reported"),query=businessQuery(filters);
- const pick:PickFilter=(key,value,second)=>{const clear=filters[key]===value&&(!second||filters[second[0]]===second[1]);patch({[key]:clear?"":value,...(second?{[second[0]]:clear?"":second[1]}:{})});};
- const options=(key:Dimension)=>{const frame=filterBusinessTickets(snapshot.tickets,{...filters,[key]:""});const counts=new Map(ranking(frame,key,sources,100000).map(r=>[r.id,r.count]));const ids=new Set(snapshot.tickets.map(t=>field(t,key)));if(key==="source")snapshot.sources?.forEach(s=>ids.add(s.code));if(filters[key])ids.add(filters[key]);return [...ids].map(id=>({id,name:names(key,id),count:counts.get(id)||0})).sort((a,b)=>a.id===MISSING?1:b.id===MISSING?-1:a.name.localeCompare(b.name));};
- const filterSelect=(key:Dimension)=><FilterSelect key={key} label={LABELS[key]} value={filters[key]} allLabel={key==="source"?"All sources":key==="requestType"?"All request types":"All values"} options={options(key)} onChange={value=>patch({[key]:value})}/>;
- const reset=()=>patch(parseBusinessFilters({}));
- const csv=()=>{const url=URL.createObjectURL(new Blob([businessCsv(rows)],{type:"text/csv;charset=utf-8"}));const a=document.createElement("a");a.href=url;a.download=`support-analytics-${filters.from||"all"}-${filters.to||"today"}.csv`;a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);setExportOpen(false);};
- const cards:[string,number,string][]=[["Total cases",rows.length,"Unique cases in this selection"],["Needs follow-up",rows.filter(isOpenCase).length,"Open cases in this selection"],["Marked resolved",resolved.length,"Recorded status"],["Closed without response",rows.filter(t=>t.status==="closed").length,"Separate from resolved"],["Ever reopened",reopened,`${rows.length?(reopened/rows.length*100).toFixed(1):"0"}% of cases · ${reopenEvents} reopen events`]];
- return <div className="bia-board sp-board" aria-busy={refreshing}>
-  <header className="sp-heading"><div><p>TECHNICAL SUPPORT / INTELLIGENCE</p><h2>Support overview<span>.</span></h2><p>Reported cases · Problem diagnosis · Handling results</p></div><div className="bia-heading-actions no-print"><button type="button" className="bia-button bia-refresh" onClick={()=>void refresh()} disabled={refreshing||preview&&!previewLoader} aria-label="Refresh analytics"><RefreshCw size={15} className={refreshing?"animate-spin":""}/><span>Refresh</span></button><div className="bia-export"><button type="button" className="bia-button" aria-expanded={exportOpen} onClick={()=>setExportOpen(v=>!v)}><ArrowDownToLine size={15}/>Export<ChevronDown size={13}/></button>{exportOpen&&<div className="bia-export-menu"><button type="button" onClick={csv}>CSV · matching cases</button><button type="button" onClick={()=>{setExportOpen(false);requestAnimationFrame(()=>window.print());}}>PDF · dashboard</button><button type="button" onClick={()=>setExportOpen(false)}>Close</button></div>}</div></div></header>
-  <div className="sp-controls no-print"><FilterSelect label="Period" value={hasDates?"custom":""} allLabel="All data" options={[{id:"custom",name:"Custom period"}]} onChange={value=>patch(value?{from:snapshot.tickets.map(t=>t.reportedOn||t.createdOn).sort()[0]||snapshot.asOf.slice(0,10),to:snapshot.asOf.slice(0,10)}:{from:"",to:""})}/>{filterSelect("source")}{filterSelect("requestType")}<button type="button" className={`bia-button sp-more ${filterOpen?"is-active":""}`} aria-expanded={filterOpen} aria-controls="sp-filters" onClick={()=>setFilterOpen(v=>!v)}><SlidersHorizontal size={15}/>More filters{selectionCount>0&&<span className="bia-count-tag">{selectionCount}</span>}</button></div>
-  {hasDates&&<div className="bia-dates no-print"><label>From<input type="date" value={filters.from} onChange={e=>patch({from:e.target.value})}/></label><label>To<input type="date" value={filters.to} onChange={e=>patch({to:e.target.value})}/></label><button type="button" onClick={()=>patch({from:"",to:""})}>Clear period</button></div>}
-  <div id="sp-filters" className={`bia-filter-panel no-print ${filterOpen?"is-open":""}`} inert={!filterOpen} aria-hidden={!filterOpen}><div><div className="bia-filter-grid"><FilterSelect allowAll={false} label="Date basis" value={filters.basis} allLabel="Reported date" options={[{id:"reported",name:"Reported date"},{id:"created",name:"System creation date"},{id:"resolved",name:"Latest resolution date"}]} onChange={value=>patch({basis:value as BusinessFilters["basis"]})}/>{MAIN.map(filterSelect)}</div><details className="bia-context-filters"><summary>Context · payments, schools, platform and record origin</summary><div className="bia-filter-grid">{CONTEXT.map(filterSelect)}</div><p className="sp-note">Fawry-related is a recorded flag, not a payment failure or transaction count.</p></details><div className="bia-filter-bottom"><label>Find a case<input type="search" value={filters.q} placeholder="Case, customer, school or problem" onChange={e=>patch({q:e.target.value})}/></label><button type="button" className="bia-button" onClick={()=>setFilterOpen(false)}>Done</button></div></div></div>
-  <div className="sp-selection"><span role="status" aria-live="polite"><strong>{rows.length.toLocaleString()}</strong> of {snapshot.tickets.length.toLocaleString()} cases · {selectionCount?`${selectionCount} active selection${selectionCount===1?"":"s"}`:"All data · no filters"}</span><div className="sp-live" role="status">{refreshing?"Checking for updates…":preview&&!previewLoader?"Development preview":"Auto updates · 15s"}<small>Updated {formatDateTime(snapshot.asOf)}</small></div></div>
-  {selectionCount>0&&<div className="bia-chips no-print">{active.map(key=><button type="button" key={key} onClick={()=>patch({[key]:""})} aria-label={`Clear ${LABELS[key]}: ${names(key,filters[key])}`}>{LABELS[key]}: {names(key,filters[key])}<X size={13}/></button>)}{hasDates&&<button type="button" onClick={()=>patch({from:"",to:""})}>Period: {filters.from||"Start"} – {filters.to||"Present"}<X size={13}/></button>}{filters.q&&<button type="button" onClick={()=>patch({q:""})}>Search: {filters.q}<X size={13}/></button>}{filters.basis!=="reported"&&<button type="button" onClick={()=>patch({basis:"reported"})}>Date basis: {filters.basis}<X size={13}/></button>}<button type="button" className="sp-clear-all" onClick={reset}>Clear all</button></div>}
-  {filters.from&&filters.to&&filters.from>filters.to&&<p className="bia-alert" role="alert">Start date must be on or before end date.</p>}{error&&<p className="bia-alert" role="status">{error}</p>}
-  <p className="bia-print-scope">Updated {formatDateTime(snapshot.asOf)} · {filters.from||"All dates"} – {filters.to||"present"} · {filters.basis} date · {active.map(k=>`${LABELS[k]}: ${names(k,filters[k])}`).join(" · ")||"All sources and dimensions"}</p>
-  <div className="sp-kpis">{cards.map(([label,value,note])=><div key={label}><span>{label}</span><strong><Count value={value}/></strong><small>{note}</small></div>)}</div>
-  {!preview&&<div className="sp-report-link"><Link href={`/tickets?scope=dashboard&view=all&${query}`}>View matching cases<ArrowUpRight size={13}/></Link></div>}
-  <SectionTitle title="Demand & attention" subtitle="When cases were reported, where the work comes from, and what needs a closer look."/>
-  <div className="sp-grid">
-   <Panel id="demand" title="Case volume over time" subtitle={`${filters.basis==="reported"?"Reported":filters.basis==="created"?"System creation":"Latest resolution"} date · exact period counts`} meta={`${rows.length} cases`} size="wide"><DemandArea tickets={rows} filters={filters} asOf={snapshot.asOf}/></Panel>
-   <Panel id="attention" title="Attention needed" subtitle="Record review · flags may overlap" size="narrow"><div className="sp-attention"><button type="button" disabled={!review.inconsistent.length} onClick={()=>patch({status:"resolved",outcome:"Issue Persists"})}><b>{review.inconsistent.length}</b><span>Marked resolved, but issue persists<small>Review the closure and recorded result.</small></span></button><div><b>{review.incomplete.length}</b><span>Tracker classification incomplete<small>At least one of the five fields is missing.</small></span></div><button type="button" disabled={!review.missingReporter.length} onClick={()=>pick("reporterId",MISSING)}><b>{review.missingReporter.length}</b><span>Reporting owner not recorded<small>Source and individual ownership are separate.</small></span></button></div></Panel>
-   <Panel id="sources" title="Who brings the work — and what kind?" subtitle="Clustered columns · compare the same request types across sources" meta={`${rows.length} cases`} size="full"><SourceColumns tickets={rows} sources={sources} onPick={pick}/></Panel>
-  </div>
-  <SectionTitle title="Understand the problems" subtitle="Reported symptoms and recorded causes answer different questions."/>
-  <div className="sp-grid"><Panel id="problems" title="Most reported problems" subtitle="Exact tracker topics · missing values stay explicit"><Problems tickets={rows} onPick={pick}/></Panel><Panel id="causes" title="Recorded cause concentration" subtitle="Pareto · case count and cumulative share of recorded labels"><CausePareto tickets={rows} onPick={pick}/></Panel></div>
-  <SectionTitle title="Where cases are reported" subtitle="Geographic concentration with visible location coverage."/>
-  <Panel id="geography" title="Cases by recorded city / area" subtitle="Heat markers · count-based area references, not customer addresses" size="full"><LocationMap tickets={rows} cities={cities} onPick={pick}/></Panel>
-  <SectionTitle title="Handling & results" subtitle="What Support did, what was recorded, and what still needs confirmation."/>
-  <div className="sp-grid"><Panel id="actions" title="From action to outcome" subtitle="Currently resolved cases · most frequent recorded result" meta={`${resolved.length} resolved`}><Handling tickets={resolved} onPick={pick}/></Panel><Panel id="outcomes" title="Recorded resolution outcomes" subtitle="Donut · each currently resolved case counted once"><OutcomeDonut tickets={resolved} onPick={pick}/><p className="sp-note">Marked resolved is a status, not proof of a confirmed fix. Unknown results remain visible.</p></Panel></div>
-  <SectionTitle title="Follow-up & record coverage" subtitle="Operational follow-up uses all dates within the other filters."/>
-  {open.length>0?<CaseTable tickets={open} query={businessQuery({...filters,from:"",to:""})} preview={preview}/>:<div className="sp-operational-empty"><strong>No open cases in the current operational selection.</strong><span>Source and other filters apply; the reported-date range does not hide older open work.</span></div>}
-  <div className="sp-coverage"><p><strong>{rows.length-review.incomplete.length}/{rows.length}</strong> cases have all five tracker fields · <strong>{resolved.filter(t=>t.resolvedAt).length}/{resolved.length}</strong> resolved cases have a resolution timestamp.</p><p><strong>{rows.filter(t=>t.isHistorical).length}</strong> historical imports · <strong>{eligible}</strong> complete native workflow histories. Timing comparisons require a representative native-history sample.</p></div>
-  <footer className="bia-footer">Each case is counted once. Reopen events are separate from unique reopened cases. Missing data is never inferred.</footer>
- </div>;
+type Option = { id: string; name: string };
+type Props = { initialSnapshot: Snapshot; initialFilters: DashboardFilters | BusinessFilters; cities?: Option[]; categories?: Option[]; preview?: boolean; userId?: string; previewLoader?: () => Promise<Snapshot>; initialTab?: string };
+
+const LABELS: Record<Dimension, string> = { source: "Source", status: "Status", requestType: "Request type", topic: "Problem topic", trackerCause: "Recorded cause", trackerAction: "Action taken", outcome: "Resolution outcome", assignee: "Support assignee", reporterId: "Reporting owner", school: "School", fawry: "Fawry-related flag", origin: "Record origin", reopened: "Ever reopened", platform: "Platform", appVersion: "App version", latestVersion: "Latest version?", city: "City / area", userType: "Customer type", category: "Intake category" };
+const MAIN: Dimension[] = ["status", "topic", "trackerCause", "trackerAction", "outcome", "reopened", "city", "assignee", "reporterId"];
+const CONTEXT: Dimension[] = ["fawry", "origin", "school", "userType", "platform", "appVersion", "latestVersion", "category"];
+const BASIS_LABELS: Record<BusinessFilters["basis"], string> = { reported: "Reported date", created: "System creation date", resolved: "Latest resolution date" };
+const BASIS_NOTES: Record<BusinessFilters["basis"], string> = {
+  reported: "Reported dates include historical records; they are different from when a case entered the system.",
+  created: "System creation dates include imported records. They are not proof of first customer contact.",
+  resolved: "Only cases with a recorded resolution timestamp enter this date view.",
+};
+const PERIODS = [{ id: "all", label: "All time" }, { id: "7", label: "7 days" }, { id: "30", label: "30 days" }, { id: "90", label: "90 days" }, { id: "year", label: "This year" }, { id: "custom", label: "Custom" }] as const;
+type PeriodId = (typeof PERIODS)[number]["id"];
+
+const percent = (part: number, whole: number) => (whole ? Math.round((part / whole) * 100) : 0);
+const daysBetween = (from: string, to: string) => Math.round((Date.parse(`${to}T12:00:00Z`) - Date.parse(`${from}T12:00:00Z`)) / 86400000) + 1;
+const shortDay = (day: string) => new Date(`${day}T12:00:00Z`).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric", timeZone: "UTC" });
+
+export function DashboardBoard({ initialSnapshot, initialFilters, cities = [], categories = [], preview = false, userId, previewLoader }: Props) {
+  const { snapshot, refreshing, error, refresh } = useLiveAnalytics(initialSnapshot, { preview, userId, previewLoader });
+  const [filters, setFilters] = useState(() => parseBusinessFilters(initialFilters as unknown as Record<string, unknown>));
+  const [filterOpen, setFilterOpen] = useState(false);
+  const [exportOpen, setExportOpen] = useState(false);
+  const [customOpen, setCustomOpen] = useState(false);
+  const exportRef = useRef<HTMLDivElement>(null);
+  const today = cairoDate(snapshot.asOf);
+
+  const sources = useMemo(() => new Map([...(snapshot.sources ?? []).map((s) => [s.code, s.name] as [string, string]), ...snapshot.tickets.map((t) => [t.source, t.sourceName || displayValue("source", t.source, [])] as [string, string])]), [snapshot]);
+  const names = useCallback(
+    (key: Dimension, value: string) =>
+      key === "city" ? (value === MISSING ? "City not supplied" : cities.find((c) => c.id === value)?.name || value) : key === "category" ? categories.find((c) => c.id === value)?.name || value : displayValue(key, value, snapshot.tickets, sources),
+    [cities, categories, snapshot.tickets, sources],
+  );
+  const patch = useCallback((update: Partial<BusinessFilters>) => setFilters((f) => ({ ...f, ...update })), []);
+
+  useEffect(() => {
+    if (!preview) window.history.replaceState(null, "", `/dashboard?${businessQuery(filters)}`);
+  }, [filters, preview]);
+  useEffect(() => {
+    if (preview) return;
+    const restore = () => setFilters(parseBusinessFilters(Object.fromEntries(new URLSearchParams(window.location.search))));
+    window.addEventListener("popstate", restore);
+    return () => window.removeEventListener("popstate", restore);
+  }, [preview]);
+  useEffect(() => {
+    if (!exportOpen) return;
+    const close = (event: Event) => {
+      if (event instanceof KeyboardEvent ? event.key === "Escape" : !exportRef.current?.contains(event.target as Node)) setExportOpen(false);
+    };
+    document.addEventListener("pointerdown", close);
+    document.addEventListener("keydown", close);
+    return () => {
+      document.removeEventListener("pointerdown", close);
+      document.removeEventListener("keydown", close);
+    };
+  }, [exportOpen]);
+
+  const rows = useMemo(() => filterBusinessTickets(snapshot.tickets, filters), [snapshot.tickets, filters]);
+  const open = useMemo(() => filterBusinessTickets(snapshot.tickets, filters, true).filter(isOpenCase).sort((a, b) => lastActivity(a).localeCompare(lastActivity(b))), [snapshot.tickets, filters]);
+  const resolved = useMemo(() => rows.filter((t) => t.status === "resolved"), [rows]);
+  const review = useMemo(() => recordReview(rows), [rows]);
+  const reopened = rows.filter((t) => (t.reopenCount ?? 0) > 0).length;
+  const reopenEvents = rows.reduce((n, t) => n + (t.reopenCount ?? 0), 0);
+  const eligible = rows.filter((t) => completeHistory(t, snapshot.asOf)).length;
+  const openInSelection = rows.filter(isOpenCase).length;
+  const closed = rows.filter((t) => t.status === "closed").length;
+
+  const active = DIMENSIONS.filter((k) => filters[k]);
+  const hasDates = !!(filters.from || filters.to);
+  const invalidDates = !!(filters.from && filters.to && filters.from > filters.to);
+  const selectionCount = active.length + Number(hasDates) + Number(!!filters.q) + Number(filters.basis !== "reported");
+  const query = businessQuery(filters);
+
+  const presetRange = useCallback(
+    (id: PeriodId) => {
+      if (id === "year") return { from: `${today.slice(0, 4)}-01-01`, to: today };
+      if (id === "7" || id === "30" || id === "90") return { from: shiftDay(today, 1 - Number(id)), to: today };
+      return { from: "", to: "" };
+    },
+    [today],
+  );
+  const preset = PERIODS.find((p) => p.id !== "all" && p.id !== "custom" && presetRange(p.id).from === filters.from && presetRange(p.id).to === filters.to);
+  const period: PeriodId = customOpen ? "custom" : !hasDates ? "all" : (preset?.id ?? "custom");
+  const choosePeriod = (id: PeriodId) => {
+    if (id === "custom") {
+      setCustomOpen(true);
+      if (!hasDates) patch({ from: snapshot.tickets.map((t) => t.reportedOn || t.createdOn).filter(Boolean).sort()[0] || today, to: today });
+      return;
+    }
+    setCustomOpen(false);
+    patch(presetRange(id));
+  };
+  const periodLabel = !hasDates ? "All time" : period === "year" ? "This year" : period !== "custom" && preset ? `Last ${preset.label}` : `${filters.from ? shortDay(filters.from) : "Start"} – ${filters.to ? shortDay(filters.to) : "today"}`;
+
+  const comparison = useMemo(() => {
+    if (!filters.from || !filters.to || filters.from > filters.to) return null;
+    const days = daysBetween(filters.from, filters.to);
+    const previous = filterBusinessTickets(snapshot.tickets, { ...filters, from: shiftDay(filters.from, -days), to: shiftDay(filters.from, -1) }).length;
+    return { days, previous };
+  }, [snapshot.tickets, filters]);
+
+  const pick: PickFilter = (key, value, second) => {
+    const clear = filters[key] === value && (!second || filters[second[0]] === second[1]);
+    patch({ [key]: clear ? "" : value, ...(second ? { [second[0]]: clear ? "" : second[1] } : {}) });
+  };
+  const toggle = (key: Dimension, value: string) => patch({ [key]: filters[key] === value ? "" : value });
+  const options = (key: Dimension) => {
+    const frame = filterBusinessTickets(snapshot.tickets, { ...filters, [key]: "" });
+    const counts = new Map(ranking(frame, key, sources, 100000).map((r) => [r.id, r.count]));
+    const ids = new Set(snapshot.tickets.map((t) => field(t, key)));
+    if (key === "source") snapshot.sources?.forEach((s) => ids.add(s.code));
+    if (filters[key]) ids.add(filters[key]);
+    return [...ids].map((id) => ({ id, name: names(key, id), count: counts.get(id) || 0 })).sort((a, b) => (a.id === MISSING ? 1 : b.id === MISSING ? -1 : a.name.localeCompare(b.name)));
+  };
+  const filterSelect = (key: Dimension, inline = false) => (
+    <FilterSelect key={key} inline={inline} label={LABELS[key]} value={filters[key]} allLabel={key === "source" ? "All sources" : key === "requestType" ? "All request types" : "All values"} options={options(key)} onChange={(value) => patch({ [key]: value })} />
+  );
+  const reset = () => {
+    setCustomOpen(false);
+    patch(parseBusinessFilters({}));
+  };
+  const csv = () => {
+    const url = URL.createObjectURL(new Blob([businessCsv(rows)], { type: "text/csv;charset=utf-8" }));
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `support-analytics-${filters.from || "all"}-${filters.to || "today"}.csv`;
+    a.click();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+    setExportOpen(false);
+  };
+
+  const totalNote = comparison
+    ? comparison.previous
+      ? `${rows.length >= comparison.previous ? "+" : "−"}${Math.abs(percent(rows.length - comparison.previous, comparison.previous))}% vs previous ${comparison.days} days (${comparison.previous})`
+      : `No cases in the previous ${comparison.days} days`
+    : selectionCount
+      ? `${percent(rows.length, snapshot.tickets.length)}% of all ${snapshot.tickets.length.toLocaleString()} cases`
+      : "Every recorded case";
+
+  return (
+    <div className="ov-board" aria-busy={refreshing}>
+      <header className="ov-head">
+        <div className="ov-head-title">
+          <h2>Support overview</h2>
+          <p role="status" aria-live="polite">
+            <strong>{rows.length.toLocaleString()}</strong> of {snapshot.tickets.length.toLocaleString()} cases · {periodLabel}
+            {selectionCount > Number(hasDates) ? ` · ${selectionCount - Number(hasDates)} filter${selectionCount - Number(hasDates) === 1 ? "" : "s"}` : ""}
+          </p>
+        </div>
+        <div className="ov-head-actions no-print">
+          <div className="ov-live" role="status" data-state={error ? "error" : refreshing ? "busy" : "ok"}>
+            <i aria-hidden="true" />
+            <span>{refreshing ? "Checking for updates…" : preview && !previewLoader ? "Design preview" : error ? "Update paused" : "Live · every 15s"}</span>
+            <small>Updated {formatDateTime(snapshot.asOf)}</small>
+          </div>
+          <button type="button" className="ov-button is-icon" onClick={() => void refresh()} disabled={refreshing || (preview && !previewLoader)} aria-label="Refresh analytics" title="Refresh">
+            <RefreshCw size={16} className={refreshing ? "animate-spin" : ""} />
+          </button>
+          <div className="ov-export" ref={exportRef}>
+            <button type="button" className="ov-button" aria-expanded={exportOpen} aria-haspopup="menu" onClick={() => setExportOpen((v) => !v)}>
+              <ArrowDownToLine size={16} />Export<ChevronDown size={14} />
+            </button>
+            {exportOpen && (
+              <div className="ov-export-menu" role="menu">
+                <button type="button" role="menuitem" onClick={csv}><Table2 size={16} /><span>CSV<small>{rows.length.toLocaleString()} matching cases</small></span></button>
+                <button type="button" role="menuitem" onClick={() => { setExportOpen(false); requestAnimationFrame(() => window.print()); }}><FileText size={16} /><span>PDF<small>Print this dashboard</small></span></button>
+              </div>
+            )}
+          </div>
+          {!preview && <Link className="ov-button is-primary" href={`/tickets?scope=dashboard&view=all&${query}`}>View matching cases<ArrowUpRight size={16} /></Link>}
+        </div>
+      </header>
+
+      <div className="ov-filterbar no-print">
+        <div className="ov-filterbar-main">
+          <div className="ov-segmented" role="group" aria-label="Period">
+            {PERIODS.map((p) => <button type="button" key={p.id} aria-pressed={period === p.id} onClick={() => choosePeriod(p.id)}>{p.label}</button>)}
+          </div>
+          {filterSelect("source", true)}
+          {filterSelect("requestType", true)}
+          <button type="button" className={`ov-button ov-more ${filterOpen ? "is-active" : ""}`} aria-expanded={filterOpen} aria-controls="ov-filters" onClick={() => setFilterOpen((v) => !v)}>
+            <SlidersHorizontal size={16} />More filters{selectionCount > 0 && <span className="ov-count-tag">{selectionCount}</span>}
+          </button>
+        </div>
+        {period === "custom" && (
+          <div className="ov-dates">
+            <label>From<input type="date" value={filters.from} max={filters.to || undefined} onChange={(e) => patch({ from: e.target.value })} /></label>
+            <label>To<input type="date" value={filters.to} min={filters.from || undefined} onChange={(e) => patch({ to: e.target.value })} /></label>
+            <button type="button" className="ov-link" onClick={() => choosePeriod("all")}>Clear period</button>
+          </div>
+        )}
+        <div id="ov-filters" className={`ov-filter-panel ${filterOpen ? "is-open" : ""}`} inert={!filterOpen} aria-hidden={!filterOpen}>
+          <div>
+            <div className="ov-filter-inner">
+              <div className="ov-filter-grid">
+                <FilterSelect allowAll={false} label="Date basis" value={filters.basis} allLabel="Reported date" options={(Object.keys(BASIS_LABELS) as BusinessFilters["basis"][]).map((id) => ({ id, name: BASIS_LABELS[id] }))} onChange={(value) => patch({ basis: value as BusinessFilters["basis"] })} />
+                {MAIN.map((key) => filterSelect(key))}
+              </div>
+              <details className="ov-context-filters">
+                <summary>Context · payments, schools, platform and record origin</summary>
+                <div className="ov-filter-grid">{CONTEXT.map((key) => filterSelect(key))}</div>
+                <p className="ov-footnote">Fawry-related is a recorded flag, not a payment failure or transaction count.</p>
+              </details>
+              <div className="ov-filter-bottom">
+                <label className="ov-search"><span>Find a case</span><Search size={16} aria-hidden="true" /><input type="search" value={filters.q} placeholder="Case, customer, school or problem" onChange={(e) => patch({ q: e.target.value })} /></label>
+                <button type="button" className="ov-button" onClick={() => setFilterOpen(false)}>Done</button>
+              </div>
+            </div>
+          </div>
+        </div>
+        {selectionCount > 0 && (
+          <div className="ov-chips">
+            {active.map((key) => <button type="button" key={key} onClick={() => patch({ [key]: "" })} aria-label={`Clear ${LABELS[key]}: ${names(key, filters[key])}`}><span>{LABELS[key]}</span>{names(key, filters[key])}<X size={14} /></button>)}
+            {hasDates && <button type="button" onClick={() => choosePeriod("all")} aria-label="Clear period"><span>Period</span>{filters.from ? shortDay(filters.from) : "Start"} – {filters.to ? shortDay(filters.to) : "Present"}<X size={14} /></button>}
+            {filters.q && <button type="button" onClick={() => patch({ q: "" })} aria-label="Clear search"><span>Search</span>{filters.q}<X size={14} /></button>}
+            {filters.basis !== "reported" && <button type="button" onClick={() => patch({ basis: "reported" })} aria-label="Reset date basis"><span>Date basis</span>{BASIS_LABELS[filters.basis]}<X size={14} /></button>}
+            <button type="button" className="ov-clear-all" onClick={reset}>Clear all</button>
+          </div>
+        )}
+      </div>
+
+      {invalidDates && <p className="ov-alert" role="alert">Start date must be on or before end date.</p>}
+      {error && <p className="ov-alert" role="status">{error}</p>}
+      <p className="ov-print-scope">Updated {formatDateTime(snapshot.asOf)} · {filters.from || "All dates"} – {filters.to || "present"} · {filters.basis} date · {active.map((k) => `${LABELS[k]}: ${names(k, filters[k])}`).join(" · ") || "All sources and dimensions"}</p>
+
+      <div className="ov-kpis">
+        <Kpi tone="total" label="Total cases" value={rows.length} note={totalNote} />
+        <Kpi tone="open" label="Needs follow-up" value={openInSelection} note={`${percent(openInSelection, rows.length)}% of selection · still open`} href="#ov-followup" action="See open cases" />
+        <Kpi tone="resolved" label="Marked resolved" value={resolved.length} note={`${percent(resolved.length, rows.length)}% of selection`} pressed={filters.status === "resolved"} onClick={() => toggle("status", "resolved")} action="Filter resolved cases" />
+        <Kpi tone="closed" label="Closed, no response" value={closed} note={`${percent(closed, rows.length)}% · separate from resolved`} pressed={filters.status === "closed"} onClick={() => toggle("status", "closed")} action="Filter closed cases" />
+        <Kpi tone="reopened" label="Ever reopened" value={reopened} note={`${percent(reopened, rows.length)}% of cases · ${reopenEvents} reopen event${reopenEvents === 1 ? "" : "s"}`} pressed={filters.reopened === "yes"} onClick={() => toggle("reopened", "yes")} action="Filter reopened cases" />
+      </div>
+
+      {rows.length === 0 ? (
+        <section className="ov-panel ov-blank">
+          <SearchX size={28} aria-hidden="true" />
+          <h3>No cases match this selection</h3>
+          <p>{invalidDates ? "The start date is after the end date." : "Widen the period or remove a filter to see cases again."}</p>
+          {selectionCount > 0 && <button type="button" className="ov-button is-primary" onClick={reset}>Clear all filters</button>}
+        </section>
+      ) : (
+        <>
+          <div className="ov-grid">
+            <Panel id="demand" size="lead" title="Case volume" subtitle={`By ${BASIS_LABELS[filters.basis].toLowerCase()}`} note={`${BASIS_NOTES[filters.basis]} Select a point to focus on that period.`}>
+              <DemandArea tickets={rows} filters={filters} asOf={snapshot.asOf} onPickRange={(from, to) => { setCustomOpen(true); patch({ from, to }); }} />
+            </Panel>
+            <div className="ov-stack">
+              <Panel id="status" title="Current status" subtitle="Where the selected cases stand now" note="Current status of the selected cases. Closed without response is separate from resolved.">
+                <StatusBreakdown tickets={rows} selected={filters.status} onPick={(status) => toggle("status", status)} />
+              </Panel>
+              <Panel id="attention" title="Needs attention" subtitle="Record review · flags may overlap">
+                <div className="ov-attention">
+                  <AttentionRow tone="warn" count={review.inconsistent.length} title="Resolved, but the issue persists" detail="Review the closure and recorded result" onClick={() => patch({ status: "resolved", outcome: "Issue Persists" })} />
+                  <AttentionRow count={review.incomplete.length} title="Classification incomplete" detail="At least one of five tracker fields is missing" />
+                  <AttentionRow count={review.missingReporter.length} title="No reporting owner" detail="Source is recorded, the individual is not" onClick={() => pick("reporterId", MISSING)} />
+                </div>
+              </Panel>
+            </div>
+          </div>
+
+          <SectionTitle title="Demand" subtitle="Who brings the work, and what it is about" />
+          <div className="ov-grid">
+            <Panel id="sources" size="wide" title="Sources by request type" subtitle="Each bar is one source · select a segment to filter both" meta={`${rows.length.toLocaleString()} cases`}>
+              <SourceMix tickets={rows} sources={sources} onPick={pick} />
+            </Panel>
+            <Panel id="problems" size="narrow" title="Most reported problems" subtitle="Tracker topics, exactly as recorded">
+              <Problems tickets={rows} onPick={pick} />
+            </Panel>
+          </div>
+
+          <SectionTitle title="Diagnosis and results" subtitle="Recorded causes, what Support did, and how it ended" />
+          <div className="ov-grid">
+            <Panel id="causes" size="third" title="Recorded causes" subtitle="Bars: cases · line: cumulative share" note="Pareto of recorded cause labels, shown as stored. The cumulative line uses cases with a recorded cause only.">
+              <CausePareto tickets={rows} onPick={pick} />
+            </Panel>
+            <Panel id="actions" size="third" title="From action to result" subtitle="Currently resolved cases" meta={`${resolved.length.toLocaleString()} resolved`} note="Most frequent recorded result for each action. Association is not proof of effectiveness.">
+              <Handling tickets={resolved} onPick={pick} />
+            </Panel>
+            <Panel id="outcomes" size="third" title="Resolution outcomes" subtitle="Each resolved case counted once" note="Marked resolved is a status, not proof of a confirmed fix. Unknown results remain visible.">
+              <OutcomeDonut tickets={resolved} onPick={pick} />
+            </Panel>
+          </div>
+
+          <SectionTitle title="Geography" subtitle="Where cases are reported from" />
+          <Panel id="geography" size="full" title="Cases by recorded city or area" subtitle="Marker size follows case count" note="Points are city, area or country reference points, not customer addresses. Unknown locations stay outside the map. Boundaries: Natural Earth / world-atlas. Places: GeoNames (CC BY). No external geocoding.">
+            <LocationMap tickets={rows} cities={cities} onPick={pick} />
+          </Panel>
+        </>
+      )}
+
+      <SectionTitle id="ov-followup" title="Follow-up" subtitle="Open cases across all dates, within the other filters" />
+      {open.length > 0 ? (
+        <CaseTable tickets={open} query={businessQuery({ ...filters, from: "", to: "" })} preview={preview} asOf={snapshot.asOf} />
+      ) : (
+        <section className="ov-panel ov-blank is-quiet">
+          <h3>No open cases to follow up</h3>
+          <p>Source and other filters apply; the date range does not hide older open work.</p>
+        </section>
+      )}
+
+      <Coverage total={rows.length} classified={rows.length - review.incomplete.length} resolved={resolved.length} timestamped={resolved.filter((t) => t.resolvedAt).length} historical={rows.filter((t) => t.isHistorical).length} nativeComplete={eligible} />
+      <footer className="ov-footer">Each case is counted once. Reopen events are separate from unique reopened cases. Missing data is never inferred.</footer>
+    </div>
+  );
 }
-function SectionTitle({title,subtitle}:{title:string;subtitle:string}){return <div className="sp-section-title"><h3>{title}</h3><p>{subtitle}</p></div>;}
-function Panel({id,title,subtitle,meta,size="half",children}:{id:string;title:string;subtitle:string;meta?:string;size?:"half"|"wide"|"narrow"|"full";children:ReactNode}){return <section className={`sp-panel sp-${size}`} data-chart={id} style={{viewTransitionName:`sp-${id}`}}><header><h3>{title}</h3>{meta&&<span>{meta}</span>}</header><p className="sp-panel-subtitle">{subtitle}</p>{children}</section>;}
-function FilterSelect({label,value,allLabel,options,onChange,allowAll=true}:{label:string;value:string;allLabel:string;options:{id:string;name:string;count?:number}[];allowAll?:boolean;onChange:(value:string)=>void}){
- const id=useId(),display=options.find(o=>o.id===value)?.name||allLabel;
- return <div className={`bia-filter sp-filter ${value&&allowAll?"has-selection":""}`}><label id={id}>{label}</label><div><Select value={value||"__all__"} onValueChange={v=>onChange(v==="__all__"?"":String(v??""))}><SelectTrigger aria-labelledby={id} className="bia-select-trigger" title={display}><SelectValue>{display}</SelectValue></SelectTrigger><SelectContent align="start" alignItemWithTrigger={false} className="bia-select-menu sp-select-menu">{allowAll&&<SelectItem value="__all__">{allLabel}</SelectItem>}{options.map(o=><SelectItem key={o.id} value={o.id}><span className="bia-select-option"><span>{o.name}</span>{o.count!==undefined&&<small>{o.count.toLocaleString()}</small>}</span></SelectItem>)}</SelectContent></Select>{value&&allowAll&&<button type="button" className="sp-filter-clear" aria-label={`Clear ${label}`} onClick={()=>onChange("")}><X size={14}/></button>}</div></div>;
+
+function SectionTitle({ id, title, subtitle }: { id?: string; title: string; subtitle: string }) {
+  return (
+    <div className="ov-section-title" id={id}>
+      <h3>{title}</h3>
+      <p>{subtitle}</p>
+    </div>
+  );
 }
-function CaseTable({tickets,query,preview}:{tickets:BusinessTicket[];query:string;preview:boolean}){
- const [page,setPage]=useState(1),pages=Math.max(1,Math.ceil(tickets.length/8)),current=Math.min(page,pages);const [prior,setPrior]=useState(query);if(prior!==query){setPrior(query);setPage(1);}
- return <section className="bia-case-section"><header><h3>Cases to review</h3><span>{tickets.length} open · all dates</span></header><div className="bia-table-wrap"><table><thead><tr><th>Case / problem</th><th>Source / reporter</th><th>Status</th><th>Support assignee</th><th>Reopened</th><th>Last activity</th></tr></thead><tbody>{tickets.slice((current-1)*8,current*8).map(t=><tr key={t.id}><td><Link href={preview?"#preview":`/tickets/${t.id}?returnTo=${encodeURIComponent(`/dashboard?${query}`)}`}><strong>{t.number}</strong><span dir="auto">{t.subject}</span></Link></td><td dir="auto">{t.sourceName||displayValue("source",t.source,[])}<small>{t.reporter||"Not recorded"}</small></td><td>{displayValue("status",t.status,[])}</td><td>{t.assignee||"Unassigned"}</td><td>{t.reopenCount||0}</td><td>{formatDateTime(lastActivity(t))}</td></tr>)}</tbody></table></div><footer><span>Page {current} of {pages}</span><div><button type="button" disabled={current<=1} onClick={()=>setPage(current-1)}>Previous</button><button type="button" disabled={current>=pages} onClick={()=>setPage(current+1)}>Next</button></div></footer></section>;
+
+function Panel({ id, title, subtitle, meta, note, size = "half", children }: { id: string; title: string; subtitle: string; meta?: string; note?: string; size?: "half" | "lead" | "wide" | "narrow" | "third" | "full"; children: ReactNode }) {
+  const [noteOpen, setNoteOpen] = useState(false);
+  const noteId = useId();
+  return (
+    <section className={`ov-panel ov-${size}`} data-chart={id}>
+      <header>
+        <div>
+          <h3>{title}</h3>
+          <p>{subtitle}</p>
+        </div>
+        {meta && <span className="ov-panel-meta">{meta}</span>}
+        {note && (
+          <button type="button" className="ov-info no-print" aria-expanded={noteOpen} aria-controls={noteId} aria-label={`About ${title}`} onClick={() => setNoteOpen((v) => !v)}>
+            <Info size={16} />
+          </button>
+        )}
+      </header>
+      {note && <p id={noteId} className={`ov-note ${noteOpen ? "is-open" : ""}`}>{note}</p>}
+      {children}
+    </section>
+  );
+}
+
+type KpiProps = { tone: "total" | "open" | "resolved" | "closed" | "reopened"; label: string; value: number; note: string; action?: string; href?: string; pressed?: boolean; onClick?: () => void };
+function Kpi({ tone, label, value, note, action, href, pressed, onClick }: KpiProps) {
+  const body = (
+    <>
+      <span className="ov-kpi-label"><i aria-hidden="true" />{label}</span>
+      <strong><Count value={value} /></strong>
+      <small>{note}</small>
+    </>
+  );
+  if (href) return <a className="ov-kpi" data-tone={tone} href={href} aria-label={`${label}: ${value}. ${action}`}>{body}</a>;
+  if (onClick) return <button type="button" className="ov-kpi" data-tone={tone} aria-pressed={pressed} onClick={onClick} title={action}>{body}</button>;
+  return <div className="ov-kpi" data-tone={tone}>{body}</div>;
+}
+
+function AttentionRow({ count, title, detail, tone, onClick }: { count: number; title: string; detail: string; tone?: "warn"; onClick?: () => void }) {
+  const body = (
+    <>
+      <b data-tone={count && tone ? tone : undefined}>{count.toLocaleString()}</b>
+      <span>{title}<small>{detail}</small></span>
+      {onClick && count > 0 && <ChevronRight size={16} aria-hidden="true" />}
+    </>
+  );
+  return onClick ? <button type="button" disabled={!count} onClick={onClick}>{body}</button> : <div>{body}</div>;
+}
+
+function FilterSelect({ label, value, allLabel, options, onChange, allowAll = true, inline = false }: { label: string; value: string; allLabel: string; options: { id: string; name: string; count?: number }[]; allowAll?: boolean; inline?: boolean; onChange: (value: string) => void }) {
+  const id = useId();
+  const display = options.find((o) => o.id === value)?.name || allLabel;
+  return (
+    <div className={`ov-filter ${inline ? "is-inline" : ""} ${value && allowAll ? "has-selection" : ""}`}>
+      <label id={id}>{label}</label>
+      <div>
+        <Select value={value || "__all__"} onValueChange={(v) => onChange(v === "__all__" ? "" : String(v ?? ""))}>
+          <SelectTrigger aria-labelledby={id} className="ov-select-trigger" title={display}>
+            <SelectValue>{display}</SelectValue>
+          </SelectTrigger>
+          <SelectContent align="start" alignItemWithTrigger={false} className="ov-select-menu">
+            {allowAll && <SelectItem value="__all__">{allLabel}</SelectItem>}
+            {options.map((o) => (
+              <SelectItem key={o.id} value={o.id}>
+                <span className="ov-select-option"><span>{o.name}</span>{o.count !== undefined && <small>{o.count.toLocaleString()}</small>}</span>
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        {value && allowAll && <button type="button" className="ov-filter-clear" aria-label={`Clear ${label}`} onClick={() => onChange("")}><X size={14} /></button>}
+      </div>
+    </div>
+  );
 }
