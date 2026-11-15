@@ -1,0 +1,157 @@
+/*
+ * One look for indicators and form controls on every signed-in screen, taken from the dashboard.
+ *
+ * Screen stylesheets load after this file and style their own controls, so the shared rules are
+ * scoped with :is(#main-content, .workspace-main): :is() takes the specificity of its most
+ * specific argument, which lets these rules win without !important and without editing each screen.
+ */
+:root {
+  --ui-ink: #15171c;
+  --ui-sub: #5a5f6b;
+  --ui-line: #e4e6eb;
+  --ui-line-strong: #d3d7de;
+  --ui-line-hover: #bcc2cc;
+  --ui-quiet: #f6f7f9;
+  --ui-forest: #183e2e;
+  --ui-forest-hover: #23583f;
+  --ui-tint: #e7ece3;
+  --ui-tint-line: #cdd8ca;
+  --ui-danger: #b3261e;
+  --ui-radius: 8px;
+  --ui-control: 36px;
+  --ui-control-text: 13px;
+  --ui-ring: 0 0 0 3px rgb(24 62 46 / 0.12);
+  --ui-ring-danger: 0 0 0 3px rgb(179 38 30 / 0.12);
+  --ui-chevron: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%235a5f6b' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+}
+/* Touch targets, and 16px text so iOS does not zoom the page on focus. */
+@media (max-width: 640px) {
+  :root { --ui-control: 44px; --ui-control-text: 16px; }
+}
+
+/* Indicators */
+.stat-card { position: relative; display: flex; flex-direction: column; min-width: 0; padding: 16px; border: 1px solid var(--ui-line); border-radius: 12px; background: #fff; box-shadow: 0 1px 2px rgb(21 23 28 / 0.04), 0 1px 1px rgb(21 23 28 / 0.02); color: var(--ui-ink); text-align: left; text-decoration: none; transition: border-color 0.16s, box-shadow 0.16s, background-color 0.16s, transform 0.16s; }
+.stat-card[data-tone="total"] { --stat: #183e2e; --stat-on: #fff; --stat-text: #183e2e; --stat-bg: #e7ece3; }
+.stat-card[data-tone="open"] { --stat: #f5c21b; --stat-on: #3f2f00; --stat-text: #8a6200; --stat-bg: #fdf3cf; }
+.stat-card[data-tone="waiting"] { --stat: #3f97d3; --stat-on: #fff; --stat-text: #1f6ea6; --stat-bg: #e1f0fa; }
+.stat-card[data-tone="resolved"] { --stat: #17a04a; --stat-on: #fff; --stat-text: #117a38; --stat-bg: #dff3e6; }
+.stat-card[data-tone="closed"] { --stat: #7b8479; --stat-on: #fff; --stat-text: #555d54; --stat-bg: #eceee9; }
+.stat-card[data-tone="reopened"] { --stat: #e8744f; --stat-on: #fff; --stat-text: #b8482a; --stat-bg: #fbe6de; }
+.stat-card:hover { border-color: var(--ui-line-strong); box-shadow: 0 6px 16px rgb(21 23 28 / 0.07); transform: translateY(-1px); }
+.stat-card:focus-visible { outline: 2px solid var(--ui-forest); outline-offset: 2px; }
+.stat-card[aria-current="page"] { border-color: var(--stat-text); background: color-mix(in srgb, var(--stat-bg) 55%, #fff); box-shadow: 0 0 0 1px var(--stat-text); }
+.stat-card-top { display: flex; align-items: center; gap: 8px; min-width: 0; min-height: 36px; }
+.stat-card-icon { display: grid; place-items: center; width: 28px; height: 28px; border-radius: 9px; background: var(--stat); color: var(--stat-on); box-shadow: 0 2px 6px color-mix(in srgb, var(--stat) 35%, transparent); flex-shrink: 0; }
+.stat-card-label { flex: 1; min-width: 0; color: var(--ui-sub); font-size: 13px; line-height: 18px; font-weight: 500; text-wrap: balance; }
+.stat-card-figure { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; margin-top: 8px; }
+.stat-card strong { font-size: 32px; line-height: 36px; font-weight: 600; letter-spacing: -0.03em; font-variant-numeric: tabular-nums; }
+.stat-card-share { color: var(--stat-text); font-size: 14px; line-height: 20px; font-weight: 600; font-variant-numeric: tabular-nums; }
+.stat-card-meter { display: block; height: 6px; margin: 9px 0; border-radius: 3px; background: #eef0f3; overflow: hidden; }
+.stat-card-meter i { display: block; height: 100%; border-radius: 3px; background: var(--stat); transition: width 0.32s ease; }
+.stat-card small { margin-top: auto; padding-top: 6px; color: var(--ui-sub); font-size: 12px; line-height: 16px; }
+@media (prefers-reduced-motion: reduce) {
+  .stat-card, .stat-card-meter i { transition: none; }
+  .stat-card:hover { transform: none; }
+}
+
+/* Text fields, selects and text areas */
+:is(#main-content, .workspace-main, [data-slot="dialog-content"], [data-slot="sheet-content"]) :is(input:not([type="radio"], [type="checkbox"], [type="hidden"], [type="file"], [type="range"], [aria-hidden="true"]), select, textarea) {
+  border: 1px solid var(--ui-line-strong);
+  border-radius: var(--ui-radius);
+  background-color: #fff;
+  box-shadow: none;
+  outline: none;
+  font-size: var(--ui-control-text);
+  transition: border-color 0.16s, box-shadow 0.16s, background-color 0.16s;
+}
+:is(#main-content, .workspace-main, [data-slot="dialog-content"], [data-slot="sheet-content"]) :is(input:not([type="radio"], [type="checkbox"], [type="hidden"], [type="file"], [type="range"], [aria-hidden="true"]), select) {
+  height: var(--ui-control);
+  min-height: var(--ui-control);
+  padding-block: 0;
+}
+:is(#main-content, .workspace-main, [data-slot="dialog-content"], [data-slot="sheet-content"]) :is(input:not([type="radio"], [type="checkbox"], [type="hidden"], [type="file"], [type="range"], [aria-hidden="true"]), select, textarea):hover:not(:disabled, :focus) {
+  border-color: var(--ui-line-hover);
+}
+:is(#main-content, .workspace-main, [data-slot="dialog-content"], [data-slot="sheet-content"]) :is(input:not([type="radio"], [type="checkbox"], [type="hidden"], [type="file"], [type="range"], [aria-hidden="true"]), select, textarea):focus {
+  border-color: var(--ui-forest);
+  box-shadow: var(--ui-ring);
+  outline: none;
+}
+:is(#main-content, .workspace-main, [data-slot="dialog-content"], [data-slot="sheet-content"]) :is(input, select, textarea)[aria-invalid="true"] {
+  border-color: var(--ui-danger);
+}
+:is(#main-content, .workspace-main, [data-slot="dialog-content"], [data-slot="sheet-content"]) :is(input, select, textarea)[aria-invalid="true"]:focus {
+  box-shadow: var(--ui-ring-danger);
+}
+:is(#main-content, .workspace-main, [data-slot="dialog-content"], [data-slot="sheet-content"]) :is(input:not([type="radio"], [type="checkbox"], [type="hidden"], [type="file"], [type="range"], [aria-hidden="true"]), select, textarea):disabled {
+  border-color: var(--ui-tint-line);
+  background-color: var(--ui-tint);
+  color: var(--ui-forest);
+  opacity: 1;
+  cursor: not-allowed;
+}
+:is(#main-content, .workspace-main, [data-slot="dialog-content"], [data-slot="sheet-content"]) :is(input, textarea)::placeholder {
+  color: #8a909c;
+}
+:is(#main-content, .workspace-main, [data-slot="dialog-content"], [data-slot="sheet-content"]) select {
+  appearance: none;
+  padding-inline: 12px 32px;
+  background-image: var(--ui-chevron);
+  background-repeat: no-repeat;
+  background-position: right 10px center;
+  background-size: 16px;
+  text-overflow: ellipsis;
+  cursor: pointer;
+}
+:is(#main-content, .workspace-main) select:dir(rtl) { background-position: left 10px center; }
+/* Read-only values shown in a field's place take the disabled-field look. */
+:is(#main-content, .workspace-main) .intake-fixed-source { display: flex; align-items: center; min-height: var(--ui-control); padding: 0 12px; border: 1px solid var(--ui-tint-line); border-radius: var(--ui-radius); background: var(--ui-tint); color: var(--ui-forest); font-size: var(--ui-control-text); }
+
+/* Searches that draw the frame on a wrapper: the frame takes the shared look, the input stays bare. */
+:is(#main-content, .workspace-main) :is(.desk-queue-search > div, header > form) {
+  min-height: var(--ui-control);
+  border: 1px solid var(--ui-line-strong);
+  border-radius: var(--ui-radius);
+  background: #fff;
+  transition: border-color 0.16s, box-shadow 0.16s;
+}
+:is(#main-content, .workspace-main) :is(.desk-queue-search > div, header > form):hover { border-color: var(--ui-line-hover); }
+:is(#main-content, .workspace-main) :is(.desk-queue-search > div, header > form):focus-within { border-color: var(--ui-forest); box-shadow: var(--ui-ring); }
+:is(#main-content, .workspace-main) :is(.desk-queue-search, header > form) input,
+:is(#main-content, .workspace-main) :is(.desk-queue-search, header > form) input:is(:hover, :focus) {
+  height: calc(var(--ui-control) - 2px);
+  min-height: 0;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+/* Sort and page-size selects that used to sit bare beside their label. */
+:is(#main-content, .workspace-main) :is(.queue-order, .queue-page-size, .desk-queue-sort) select { color: var(--ui-ink); }
+:is(#main-content, .workspace-main) .queue-v2 .desk-field.is-selected select { border-color: var(--ui-tint-line); background-color: var(--ui-tint); color: var(--ui-forest); font-weight: 500; box-shadow: none; }
+
+/* Segmented choices (radio groups) */
+:is(#main-content, .workspace-main) .intake-choice > div { gap: 2px; padding: 3px; border: 1px solid var(--ui-line); border-radius: 9px; background: var(--ui-quiet); }
+:is(#main-content, .workspace-main) .intake-choice[aria-invalid="true"] > div { border-color: var(--ui-danger); }
+:is(#main-content, .workspace-main) .intake-choice label > span { min-height: calc(var(--ui-control) - 8px); padding: 4px 8px; border: 0; border-radius: 6px; color: var(--ui-sub); font-size: 13px; line-height: 18px; font-weight: 500; transition: background-color 0.16s, color 0.16s, box-shadow 0.16s; }
+:is(#main-content, .workspace-main) .intake-choice label:hover > span { color: var(--ui-ink); }
+:is(#main-content, .workspace-main) .intake-choice label:has(:checked) > span { background: var(--ui-forest); color: #fff; box-shadow: 0 1px 2px rgb(24 62 46 / 0.3); }
+:is(#main-content, .workspace-main) .intake-choice label:has(:focus-visible) > span { outline: 2px solid var(--ui-forest); outline-offset: 2px; }
+
+/* View tabs */
+:is(#main-content, .workspace-main) :is(.portal-tabs, .desk-queue-views) a { min-height: var(--ui-control); padding: 6px 11px; border: 1px solid transparent; border-radius: var(--ui-radius); color: var(--ui-sub); font-size: 13px; font-weight: 500; transition: background-color 0.16s, color 0.16s; }
+:is(#main-content, .workspace-main) :is(.portal-tabs, .desk-queue-views) a:hover { background: var(--ui-quiet); color: var(--ui-ink); }
+:is(#main-content, .workspace-main) :is(.portal-tabs, .desk-queue-views) a > :is(span:last-child, b) { display: inline-block; min-width: 0; height: auto; border-radius: 999px; padding: 2px 7px; background: #eef0f3; color: var(--ui-sub); font: 600 11px/16px var(--font-sans), sans-serif; font-variant-numeric: tabular-nums; }
+:is(#main-content, .workspace-main) :is(.portal-tabs, .desk-queue-views) a[aria-current="page"] { border-color: var(--ui-forest); background: var(--ui-forest); color: #fff; }
+:is(#main-content, .workspace-main) :is(.portal-tabs, .desk-queue-views) a[aria-current="page"] > :is(span:last-child, b) { background: rgb(255 255 255 / 0.18); color: #fff; }
+:is(#main-content, .workspace-main) .desk-queue-views { padding-bottom: 10px; }
+
+/* Buttons that sit in the same row as a field */
+:is(#main-content, .workspace-main) :is(.portal-search button, .portal-refresh button) { min-height: var(--ui-control); padding: 7px 14px; border: 1px solid var(--ui-line-strong); border-radius: var(--ui-radius); background: #fff; color: var(--ui-ink); font-size: 13px; font-weight: 500; transition: background-color 0.16s, border-color 0.16s; }
+:is(#main-content, .workspace-main) :is(.portal-search button, .portal-refresh button):hover:not(:disabled) { border-color: var(--ui-line-hover); background: var(--ui-quiet); }
+:is(#main-content, .workspace-main) .portal-search button[type="submit"] { border-color: var(--ui-forest); background: var(--ui-forest); color: #fff; }
+:is(#main-content, .workspace-main) .portal-search button[type="submit"]:hover:not(:disabled) { border-color: var(--ui-forest-hover); background: var(--ui-forest-hover); }
+:is(#main-content, .workspace-main) :is(.portal-primary, .queue-create) { min-height: var(--ui-control); border-radius: var(--ui-radius); background: var(--ui-forest); transition: background-color 0.16s; }
+:is(#main-content, .workspace-main) :is(.portal-primary, .queue-create):hover { background: var(--ui-forest-hover); }
+:is(#main-content, .workspace-main) .portal-view :is(a, button):focus-visible { outline: 2px solid var(--ui-forest); outline-offset: 2px; }
+:is(#main-content, .workspace-main) .portal-search-input > svg { top: 50%; transform: translateY(-50%); color: var(--ui-sub); }
