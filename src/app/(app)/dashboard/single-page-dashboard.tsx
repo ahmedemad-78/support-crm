@@ -19,7 +19,7 @@ type Props = { initialSnapshot: Snapshot; initialFilters: DashboardFilters | Bus
 
 const LABELS: Record<Dimension, string> = { source: "Source", status: "Status", requestType: "Request type", topic: "Problem topic", trackerCause: "Recorded cause", trackerAction: "Action taken", outcome: "Resolution outcome", assignee: "Support assignee", reporterId: "Reporting owner", school: "School", fawry: "Fawry-related flag", origin: "Record origin", reopened: "Ever reopened", platform: "Platform", appVersion: "App version", latestVersion: "Latest version?", city: "City / area", userType: "Customer type", category: "Intake category" };
 const MAIN: Dimension[] = ["status", "topic", "trackerCause", "trackerAction", "outcome", "reopened", "city", "assignee", "reporterId"];
-const CONTEXT: Dimension[] = ["fawry", "origin", "school", "userType", "platform", "appVersion", "latestVersion", "category"];
+const CONTEXT: Dimension[] = ["fawry", "school", "userType", "platform", "appVersion", "latestVersion", "category"];
 const BASIS_LABELS: Record<BusinessFilters["basis"], string> = { reported: "Reported date", created: "System creation date", resolved: "Latest resolution date" };
 const BASIS_NOTES: Record<BusinessFilters["basis"], string> = {
   reported: "Reported dates include historical records; they are different from when a case entered the system.",
@@ -217,7 +217,7 @@ export function DashboardBoard({ initialSnapshot, initialFilters, cities = [], c
                 {MAIN.map((key) => filterSelect(key))}
               </div>
               <details className="ov-context-filters">
-                <summary>Context · payments, schools, platform and record origin</summary>
+                <summary>Context · payments, schools and platform</summary>
                 <div className="ov-filter-grid">{CONTEXT.map((key) => filterSelect(key))}</div>
                 <p className="ov-footnote">Fawry-related is a recorded flag, not a payment failure or transaction count.</p>
               </details>
@@ -318,7 +318,7 @@ export function DashboardBoard({ initialSnapshot, initialFilters, cities = [], c
         </section>
       )}
 
-      <Coverage total={rows.length} classified={rows.length - review.incomplete.length} resolved={resolved.length} timestamped={resolved.filter((t) => t.resolvedAt).length} historical={rows.filter((t) => t.isHistorical).length} nativeComplete={eligible} />
+      <Coverage total={rows.length} classified={rows.length - review.incomplete.length} resolved={resolved.length} timestamped={resolved.filter((t) => t.resolvedAt).length} nativeComplete={eligible} />
       <footer className="ov-footer">Each case is counted once. Reopen events are separate from unique reopened cases. Missing data is never inferred.</footer>
     </div>
   );

@@ -89,12 +89,11 @@ export function CaseTable({ tickets, query, preview, asOf }: { tickets: Business
   );
 }
 
-export function Coverage({ total, classified, resolved, timestamped, historical, nativeComplete }: { total: number; classified: number; resolved: number; timestamped: number; historical: number; nativeComplete: number }) {
+export function Coverage({ total, classified, resolved, timestamped, nativeComplete }: { total: number; classified: number; resolved: number; timestamped: number; nativeComplete: number }) {
   const items = [
     { label: "Fully classified", detail: "All five tracker fields recorded", part: classified, whole: total },
     { label: "Resolution timestamp", detail: "Resolved cases with a recorded time", part: timestamped, whole: resolved },
     { label: "Complete native history", detail: "Usable for timing comparisons", part: nativeComplete, whole: total },
-    { label: "Historical imports", detail: "No workflow events are inferred", part: historical, whole: total },
   ];
   return (
     <section className="ov-coverage" aria-label="Record coverage">
