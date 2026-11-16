@@ -20,7 +20,7 @@ const f=(overrides={})=>m.parseBusinessFilters(overrides);
 test('chart tooltips contain the same text in server HTML instead of empty SVG titles',()=>{
  const React=require('react'),{renderToStaticMarkup}=require('react-dom/server');
  const compiled=ts.transpileModule(readFileSync(new URL('../src/app/(app)/dashboard/single-page-charts.tsx',import.meta.url),'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022,jsx:ts.JsxEmit.ReactJSX,esModuleInterop:true}}).outputText;
- const sandbox={exports:{}};const localRequire=(name)=>name==='@/lib/tickets/business-analytics'?m:name==='@/lib/tickets/single-page-model'?single:name==='@/lib/tickets/world-countries.json'?require(join(directory,'world-countries.json')):require(name);
+ const sandbox={exports:{}};const localRequire=(name)=>name==='./case-map'?{CaseMap:({fallback})=>fallback}:name==='@/lib/tickets/business-analytics'?m:name==='@/lib/tickets/single-page-model'?single:name==='@/lib/tickets/world-countries.json'?require(join(directory,'world-countries.json')):require(name);
  vm.runInNewContext(compiled,{require:localRequire,exports:sandbox.exports,module:sandbox});
  const charts=sandbox.exports,tickets=[ticket()];const components=[['DemandArea',{tickets,filters:f(),asOf}],['SourceMix',{tickets,sources:new Map(),onPick:()=>{}}],['OutcomeDonut',{tickets,onPick:()=>{}}],['LocationMap',{tickets,cities:[{id:'1',name:'Cairo'}],onPick:()=>{}}]];
  for(const [name,props]of components){const html=renderToStaticMarkup(React.createElement(charts[name],props)),titles=[...html.matchAll(/<title>(.*?)<\/title>/g)].map(x=>x[1]);assert.ok(titles.length>0,name);assert.ok(titles.every(text=>text.trim().length>0),name+' must serialize nonempty SVG titles');}
@@ -113,7 +113,7 @@ test('loader cursor-pages more than 500 tickets and more than 500 workflow event
 test('volume chart gives a source the same colour in every period',()=>{
  const React=require('react'),{renderToStaticMarkup}=require('react-dom/server');
  const compiled=ts.transpileModule(readFileSync(new URL('../src/app/(app)/dashboard/single-page-charts.tsx',import.meta.url),'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022,jsx:ts.JsxEmit.ReactJSX,esModuleInterop:true}}).outputText;
- const sandbox={exports:{}};const localRequire=(name)=>name==='@/lib/tickets/business-analytics'?m:name==='@/lib/tickets/single-page-model'?single:name==='@/lib/tickets/world-countries.json'?require(join(directory,'world-countries.json')):require(name);
+ const sandbox={exports:{}};const localRequire=(name)=>name==='./case-map'?{CaseMap:({fallback})=>fallback}:name==='@/lib/tickets/business-analytics'?m:name==='@/lib/tickets/single-page-model'?single:name==='@/lib/tickets/world-countries.json'?require(join(directory,'world-countries.json')):require(name);
  vm.runInNewContext(compiled,{require:localRequire,exports:sandbox.exports,module:sandbox});
  const sources=new Map([['whatsapp','WhatsApp'],['call_center','Call Center'],['june_schools','30 June Schools'],['new_desk','New desk']]);
  assert.equal(new Set([...sources.keys()].map(id=>sandbox.exports.sourceColor(id,sources))).size,4);

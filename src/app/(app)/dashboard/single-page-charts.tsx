@@ -3,6 +3,7 @@ import { useEffect, useId, useMemo, useRef, useState, type KeyboardEvent, type P
 import { MISSING, field, ranking, timeBuckets, type BusinessFilters, type BusinessTicket, type Bucket, type Dimension, type Rank } from "@/lib/tickets/business-analytics";
 import { clusteredSources, geographicCases } from "@/lib/tickets/single-page-model";
 import countries from "@/lib/tickets/world-countries.json";
+import { CaseMap } from "./case-map";
 
 export type PickFilter = (key: Dimension, value: string, second?: [Dimension, string]) => void;
 
@@ -589,6 +590,7 @@ export function LocationMap({ tickets, cities, onPick }: { tickets: BusinessTick
   const geo = useMemo(() => geographicCases(tickets, cities), [tickets, cities]);
   const marks = geo.locations.filter((l) => l.place);
   const max = Math.max(1, ...geo.locations.map((m) => m.count));
+  const glMarks = useMemo(() => geo.locations.filter((l) => l.place).map((l) => ({ id: l.id, name: l.name, count: l.count, lon: l.place!.lon, lat: l.place!.lat, level: l.place!.level })), [geo]);
   const lon = marks.map((m) => m.place!.lon);
   const lat = marks.map((m) => m.place!.lat);
   const bounds = world ? [-180, 180, -58, 85] : [Math.min(24, ...lon) - 3, Math.max(37, ...lon) + 3, Math.min(22, ...lat) - 2, Math.max(33, ...lat) + 2];
@@ -607,6 +609,7 @@ export function LocationMap({ tickets, cities, onPick }: { tickets: BusinessTick
         </div>
       </div>
       <div className="ov-map-layout">
+        <CaseMap world={world} label={`Case concentration by recorded location. ${geo.mapped} mapped, ${geo.missing} unknown, ${geo.unmapped} unmapped. Points are area references, not customer addresses.`} onPick={(cityId) => onPick("city", cityId)} marks={glMarks} fallback={
         <svg className="ov-map" viewBox="0 0 800 350" role="group" aria-label={`Case concentration by recorded location. ${geo.mapped} mapped, ${geo.missing} unknown, ${geo.unmapped} unmapped. Points are area references, not customer addresses.`}>
           <defs>
             <radialGradient id={`${id}-halo`}>
@@ -634,6 +637,7 @@ export function LocationMap({ tickets, cities, onPick }: { tickets: BusinessTick
           })}
           {!geo.mapped && <text x="400" y="180" textAnchor="middle" fill="#5a5f6b" fontSize="16">No mapped locations in this selection</text>}
         </svg>
+        } />
         <div className="ov-location-list">
           <ol className="ov-rank is-compact">
             {geo.locations.map((m) => (

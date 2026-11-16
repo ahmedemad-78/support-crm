@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import { AlertCircle, ArrowLeft, ArrowUpRight, Check, LoaderCircle, Lock, Plus, UploadCloud } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { ATTACHMENT_RULES, ATTACHMENTS_BUCKET, END_USER_TYPE_LABELS, END_USER_TYPES, PLATFORM_LABELS, PLATFORMS, sourceLabel } from "@/lib/tickets/constants";
+import { CityCombo } from "./city-combo";
 import { INTAKE_LABELS, attachmentMime, checkIntakeFiles, initialIntakeDraft, isOtherCity, typedCity, uploadIntakeFiles, type IntakeField, type IntakeFile } from "@/lib/tickets/intake";
 import { intakeDraftErrors, needsSchool, type PortalTicketFieldErrors, type SupportTicketInput } from "@/lib/tickets/schema";
 import { createPortalTicket, createSupportTicket } from "./actions";
@@ -48,7 +49,7 @@ export function NewTicketForm({ cities, sources, reporters=[], lockedSource = "c
   const noun = sources ? "case" : "ticket";
   const otherCity=isOtherCity(cities.find(city=>String(city.id)===draft.city_id)?.name);
   const typedCityError=(value:Record<string,string>)=>typedCity(cities.find(city=>String(city.id)===value.city_id)?.name,value.city_other).error;
-  const invalid:PortalTicketFieldErrors={...intakeDraftErrors(juneIntakeDraft(draft,source),source,Boolean(sources)),...(typedCityError(draft)?{city_other:typedCityError(draft)}:{})};
+  const invalid:PortalTicketFieldErrors={...intakeDraftErrors(juneIntakeDraft(draft,source),source,Boolean(sources)),...(typedCityError(draft)?{city_id:typedCityError(draft)}:{})};
   const validField=(key:IntakeField)=>Boolean(draft[key]?.trim())&&!invalid[key];
   const june=source==="june_schools";
   const listedSchool=JUNE_SCHOOLS.find(school=>school.code===schoolPick);
@@ -57,12 +58,12 @@ export function NewTicketForm({ cities, sources, reporters=[], lockedSource = "c
   const labelOf=(key:IntakeField)=>june&&key==="end_user_type"?"Who is affected?":june&&key==="school_name"?"School":INTAKE_LABELS[key];
   const groups=june?[
     {name:"Reporting",keys:["issue_date",...(sources?["source","reporter_id"]:[])] as IntakeField[],target:"intake-routing"},
-    {name:"School",keys:["school_name",...(schoolPick&&!schoolCityKnown?["city_id",...(otherCity?["city_other"]:[])]:[])] as IntakeField[],target:"intake-school"},
+    {name:"School",keys:["school_name",...(schoolPick&&!schoolCityKnown?["city_id"]:[])] as IntakeField[],target:"intake-school"},
     {name:"The problem",keys:["school_issue_area","end_user_type","platform","school_update_requested","issue_description"] as IntakeField[],target:"intake-issue"},
   ]:[
     {name:"Reporting",keys:["issue_date",...(sources?["source","reporter_id"]:[])] as IntakeField[],target:"intake-routing"},
     {name:"The problem",keys:["issue_description"] as IntakeField[],target:"intake-issue"},
-    {name:"Customer",keys:["customer_name","end_user_type","city_id",...(otherCity?["city_other"]:[]),...(schoolRequired?["school_name"]:[])] as IntakeField[],target:"intake-customer"},
+    {name:"Customer",keys:["customer_name","end_user_type","city_id",...(schoolRequired?["school_name"]:[])] as IntakeField[],target:"intake-customer"},
     {name:"Technical context",keys:["platform",...(draft.platform==="web"?[]:["is_latest_version"]),"fawry_payment"] as IntakeField[],target:"intake-app"},
   ];
   const required = groups.flatMap((group) => group.keys);
@@ -138,7 +139,7 @@ export function NewTicketForm({ cities, sources, reporters=[], lockedSource = "c
     const submitted = juneIntakeDraft({ ...draft, ...Object.fromEntries([...new FormData(formRef.current!).entries()].filter(([, value]) => typeof value === "string")) }, source);
     setDraft(submitted);
     if(!otherCity)submitted.city_other="";
-    if(!existing){const next:PortalTicketFieldErrors={...intakeDraftErrors(submitted,source,Boolean(sources)),...(typedCityError(submitted)?{city_other:typedCityError(submitted)}:{})};if(Object.keys(next).length){showErrors(next);return;}submitMode.current=(event.nativeEvent as SubmitEvent).submitter?.getAttribute("value")==="another"?"another":"open";setBatchMessage("");}
+    if(!existing){const next:PortalTicketFieldErrors={...intakeDraftErrors(submitted,source,Boolean(sources)),...(typedCityError(submitted)?{city_id:typedCityError(submitted)}:{})};if(Object.keys(next).length){showErrors(next);return;}submitMode.current=(event.nativeEvent as SubmitEvent).submitter?.getAttribute("value")==="another"?"another":"open";setBatchMessage("");}
     setErrors({}); setFileIssues([]); inFlight.current = true;
     startTransition(async () => {
       try {
@@ -167,7 +168,8 @@ export function NewTicketForm({ cities, sources, reporters=[], lockedSource = "c
     return <FieldShell name={key} error={errors[key]} optional={optional}><select id={key} name={key} value={draft[key]} disabled={disabled} onChange={(event) => change(key, event.target.value)} aria-invalid={Boolean(errors[key])} aria-describedby={errors[key] ? `${key}-error` : undefined} required={!optional}><option value="">Choose…</option>{items.map((item) => <option value={item.value} key={item.value}>{item.label}</option>)}</select></FieldShell>;
   }
   function cityFields() {
-    return <>{select("city_id",cities.map(city=>({value:String(city.id),label:isOtherCity(city.name)?"Other (type it)":city.name})))}{otherCity&&field("city_other",{maxLength:80,placeholder:"e.g. Saudi Arabia",hint:"An administrator can add it to the list later."})}</>;
+    const error=errors.city_id||errors.city_other;
+    return <FieldShell name="city_id" error={error} hint={error?undefined:"Not in the list? Just type it."}><CityCombo cities={cities} cityId={draft.city_id} typed={otherCity?draft.city_other:""} invalid={Boolean(error)} describedBy={error?"city_id-error":"city_id-hint"} onPick={(cityId,typed)=>{setDraft(current=>({...current,city_id:cityId,city_other:typed}));setErrors(current=>{const next={...current};delete next.city_id;delete next.city_other;return next;});setFormError("");}} /></FieldShell>;
   }
   function choice(key: IntakeField, items: readonly { value: string; label: string }[], hint?: string, label: string = INTAKE_LABELS[key]) {
     return <fieldset className="intake-field intake-choice" data-intake-field={key} aria-invalid={Boolean(errors[key])} aria-describedby={errors[key] ? `${key}-error` : hint ? `${key}-hint` : undefined}><legend><span className="intake-label-text">{label}</span><span className="intake-field-status">Required</span></legend>{hint && <small id={`${key}-hint`}>{hint}</small>}<div>{items.map((item) => <label key={item.value}><input className="sr-only" type="radio" name={key} value={item.value} checked={draft[key] === item.value} onChange={() => change(key, item.value)} required /><span>{item.label}</span></label>)}</div>{errors[key] && <p id={`${key}-error`} className="intake-field-error">{errors[key]}</p>}</fieldset>;

@@ -341,6 +341,12 @@ button.ov-missing:not(:disabled):hover { color: var(--ov-ink); text-decoration: 
 .ov-coverage-line b { color: var(--ov-ink); font-weight: 600; }
 .ov-map-layout { display: grid; grid-template-columns: minmax(0, 1fr) 260px; gap: 24px; align-items: start; }
 .ov-map { display: block; width: 100%; height: auto; border: 1px solid var(--ov-line); border-radius: 10px; }
+.ov-map-gl { position: relative; height: 420px; border: 1px solid var(--ov-line); border-radius: 10px; overflow: hidden; background: #f4f7fa; }
+.ov-map-gl-canvas { position: absolute; inset: 0; }
+.ov-map-gl-wait { position: absolute; inset: 0; display: grid; place-items: center; color: var(--ov-sub); font-size: 13px; pointer-events: none; }
+.ov-map-gl .maplibregl-ctrl-group { border-radius: 8px; box-shadow: 0 1px 2px rgb(16 24 40 / 0.12), 0 0 0 1px var(--ov-line); }
+.ov-map-tip .maplibregl-popup-content { padding: 8px 10px; border-radius: 8px; font: 12px/16px var(--font-sans), sans-serif; color: var(--ov-sub); box-shadow: 0 6px 18px -6px rgb(16 24 40 / 0.3); }
+.ov-map-tip b { display: block; color: var(--ov-ink); font-size: 13px; font-weight: 600; }
 .ov-map [role="button"] { transition: fill-opacity 0.16s; }
 .ov-map [role="button"]:hover { fill-opacity: 1; }
 .ov-location-list { max-height: 340px; overflow-y: auto; padding-inline: 8px; margin-inline: -8px; }
