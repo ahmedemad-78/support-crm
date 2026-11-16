@@ -3,6 +3,7 @@ import { IBM_Plex_Mono, IBM_Plex_Sans } from "next/font/google";
 import { Toaster } from "@/components/ui/sonner";
 import "./globals.css";
 import "./operations.css";
+import "./controls.css";
 
 const plexSans = IBM_Plex_Sans({
   variable: "--font-plex-sans",

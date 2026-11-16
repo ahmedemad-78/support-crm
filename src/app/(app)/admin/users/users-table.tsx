@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState, useTransition } from "react";
-import { Lock, Search, Unlock } from "lucide-react";
+import { Lock, Search, ShieldCheck, Unlock } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -16,7 +16,7 @@ import {
 import { cn } from "@/lib/utils";
 import { ROLE_LABELS, type Role } from "@/lib/auth/roles";
 import { setUserActive, unlockUser, updateUser } from "./actions";
-import { PasswordField, RoleOptions } from "./fields";
+import { PasswordField, RoleIcon, RoleOptions } from "./fields";
 
 export type UserRow = {
   id: string;
@@ -27,15 +27,6 @@ export type UserRow = {
   isActive: boolean;
   lockedUntil: string | null;
   lastSignInAt: string | null;
-};
-
-const ROLE_CHIP: Record<Role, string> = {
-  support_agent: "bg-brand-tint text-brand-action",
-  moderation: "bg-status-awaiting-bg text-status-awaiting",
-  call_center: "bg-status-new-bg text-status-new",
-  june_schools: "bg-status-resolved-bg text-status-resolved",
-  business_development: "bg-status-closed-bg text-status-closed",
-  manager: "bg-status-progress-bg text-status-progress",
 };
 
 export function UsersTable({ rows, currentUserId }: { rows: UserRow[]; currentUserId: string }) {
@@ -78,12 +69,12 @@ export function UsersTable({ rows, currentUserId }: { rows: UserRow[]; currentUs
         </span>
       </div>
 
-      <div className="overflow-x-auto rounded-xl border">
+      <div className="relative overflow-x-auto rounded-xl border">
         <table className="w-full min-w-[680px] text-sm">
           <thead className="bg-muted text-left text-xs font-semibold tracking-wide text-muted-foreground uppercase">
             <tr>
               <th className="px-4 py-3">User</th>
-              <th className="w-60 px-4 py-3">Role</th>
+              <th className="w-64 px-4 py-3">Role</th>
               <th className="w-32 px-4 py-3">Status</th>
               <th className="w-36 px-4 py-3">Last sign-in</th>
               <th className="px-4 py-3"><span className="sr-only">Actions</span></th>
@@ -116,16 +107,13 @@ export function UsersTable({ rows, currentUserId }: { rows: UserRow[]; currentUs
                 </td>
                 <td className="px-4 py-3">
                   <div className="flex flex-wrap items-center gap-1.5">
-                    <span
-                      className={cn(
-                        "rounded-full px-2.5 py-0.5 text-xs font-semibold whitespace-nowrap",
-                        ROLE_CHIP[row.role],
-                      )}
-                    >
+                    <span className="role-chip">
+                      <RoleIcon role={row.role} size="sm" />
                       {ROLE_LABELS[row.role]}
                     </span>
                     {row.isAdmin && (
-                      <span className="rounded-full bg-foreground px-2 py-0.5 text-xs font-semibold text-background">
+                      <span className="role-admin">
+                        <ShieldCheck size={12} strokeWidth={2.25} aria-hidden="true" />
                         Admin
                       </span>
                     )}
@@ -199,7 +187,7 @@ function EditUserSheet({ user, isSelf, onClose }: { user: UserRow | null; isSelf
 
   return (
     <Sheet open onOpenChange={(open) => !open && onClose()}>
-      <SheetContent className="flex w-[400px] flex-col gap-0 p-0 sm:max-w-[400px]">
+      <SheetContent className="flex w-full max-w-[400px] flex-col gap-0 p-0 sm:max-w-[400px]">
         <SheetHeader className="border-b px-6 py-5">
           <SheetTitle>{user.fullName}</SheetTitle>
           <SheetDescription>{user.email}</SheetDescription>
@@ -252,7 +240,7 @@ function EditUserSheet({ user, isSelf, onClose }: { user: UserRow | null; isSelf
           {error && <p className="text-sm font-medium text-destructive">{error}</p>}
         </div>
 
-        <SheetFooter className="flex-row items-center gap-2.5 border-t px-6 py-4">
+        <SheetFooter className="flex-row flex-wrap items-center gap-2.5 border-t px-6 py-4">
           {!isSelf &&
             (user.isActive ? (
               <Button
