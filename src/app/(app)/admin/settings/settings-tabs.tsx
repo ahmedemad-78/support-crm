@@ -85,10 +85,12 @@ const settingsServerLayout = () => false;
 export function SettingsTabs({
   lists,
   sources,
+  typedCities = [],
   notificationRecipient,
 }: {
   lists: Record<ListTable, ListItem[]>;
   sources: SourceItem[];
+  typedCities?: { name: string; count: number }[];
   notificationRecipient: string;
 }) {
   const mobile = useSyncExternalStore(subscribeSettingsLayout, settingsIsMobile, settingsServerLayout);
@@ -117,7 +119,7 @@ export function SettingsTabs({
 
       {LISTS.map((l) => (
         <TabsContent key={l.table} value={l.table}>
-          <ListEditor table={l.table} items={lists[l.table]} hint={l.hint} addLabel={l.addLabel} />
+          <ListEditor table={l.table} items={lists[l.table]} hint={l.hint} addLabel={l.addLabel} suggestions={l.table === "cities" ? typedCities : []} />
         </TabsContent>
       ))}
       <TabsContent value="notifications">
@@ -148,11 +150,13 @@ function ListEditor({
   items,
   hint,
   addLabel,
+  suggestions = [],
 }: {
   table: ListTable;
   items: ListItem[];
   hint: string;
   addLabel: string;
+  suggestions?: { name: string; count: number }[];
 }) {
   const [newName, setNewName] = useState("");
   const { pending, run } = useAction();
@@ -176,6 +180,24 @@ function ListEditor({
           {addLabel}
         </Button>
       </form>
+
+      {suggestions.length > 0 && (
+        <div className="max-w-2xl rounded-lg border border-dashed p-4">
+          <p className="text-sm font-semibold">Typed by the team, not in the list yet</p>
+          <p className="mt-1 text-xs text-muted-foreground">Adding a name moves its cases from Other to the new city in reports and on the map.</p>
+          <ul className="mt-3 flex flex-wrap gap-2">
+            {suggestions.map((place) => (
+              <li key={place.name}>
+                <Button type="button" variant="outline" size="sm" disabled={pending} onClick={() => run(() => addListItem(table, place.name))}>
+                  <Plus />
+                  <span dir="auto">{place.name}</span>
+                  <span className="text-muted-foreground">{place.count} case{place.count === 1 ? "" : "s"}</span>
+                </Button>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
 
       <div className="overflow-hidden rounded-lg border">
         <table className="w-full text-sm">

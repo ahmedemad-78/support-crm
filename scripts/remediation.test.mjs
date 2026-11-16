@@ -415,3 +415,10 @@ test("school context stays structured, source-specific and readable for Support"
  assert.ok(schoolContext.schoolContextEntries(school.school_context).some(([label,text])=>label==="Issue type"&&text==="Grade not promoted"));
  assert.equal(schoolContext.intakeRecord(input,"call_center").school_context,null);assert.deepEqual(schoolContext.schoolContextEntries(null),[]);
 });
+
+test("a typed place is kept only with the Other city and is required there",()=>{
+ assert.deepEqual(intakeHelpers.typedCity("Other"," Saudi Arabia "),{value:"Saudi Arabia"});
+ assert.ok(intakeHelpers.typedCity("other","").error);assert.ok(intakeHelpers.typedCity("Other","x").error);
+ assert.deepEqual(intakeHelpers.typedCity("Cairo","Saudi Arabia"),{value:null});
+ assert.equal(intakeHelpers.cityLabel("Other","Riyadh"),"Riyadh");assert.equal(intakeHelpers.cityLabel("Cairo","Riyadh"),"Cairo");assert.equal(intakeHelpers.cityLabel("Other",null),"Other");
+});

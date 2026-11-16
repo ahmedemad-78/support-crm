@@ -36,6 +36,7 @@ const rawTicketSchema = z.object({
     .refine(validDay, "Pick a real date")
     .refine((d) => d <= todayInCairo(), "Date of issue can't be in the future"),
   city_id: z.coerce.number({ error: "Choose a city" }).int().positive("Choose a city"),
+  city_other: optionalText(80),
   end_user_type: z.enum(END_USER_TYPES, { error: "Choose the user type" }),
   platform: z.enum(PLATFORMS, { error: "Choose the platform" }),
   is_latest_version: z.string().optional().default(""),

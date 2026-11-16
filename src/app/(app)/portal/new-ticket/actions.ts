@@ -2,6 +2,7 @@
 
 import { deliverPendingEmails } from "@/lib/email/deliver";
 import { intakeRecord } from "@/lib/tickets/school-context";
+import { typedCity } from "@/lib/tickets/intake";
 import { z } from "zod";
 import { revalidatePath } from "next/cache";
 import { isPortalRole } from "@/lib/auth/roles";
@@ -32,6 +33,9 @@ export async function createPortalTicket(input: PortalTicketInput, requestId?: s
 
   const supabase = await createClient();
   if (requestId) { const existing = await findRequest(supabase, requestId, user.id); if (existing) return existing; }
+  const place = await typedPlace(supabase, parsed.data.city_id, parsed.data.city_other);
+  if (place.error) return { ok: false, fieldErrors: { city_other: place.error } };
+  parsed.data.city_other = place.value;
   const { data, error } = await supabase
     .from("tickets")
     // ticket_number, source, status and created_by are set by the database trigger.
@@ -67,6 +71,9 @@ export async function createSupportTicket(input: SupportTicketInput, requestId?:
     .maybeSingle();
   if (sourceError) return { ok: false, error: sourceError.message };
   if (!source) return { ok: false, fieldErrors: { source: "Choose an active source." } };
+  const place = await typedPlace(supabase, parsed.data.city_id, parsed.data.city_other);
+  if (place.error) return { ok: false, fieldErrors: { city_other: place.error } };
+  parsed.data.city_other = place.value;
 
   const { data, error } = await supabase
     .from("tickets")
@@ -88,4 +95,9 @@ async function findRequest(supabase: Awaited<ReturnType<typeof createClient>>, r
   const { data, error } = await supabase.from("tickets").select("id, ticket_number").eq("id", requestId).eq("created_by", userId).maybeSingle();
   if (error) return { ok: false, error: "We could not confirm this request. Your entries are still here; retry using this form." };
   return data ? { ok: true, ticketId: data.id, ticketNumber: data.ticket_number } : null;
+}
+
+async function typedPlace(supabase: Awaited<ReturnType<typeof createClient>>, cityId: number, typed: string | null) {
+  const { data } = await supabase.from("cities").select("name").eq("id", cityId).maybeSingle();
+  return typedCity(data?.name, typed);
 }

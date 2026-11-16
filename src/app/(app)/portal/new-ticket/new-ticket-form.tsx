@@ -4,7 +4,7 @@ import { useRouter } from "next/navigation";
 import { AlertCircle, ArrowLeft, ArrowUpRight, Check, LoaderCircle, Lock, Plus, UploadCloud } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { ATTACHMENT_RULES, ATTACHMENTS_BUCKET, END_USER_TYPE_LABELS, END_USER_TYPES, PLATFORM_LABELS, PLATFORMS, sourceLabel } from "@/lib/tickets/constants";
-import { INTAKE_LABELS, attachmentMime, checkIntakeFiles, initialIntakeDraft, uploadIntakeFiles, type IntakeField, type IntakeFile } from "@/lib/tickets/intake";
+import { INTAKE_LABELS, attachmentMime, checkIntakeFiles, initialIntakeDraft, isOtherCity, typedCity, uploadIntakeFiles, type IntakeField, type IntakeFile } from "@/lib/tickets/intake";
 import { intakeDraftErrors, needsSchool, type PortalTicketFieldErrors, type SupportTicketInput } from "@/lib/tickets/schema";
 import { createPortalTicket, createSupportTicket } from "./actions";
 import "./intake.css";
@@ -46,7 +46,9 @@ export function NewTicketForm({ cities, sources, reporters=[], lockedSource = "c
   const eligibleReporters=sourceTeam?reporters.filter(person=>person.role===(sourceTeam.bound_role||"support_agent")):[];
   const schoolRequired = needsSchool(source);
   const noun = sources ? "case" : "ticket";
-  const invalid=intakeDraftErrors(juneIntakeDraft(draft,source),source,Boolean(sources));
+  const otherCity=isOtherCity(cities.find(city=>String(city.id)===draft.city_id)?.name);
+  const typedCityError=(value:Record<string,string>)=>typedCity(cities.find(city=>String(city.id)===value.city_id)?.name,value.city_other).error;
+  const invalid:PortalTicketFieldErrors={...intakeDraftErrors(juneIntakeDraft(draft,source),source,Boolean(sources)),...(typedCityError(draft)?{city_other:typedCityError(draft)}:{})};
   const validField=(key:IntakeField)=>Boolean(draft[key]?.trim())&&!invalid[key];
   const june=source==="june_schools";
   const listedSchool=JUNE_SCHOOLS.find(school=>school.code===schoolPick);
@@ -55,18 +57,18 @@ export function NewTicketForm({ cities, sources, reporters=[], lockedSource = "c
   const labelOf=(key:IntakeField)=>june&&key==="end_user_type"?"Who is affected?":june&&key==="school_name"?"School":INTAKE_LABELS[key];
   const groups=june?[
     {name:"Reporting",keys:["issue_date",...(sources?["source","reporter_id"]:[])] as IntakeField[],target:"intake-routing"},
-    {name:"School",keys:["school_name",...(schoolPick&&!schoolCityKnown?["city_id"]:[])] as IntakeField[],target:"intake-school"},
+    {name:"School",keys:["school_name",...(schoolPick&&!schoolCityKnown?["city_id",...(otherCity?["city_other"]:[])]:[])] as IntakeField[],target:"intake-school"},
     {name:"The problem",keys:["school_issue_area","end_user_type","platform","school_update_requested","issue_description"] as IntakeField[],target:"intake-issue"},
   ]:[
     {name:"Reporting",keys:["issue_date",...(sources?["source","reporter_id"]:[])] as IntakeField[],target:"intake-routing"},
     {name:"The problem",keys:["issue_description"] as IntakeField[],target:"intake-issue"},
-    {name:"Customer",keys:["customer_name","end_user_type","city_id",...(schoolRequired?["school_name"]:[])] as IntakeField[],target:"intake-customer"},
+    {name:"Customer",keys:["customer_name","end_user_type","city_id",...(otherCity?["city_other"]:[]),...(schoolRequired?["school_name"]:[])] as IntakeField[],target:"intake-customer"},
     {name:"Technical context",keys:["platform",...(draft.platform==="web"?[]:["is_latest_version"]),"fawry_payment"] as IntakeField[],target:"intake-app"},
   ];
   const required = groups.flatMap((group) => group.keys);
   const filled = required.filter((key) => validField(key)).length;
   const configMissing = !cities.length || (sources !== undefined && !sources.length);
-  const order:IntakeField[]=["source","reporter_id","issue_date","issue_description","customer_name","end_user_type","city_id","credentials_username","customer_phone","customer_email","school_name","school_code","school_issue_area","school_user_ids","school_update_requested","platform","is_latest_version","fawry_payment",...optionalFields];
+  const order:IntakeField[]=["source","reporter_id","issue_date","issue_description","customer_name","end_user_type","city_id","city_other","credentials_username","customer_phone","customer_email","school_name","school_code","school_issue_area","school_user_ids","school_update_requested","platform","is_latest_version","fawry_payment",...optionalFields];
   const errorEntries=(Object.entries(errors) as [IntakeField,string][]).sort((a,b)=>order.indexOf(a[0])-order.indexOf(b[0]));
   const missing=required.filter(key=>!validField(key));
 
@@ -87,7 +89,7 @@ export function NewTicketForm({ cities, sources, reporters=[], lockedSource = "c
     const schoolSwitch=key==="source"&&(value==="june_schools"||draft.source==="june_schools");
     if(schoolSwitch)setSchoolPick("");
     setDraft((current) => ({ ...current, [key]: value, ...(key==="source"?{reporter_id:sources?.find(item=>item.code===value)?.default_reporter_id||""}:{}), ...(schoolSwitch?{school_name:"",school_code:"",city_id:"",customer_name:"",school_issue_area:"",school_user_ids:"",school_update_requested:""}:{}) }));
-    setErrors((current) => { const next = { ...current }; delete next[key]; if(key==="source"){delete next.reporter_id;delete next.school_name;}if(key==="platform")delete next.is_latest_version; return next; }); setFormError("");
+    setErrors((current) => { const next = { ...current }; delete next[key]; if(key==="city_id")delete next.city_other; if(key==="source"){delete next.reporter_id;delete next.school_name;}if(key==="platform")delete next.is_latest_version; return next; }); setFormError("");
   }
   function pickSchool(value: string) {
     const school=JUNE_SCHOOLS.find(item=>item.code===value);
@@ -135,7 +137,8 @@ export function NewTicketForm({ cities, sources, reporters=[], lockedSource = "c
     setFormError(""); const existing = createdRef.current;
     const submitted = juneIntakeDraft({ ...draft, ...Object.fromEntries([...new FormData(formRef.current!).entries()].filter(([, value]) => typeof value === "string")) }, source);
     setDraft(submitted);
-    if(!existing){const next=intakeDraftErrors(submitted,source,Boolean(sources));if(Object.keys(next).length){showErrors(next);return;}submitMode.current=(event.nativeEvent as SubmitEvent).submitter?.getAttribute("value")==="another"?"another":"open";setBatchMessage("");}
+    if(!otherCity)submitted.city_other="";
+    if(!existing){const next:PortalTicketFieldErrors={...intakeDraftErrors(submitted,source,Boolean(sources)),...(typedCityError(submitted)?{city_other:typedCityError(submitted)}:{})};if(Object.keys(next).length){showErrors(next);return;}submitMode.current=(event.nativeEvent as SubmitEvent).submitter?.getAttribute("value")==="another"?"another":"open";setBatchMessage("");}
     setErrors({}); setFileIssues([]); inFlight.current = true;
     startTransition(async () => {
       try {
@@ -163,6 +166,9 @@ export function NewTicketForm({ cities, sources, reporters=[], lockedSource = "c
   function select(key: IntakeField, items: readonly { value: string; label: string }[], optional = false, disabled=false) {
     return <FieldShell name={key} error={errors[key]} optional={optional}><select id={key} name={key} value={draft[key]} disabled={disabled} onChange={(event) => change(key, event.target.value)} aria-invalid={Boolean(errors[key])} aria-describedby={errors[key] ? `${key}-error` : undefined} required={!optional}><option value="">Choose…</option>{items.map((item) => <option value={item.value} key={item.value}>{item.label}</option>)}</select></FieldShell>;
   }
+  function cityFields() {
+    return <>{select("city_id",cities.map(city=>({value:String(city.id),label:isOtherCity(city.name)?"Other (type it)":city.name})))}{otherCity&&field("city_other",{maxLength:80,placeholder:"e.g. Saudi Arabia",hint:"An administrator can add it to the list later."})}</>;
+  }
   function choice(key: IntakeField, items: readonly { value: string; label: string }[], hint?: string, label: string = INTAKE_LABELS[key]) {
     return <fieldset className="intake-field intake-choice" data-intake-field={key} aria-invalid={Boolean(errors[key])} aria-describedby={errors[key] ? `${key}-error` : hint ? `${key}-hint` : undefined}><legend><span className="intake-label-text">{label}</span><span className="intake-field-status">Required</span></legend>{hint && <small id={`${key}-hint`}>{hint}</small>}<div>{items.map((item) => <label key={item.value}><input className="sr-only" type="radio" name={key} value={item.value} checked={draft[key] === item.value} onChange={() => change(key, item.value)} required /><span>{item.label}</span></label>)}</div>{errors[key] && <p id={`${key}-error`} className="intake-field-error">{errors[key]}</p>}</fieldset>;
   }
@@ -185,14 +191,14 @@ export function NewTicketForm({ cities, sources, reporters=[], lockedSource = "c
       {june&&<section className="intake-panel intake-school" id="intake-school"><header><span>01 / SCHOOL</span><h3>Which school?</h3></header><div className="intake-grid">
         <div className="intake-field intake-wide" data-intake-field={schoolByHand?undefined:"school_name"}><label htmlFor="school_pick"><span className="intake-label-text">School</span><span className="intake-field-status">Required</span></label><select id="school_pick" value={schoolPick} onChange={event=>pickSchool(event.target.value)} aria-invalid={Boolean(errors.school_name)&&!schoolByHand} aria-describedby={errors.school_name&&!schoolByHand?"school_pick-error":undefined} required><option value="">Choose…</option>{JUNE_SCHOOLS.map(school=><option value={school.code} key={school.code}>{school.code} · {school.name}</option>)}<option value="other">Other school…</option></select>{errors.school_name&&!schoolByHand&&<p id="school_pick-error" className="intake-field-error">{errors.school_name}</p>}</div>
         {schoolByHand&&<>{field("school_name",{maxLength:160,placeholder:"School’s full name"})}{field("school_code",{optional:true,maxLength:80,placeholder:"e.g. 110"})}</>}
-        {schoolPick&&!schoolCityKnown&&select("city_id",cities.map(city=>({value:String(city.id),label:city.name})))}
+        {schoolPick&&!schoolCityKnown&&cityFields()}
       </div></section>}
       <section className="intake-panel" id="intake-issue"><header><span>{june?"02":"01"} / THE PROBLEM</span><h3>What happened?</h3></header><div className="intake-grid">
         {june&&<>{select("school_issue_area",SCHOOL_ISSUE_AREAS)}{field("school_user_ids",{optional:true,maxLength:600,placeholder:"One ID or several, separated by commas"})}{choice("end_user_type",[{value:"student",label:"Students"},{value:"teacher",label:"Teachers"},{value:"other",label:"Both / other"}],undefined,"Who is affected?")}{choice("school_update_requested",SCHOOL_UPDATE_REQUESTED)}{choice("platform",PLATFORMS.map(platform=>({value:platform,label:PLATFORM_LABELS[platform]})))}</>}
         <FieldShell name="issue_description" error={errors.issue_description} wide hint={june?"What does the school see, and what should it see?":"What happened, and what did the customer expect?"}><textarea id="issue_description" name="issue_description" dir="auto" rows={3} maxLength={8000} value={draft.issue_description} onChange={event=>change("issue_description",event.target.value)} aria-invalid={Boolean(errors.issue_description)} aria-describedby={errors.issue_description?"issue_description-error":"issue_description-hint"} required placeholder="Describe the problem…"/></FieldShell></div>
         <details className="intake-evidence" open={evidenceOpen} onToggle={event=>setEvidenceOpen(event.currentTarget.open)}><summary><UploadCloud size={17}/><div><strong>Attachments <b>{files.length}</b></strong><span>Images · video · audio · PDF · Excel</span></div></summary><div className="intake-evidence-body"><label className={`intake-dropzone${pending||createdCase?" is-disabled":""}`} onDragOver={event=>event.preventDefault()} onDrop={event=>{event.preventDefault();addFiles(event.dataTransfer.files);}}><UploadCloud size={22}/><strong>Add files or drop them here</strong><span>Up to 5 files · Images, audio, PDF & Excel: 10 MB · Video: 50 MB</span><input type="file" aria-label="Attach evidence" multiple accept={ATTACHMENT_RULES.accept} disabled={pending||Boolean(createdCase)} onChange={event=>{addFiles(event.target.files);event.target.value="";}} className="sr-only"/></label>{fileIssues.length>0&&<ul className="intake-file-issues" role="alert">{fileIssues.map((issue,index)=><li key={index}>{issue}</li>)}</ul>}<div className="attachment-grid">{files.map(item=><LocalAttachmentPreview key={item.id} id={item.id} file={item.file} disabled={pending} remove={()=>setFiles(current=>current.filter(file=>file.id!==item.id))}/>)}</div></div></details>
       </section>
-      {!june&&<section className="intake-panel" id="intake-customer"><header><span>02 / CUSTOMER</span><h3>Customer & account</h3></header><div className="intake-grid">{field("customer_name",{placeholder:"Customer’s name"})}{select("end_user_type",END_USER_TYPES.map(type=>({value:type,label:END_USER_TYPE_LABELS[type]})))}{select("city_id",cities.map(city=>({value:String(city.id),label:city.name})))}{field("credentials_username",{optional:true,placeholder:"Email or phone used to sign in",maxLength:160})}{field("customer_phone",{type:"tel",optional:true,placeholder:"Number to reach the customer"})}{schoolRequired&&field("school_name",{maxLength:160,placeholder:"School name"})}</div>
+      {!june&&<section className="intake-panel" id="intake-customer"><header><span>02 / CUSTOMER</span><h3>Customer & account</h3></header><div className="intake-grid">{field("customer_name",{placeholder:"Customer’s name"})}{select("end_user_type",END_USER_TYPES.map(type=>({value:type,label:END_USER_TYPE_LABELS[type]})))}{cityFields()}{field("credentials_username",{optional:true,placeholder:"Email or phone used to sign in",maxLength:160})}{field("customer_phone",{type:"tel",optional:true,placeholder:"Number to reach the customer"})}{schoolRequired&&field("school_name",{maxLength:160,placeholder:"School name"})}</div>
         <details className="intake-more intake-contact" open={contactOpen} onToggle={event=>setContactOpen(event.currentTarget.open)}><summary><Plus size={15}/><div><strong>Extra contact details</strong><span>Optional · contact email{!schoolRequired?" & school":""}</span></div></summary><div className="intake-grid">{field("customer_email",{type:"email",optional:true,placeholder:"name@example.com"})}{!schoolRequired&&field("school_name",{optional:true,maxLength:160,placeholder:"School name"})}</div></details>
       </section>}
       {!june&&<section className="intake-panel" id="intake-app"><header><span>03 / TECHNICAL CONTEXT</span><h3>App & payment</h3></header><div className="intake-grid">{choice("platform",PLATFORMS.map(platform=>({value:platform,label:PLATFORM_LABELS[platform]})))}{draft.platform==="web"?<p className="intake-not-applicable">Web selected · installed app version does not apply.</p>:choice("is_latest_version",[{value:"yes",label:"Yes"},{value:"no",label:"No"},{value:"unknown",label:"Unknown"}])}{choice("fawry_payment",[{value:"yes",label:"Yes"},{value:"no",label:"No"},{value:"unknown",label:"Unknown"}])}</div>

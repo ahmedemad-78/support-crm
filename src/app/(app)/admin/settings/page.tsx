@@ -24,6 +24,16 @@ export default async function SettingsPage() {
       supabase.from("ticket_sources").select("code, name, is_active, bound_role").order("sort_order").order("name"),
     ]);
 
+  const { data: typed, error: typedError } = await supabase.from("tickets").select("city_other").not("city_other", "is", null).limit(2000);
+  if (typedError) throw typedError;
+  const listed = new Set((cities.data ?? []).map((city) => city.name.trim().toLowerCase()));
+  const typedCities = [...(typed ?? []).reduce((found, row) => {
+    const name = (row.city_other ?? "").trim();
+    const key = name.toLowerCase();
+    if (name && !listed.has(key)) found.set(key, { name: found.get(key)?.name ?? name, count: (found.get(key)?.count ?? 0) + 1 });
+    return found;
+  }, new Map<string, { name: string; count: number }>()).values()].sort((a, b) => b.count - a.count || a.name.localeCompare(b.name));
+
   for (const result of [cities, categories, causes, requestTypes, topics, trackerCauses, trackerActions, outcomes, sources]) {
     if (result.error) throw result.error;
   }
@@ -44,6 +54,7 @@ export default async function SettingsPage() {
           outcomes: outcomes.data ?? [],
         }}
         sources={sources.data ?? []}
+        typedCities={typedCities}
         notificationRecipient={String(deliveryPolicy?.value?.email || "")}
       />
     </>
