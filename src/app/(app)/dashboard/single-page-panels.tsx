@@ -88,23 +88,3 @@ export function CaseTable({ tickets, query, preview, asOf }: { tickets: Business
     </section>
   );
 }
-
-export function Coverage({ total, classified, resolved, timestamped, nativeComplete }: { total: number; classified: number; resolved: number; timestamped: number; nativeComplete: number }) {
-  const items = [
-    { label: "Fully classified", detail: "All five tracker fields recorded", part: classified, whole: total },
-    { label: "Resolution timestamp", detail: "Resolved cases with a recorded time", part: timestamped, whole: resolved },
-    { label: "Complete native history", detail: "Usable for timing comparisons", part: nativeComplete, whole: total },
-  ];
-  return (
-    <section className="ov-coverage" aria-label="Record coverage">
-      {items.map((item) => (
-        <div key={item.label}>
-          <span>{item.label}</span>
-          <strong>{item.part.toLocaleString()}<small> / {item.whole.toLocaleString()}</small></strong>
-          <span className="ov-meter" role="img" aria-label={`${percent(item.part, item.whole)}%`}><i style={{ width: `${percent(item.part, item.whole)}%` }} /></span>
-          <small>{item.detail}</small>
-        </div>
-      ))}
-    </section>
-  );
-}

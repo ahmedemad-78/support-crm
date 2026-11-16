@@ -6,12 +6,12 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { formatDateTime } from "@/lib/format";
 import { cairoDate, shiftDay } from "@/lib/tickets/dashboard-model";
 import type { DashboardFilters } from "@/lib/tickets/filters";
-import { businessCsv, businessQuery, completeHistory, displayValue, field, filterBusinessTickets, isOpenCase, lastActivity, parseBusinessFilters, ranking, timeBuckets, MISSING, DIMENSIONS, type BusinessFilters, type Dimension, type Snapshot } from "@/lib/tickets/business-analytics";
+import { businessCsv, businessQuery, displayValue, field, filterBusinessTickets, isOpenCase, lastActivity, parseBusinessFilters, ranking, timeBuckets, MISSING, DIMENSIONS, type BusinessFilters, type Dimension, type Snapshot } from "@/lib/tickets/business-analytics";
 import { recordReview } from "@/lib/tickets/single-page-model";
 import { Count } from "./business-charts";
 import { useLiveAnalytics } from "./use-live-analytics";
 import { CausePareto, DemandArea, Handling, LocationMap, OutcomeDonut, Problems, SourceMix, type PickFilter } from "./single-page-charts";
-import { CaseTable, Coverage, StatusBreakdown } from "./single-page-panels";
+import { CaseTable, StatusBreakdown } from "./single-page-panels";
 import "./single-page.css";
 
 type Option = { id: string; name: string };
@@ -78,7 +78,6 @@ export function DashboardBoard({ initialSnapshot, initialFilters, cities = [], c
   const review = useMemo(() => recordReview(rows), [rows]);
   const reopened = rows.filter((t) => (t.reopenCount ?? 0) > 0).length;
   const reopenEvents = rows.reduce((n, t) => n + (t.reopenCount ?? 0), 0);
-  const eligible = rows.filter((t) => completeHistory(t, snapshot.asOf)).length;
   const openInSelection = rows.filter(isOpenCase).length;
   const closed = rows.filter((t) => t.status === "closed").length;
 
@@ -318,7 +317,6 @@ export function DashboardBoard({ initialSnapshot, initialFilters, cities = [], c
         </section>
       )}
 
-      <Coverage total={rows.length} classified={rows.length - review.incomplete.length} resolved={resolved.length} timestamped={resolved.filter((t) => t.resolvedAt).length} nativeComplete={eligible} />
       <footer className="ov-footer">Each case is counted once. Reopen events are separate from unique reopened cases. Missing data is never inferred.</footer>
     </div>
   );

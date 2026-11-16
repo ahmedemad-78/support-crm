@@ -1,6 +1,6 @@
 "use client";
 
-import { PasswordEye } from "@/components/password-eye";
+import { PasswordEye, useEyeLook } from "@/components/password-eye";
 import { useActionState, useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { ArrowRight, ArrowBigUpDash, LoaderCircle, LockKeyhole, Mail, CircleAlert } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -29,8 +29,6 @@ export function LoginForm({ deactivated, initialState = {} }: { deactivated: boo
   const passwordRef = useRef<HTMLInputElement>(null);
   const errorRef = useRef<HTMLDivElement>(null);
   const eyeRef = useRef<HTMLButtonElement>(null);
-  const measureRef = useRef<CanvasRenderingContext2D | null>(null);
-  const lookTimer = useRef<number | null>(null);
   const formRef = useRef<HTMLFormElement>(null);
   const sameEmail = state.email === undefined || state.email.toLowerCase() === email.trim().toLowerCase();
   const seconds = state.lockedUntil ? Math.max(0, Math.ceil((Date.parse(state.lockedUntil) - clock) / 1000)) : 0;
@@ -38,24 +36,7 @@ export function LoginForm({ deactivated, initialState = {} }: { deactivated: boo
   const fieldErrors = sameEmail ? state.fieldErrors : undefined;
   const error = sameEmail ? state.error : undefined;
 
-  useEffect(() => () => { if (lookTimer.current !== null) clearTimeout(lookTimer.current); }, []);
-
-  function lookAtCaret(input: HTMLInputElement, up = false) {
-    const eye = eyeRef.current;
-    measureRef.current ??= document.createElement("canvas").getContext("2d");
-    const ctx = measureRef.current;
-    if (!eye || !ctx) return;
-    const style = getComputedStyle(input);
-    ctx.font = `${style.fontWeight} ${style.fontSize} ${style.fontFamily}`;
-    const typed = input.value.slice(0, input.selectionStart ?? input.value.length);
-    const caret = parseFloat(style.paddingLeft) + ctx.measureText(input.type === "password" ? "\u2022".repeat(typed.length) : typed).width - input.scrollLeft;
-    const distance = Math.min(1, Math.max(0, (input.clientWidth - 30 - caret) / (input.clientWidth * 0.75)));
-    eye.style.setProperty("--look-x", `${(-4.4 * distance).toFixed(2)}px`);
-    eye.style.setProperty("--look-y", up ? "-1.6px" : ".7px");
-    eye.dataset.looking = "true";
-    if (lookTimer.current !== null) clearTimeout(lookTimer.current);
-    lookTimer.current = window.setTimeout(() => { delete eye.dataset.looking; }, 900);
-  }
+  const lookAtCaret = useEyeLook(eyeRef);
 
   const progress = /^\S+@\S+\.\S+$/.test(email.trim()) ? (hasPassword ? 2 : 1) : 0;
   useEffect(() => {

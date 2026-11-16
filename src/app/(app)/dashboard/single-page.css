@@ -372,14 +372,6 @@ button.ov-missing:not(:disabled):hover { color: var(--ov-ink); text-decoration: 
 .ov-cases > footer > div { display: flex; gap: 8px; }
 .ov-cases > footer .ov-button { min-height: 32px; padding: 5px 12px; }
 
-.ov-coverage { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); border: 1px solid var(--ov-line); border-radius: var(--ov-radius); background: var(--ov-surface); box-shadow: var(--ov-shadow); }
-.ov-coverage > div { min-width: 0; padding: 16px 20px; border-left: 1px solid var(--ov-line); }
-.ov-coverage > div:first-child { border-left: 0; }
-.ov-coverage > div > span:first-child { color: var(--ov-sub); font-size: 13px; font-weight: 500; }
-.ov-coverage strong { display: block; margin-top: 4px; font-size: 20px; line-height: 28px; font-weight: 600; letter-spacing: -0.02em; }
-.ov-coverage strong small { color: var(--ov-sub); font-size: 13px; font-weight: 400; letter-spacing: 0; }
-.ov-coverage > div > small { color: var(--ov-sub); font-size: 12px; line-height: 16px; }
-.ov-coverage .ov-meter { margin: 8px 0; }
 .ov-footer { color: var(--ov-sub); font-size: 12px; line-height: 18px; text-align: center; }
 
 /* Responsive: the board sits beside a collapsible sidebar, so it follows its own width. */
@@ -406,9 +398,6 @@ button.ov-missing:not(:disabled):hover { color: var(--ov-ink); text-decoration: 
   .ov-kpi { grid-column: span 2; }
   .ov-kpi:nth-child(n + 4) { grid-column: span 3; }
   .ov-filterbar-main > .ov-more { margin-left: 0; }
-  .ov-coverage { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  .ov-coverage > div:nth-child(3) { grid-column: 1 / -1; border-left: 0; }
-  .ov-coverage > div:nth-child(n + 3) { border-top: 1px solid var(--ov-line); }
 }
 @container ov (max-width: 640px) {
   .ov-stack { flex-direction: column; }
@@ -439,9 +428,6 @@ button.ov-missing:not(:disabled):hover { color: var(--ov-ink); text-decoration: 
   .ov-kpi strong { font-size: 28px; line-height: 32px; }
   .ov-head h2 { font-size: 22px; line-height: 28px; }
   .ov-panel.ov-third:last-child .ov-donut-layout { flex-direction: column; gap: 16px; }
-  .ov-coverage { grid-template-columns: 1fr; }
-  .ov-coverage > div { border-left: 0; }
-  .ov-coverage > div + div { border-top: 1px solid var(--ov-line); }
   .ov-facts { gap: 8px 20px; }
   .ov-facts dd { font-size: 18px; }
 }
@@ -475,7 +461,6 @@ button.ov-missing:not(:disabled):hover { color: var(--ov-ink); text-decoration: 
   .ov-kpis { grid-template-columns: repeat(5, 1fr); }
   .ov-kpi,
   .ov-panel,
-  .ov-coverage { box-shadow: none; break-inside: avoid; print-color-adjust: exact; }
   .ov-kpi { grid-column: auto !important; }
   .ov-grid { display: grid; grid-template-columns: repeat(12, 1fr); }
   .ov-panel.ov-lead { grid-column: span 8; }

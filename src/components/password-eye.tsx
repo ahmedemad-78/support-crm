@@ -1,3 +1,6 @@
+"use client";
+
+import { useCallback, useEffect, useRef, type RefObject } from "react";
 import "./password-eye.css";
 
 /** The blinking eye of the sign-in page. The parent button sets data-open and carries the eye-toggle class. */
@@ -12,4 +15,27 @@ export function PasswordEye() {
       <path d="M5.9 13.8 4.3 16M9.3 15.5l-.7 2.6M14.7 15.5l.7 2.6M18.1 13.8l1.6 2.2" />
     </g>
   </svg>;
+}
+
+/** Makes the eye follow the caret of the field it sits in. Returns the handler to call with the input on input/select/focus. */
+export function useEyeLook(eyeRef: RefObject<HTMLElement | null>) {
+  const measure = useRef<CanvasRenderingContext2D | null>(null);
+  const timer = useRef<number | null>(null);
+  useEffect(() => () => { if (timer.current !== null) clearTimeout(timer.current); }, []);
+  return useCallback((input: HTMLInputElement, up = false) => {
+    const eye = eyeRef.current;
+    measure.current ??= document.createElement("canvas").getContext("2d");
+    const ctx = measure.current;
+    if (!eye || !ctx) return;
+    const style = getComputedStyle(input);
+    ctx.font = `${style.fontWeight} ${style.fontSize} ${style.fontFamily}`;
+    const typed = input.value.slice(0, input.selectionStart ?? input.value.length);
+    const caret = parseFloat(style.paddingLeft) + ctx.measureText(input.type === "password" ? "\u2022".repeat(typed.length) : typed).width - input.scrollLeft;
+    const distance = Math.min(1, Math.max(0, (input.clientWidth - 30 - caret) / (input.clientWidth * 0.75)));
+    eye.style.setProperty("--look-x", `${(-4.4 * distance).toFixed(2)}px`);
+    eye.style.setProperty("--look-y", up ? "-1.6px" : ".7px");
+    eye.dataset.looking = "true";
+    if (timer.current !== null) clearTimeout(timer.current);
+    timer.current = window.setTimeout(() => { delete eye.dataset.looking; }, 900);
+  }, [eyeRef]);
 }

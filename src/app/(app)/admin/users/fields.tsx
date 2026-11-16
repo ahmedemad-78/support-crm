@@ -1,7 +1,7 @@
 "use client";
 
-import { PasswordEye } from "@/components/password-eye";
-import { useState } from "react";
+import { PasswordEye, useEyeLook } from "@/components/password-eye";
+import { useRef, useState } from "react";
 import { Radio as RadioPrimitive } from "@base-ui/react/radio";
 import { Building2, ChartColumn, Check, Copy, Headset, MessagesSquare, PhoneCall, RefreshCw, School, type LucideIcon } from "lucide-react";
 import { toast } from "sonner";
@@ -72,6 +72,8 @@ export function PasswordField({
   help?: string;
 }) {
   const [visible, setVisible] = useState(false);
+  const eyeRef = useRef<HTMLButtonElement>(null);
+  const look = useEyeLook(eyeRef);
 
   return (
     <div className="flex flex-col gap-2">
@@ -84,11 +86,14 @@ export function PasswordField({
           type={visible ? "text" : "password"}
           value={value}
           onChange={(e) => onChange(e.target.value)}
+          onInput={(e) => look(e.currentTarget)}
+          onSelect={(e) => look(e.currentTarget)}
           autoComplete="new-password"
           className="h-10 pr-20 font-mono"
         />
         <div className="absolute top-1/2 right-2 flex -translate-y-1/2 items-center gap-1">
           <button
+            ref={eyeRef}
             type="button"
             onClick={() => setVisible((v) => !v)}
             className="eye-toggle is-compact"
