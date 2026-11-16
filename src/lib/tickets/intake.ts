@@ -7,7 +7,7 @@ export const INTAKE_LABELS: Record<IntakeField, string> = { ...SCHOOL_CONTEXT_LA
 export const CUSTOMER_FIELDS: IntakeField[] = ["customer_name", "end_user_type", "city_id"];
 export const APP_FIELDS: IntakeField[] = ["platform", "is_latest_version", "fawry_payment"];
 export function initialIntakeDraft(today: string, onlySource = ""): IntakeDraft {
-  return { school_code:"",school_user_ids:"",school_issue_area:"",school_impact:"",school_expected_grade:"",school_shown_grade:"",school_subject:"",school_section:"", reporter_id: "", contact_channel: "unspecified", linked_ticket_id: "", source: onlySource, customer_name: "", customer_email: "", customer_phone: "", school_name: "", credentials_username: "", issue_date: today, city_id: "", end_user_type: "", platform: "", is_latest_version: "", fawry_payment: "", app_version: "", device_type: "", page_screen: "", steps: "", issue_description: "" };
+  return { school_code:"",school_user_ids:"",school_issue_area:"",school_update_requested:"", reporter_id: "", contact_channel: "unspecified", linked_ticket_id: "", source: onlySource, customer_name: "", customer_email: "", customer_phone: "", school_name: "", credentials_username: "", issue_date: today, city_id: "", end_user_type: "", platform: "", is_latest_version: "", fawry_payment: "", app_version: "", device_type: "", page_screen: "", steps: "", issue_description: "" };
 }
 export type IntakeFile = { id: string; file: File; uploaded?: boolean };
 type FileInfo = Pick<File, "name" | "size" | "type" | "lastModified">;
