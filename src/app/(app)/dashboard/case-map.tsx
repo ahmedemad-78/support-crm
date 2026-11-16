@@ -8,7 +8,7 @@ export type CaseMark = { id: string; name: string; count: number; lon: number; l
 
 /* OpenFreeMap serves OpenStreetMap vector tiles without a key or quota. Only map tiles are requested; no case data leaves the browser. */
 const STYLE = "https://tiles.openfreemap.org/styles/positron";
-const EGYPT: [number, number, number, number] = [24, 22, 37, 33];
+const EGYPT: [number, number, number, number] = [24.5, 21.8, 37, 31.9];
 /* The country label is drawn once, as "Palestine"; the data's own entries for it are dropped so it is not repeated. */
 const PALESTINE_DUPLICATES = ["Palestine", "State of Palestine", "Palestinian Territories", "Palestinian Territory"];
 const DOT = "#183e2e";
@@ -80,8 +80,7 @@ export function CaseMap({ marks, world, onPick, label, fallback }: { marks: Case
     const current = map.current;
     if (state !== "ready" || !current) return;
     (current.getSource("cases") as GeoJSONSource | undefined)?.setData(collection(marks));
-    const lon = marks.map((mark) => mark.lon), lat = marks.map((mark) => mark.lat);
-    const bounds: [number, number, number, number] = world ? [-125, -45, 150, 68] : [Math.min(EGYPT[0], ...lon) - 1.5, Math.min(EGYPT[1], ...lat) - 1, Math.max(EGYPT[2], ...lon) + 1.5, Math.max(EGYPT[3], ...lat) + 1];
+    const bounds: [number, number, number, number] = world ? [-125, -45, 150, 68] : EGYPT;
     current.fitBounds(bounds, { padding: 40, maxZoom: 7, duration: 600 });
   }, [marks, world, state]);
 

@@ -591,9 +591,7 @@ export function LocationMap({ tickets, cities, onPick }: { tickets: BusinessTick
   const marks = geo.locations.filter((l) => l.place);
   const max = Math.max(1, ...geo.locations.map((m) => m.count));
   const glMarks = useMemo(() => geo.locations.filter((l) => l.place).map((l) => ({ id: l.id, name: l.name, count: l.count, lon: l.place!.lon, lat: l.place!.lat, level: l.place!.level })), [geo]);
-  const lon = marks.map((m) => m.place!.lon);
-  const lat = marks.map((m) => m.place!.lat);
-  const bounds = world ? [-180, 180, -58, 85] : [Math.min(24, ...lon) - 3, Math.max(37, ...lon) + 3, Math.min(22, ...lat) - 2, Math.max(33, ...lat) + 2];
+  const bounds = world ? [-180, 180, -58, 85] : [23, 38.5, 21, 32.5];
   const scale = Math.min(740 / (bounds[1] - bounds[0]), 310 / (bounds[3] - bounds[2]));
   const project = (a: number, b: number) => [30 + (740 - (bounds[1] - bounds[0]) * scale) / 2 + (a - bounds[0]) * scale, 20 + (310 - (bounds[3] - bounds[2]) * scale) / 2 + (bounds[3] - b) * scale];
   return (
@@ -604,7 +602,7 @@ export function LocationMap({ tickets, cities, onPick }: { tickets: BusinessTick
           <p><b>{geo.mapped.toLocaleString()} of {geo.total.toLocaleString()}</b> cases mapped{geo.unmapped ? ` · ${geo.unmapped} recorded but not mapped` : ""} · {geo.missing.toLocaleString()} without a location</p>
         </div>
         <div className="ov-segmented" role="group" aria-label="Map extent">
-          <button type="button" aria-pressed={!world} onClick={() => setWorld(false)}>Fit locations</button>
+          <button type="button" aria-pressed={!world} onClick={() => setWorld(false)}>Egypt</button>
           <button type="button" aria-pressed={world} onClick={() => setWorld(true)}>World</button>
         </div>
       </div>
