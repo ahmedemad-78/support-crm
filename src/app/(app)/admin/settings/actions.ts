@@ -48,6 +48,7 @@ export async function addListItem(table: ListTable, name: string): Promise<Actio
   if (error) return { ok: false, error: friendly(error, parsed.data) };
 
   revalidatePath("/admin/settings");
+  if (t === "cities") revalidatePath("/dashboard");
   return { ok: true, message: `Added "${parsed.data}".` };
 }
 

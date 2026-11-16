@@ -3,11 +3,11 @@ import { SCHOOL_CONTEXT_LABELS } from "./school-context";
 import type { SupportTicketInput } from "./schema";
 export type IntakeField = keyof SupportTicketInput;
 export type IntakeDraft = Record<IntakeField, string>;
-export const INTAKE_LABELS: Record<IntakeField, string> = { ...SCHOOL_CONTEXT_LABELS, reporter_id: "Reported by", contact_channel: "Contact channel", linked_ticket_id: "Related case", source: "Source", customer_name: "Customer full name", customer_email: "Contact email", customer_phone: "Contact phone", school_name: "School name", credentials_username: "Account identifier (email or phone number)", issue_date: "Reported on", city_id: "City", end_user_type: "Customer type", platform: "App platform", is_latest_version: "Using the latest app version?", fawry_payment: "Related to a Fawry payment?", app_version: "Installed app version", device_type: "Device model", page_screen: "Affected page or screen", steps: "Steps to reproduce", issue_description: "Issue description" };
+export const INTAKE_LABELS: Record<IntakeField, string> = { ...SCHOOL_CONTEXT_LABELS, reporter_id: "Reported by", contact_channel: "Contact channel", linked_ticket_id: "Related case", source: "Source", customer_name: "Customer full name", customer_email: "Contact email", customer_phone: "Contact phone", school_name: "School name", credentials_username: "Account identifier (email or phone number)", issue_date: "Reported on", city_id: "City", city_other: "City or country name", end_user_type: "Customer type", platform: "App platform", is_latest_version: "Using the latest app version?", fawry_payment: "Related to a Fawry payment?", app_version: "Installed app version", device_type: "Device model", page_screen: "Affected page or screen", steps: "Steps to reproduce", issue_description: "Issue description" };
 export const CUSTOMER_FIELDS: IntakeField[] = ["customer_name", "end_user_type", "city_id"];
 export const APP_FIELDS: IntakeField[] = ["platform", "is_latest_version", "fawry_payment"];
 export function initialIntakeDraft(today: string, onlySource = ""): IntakeDraft {
-  return { school_code:"",school_user_ids:"",school_issue_area:"",school_impact:"",school_expected_grade:"",school_shown_grade:"",school_subject:"",school_section:"", reporter_id: "", contact_channel: "unspecified", linked_ticket_id: "", source: onlySource, customer_name: "", customer_email: "", customer_phone: "", school_name: "", credentials_username: "", issue_date: today, city_id: "", end_user_type: "", platform: "", is_latest_version: "", fawry_payment: "", app_version: "", device_type: "", page_screen: "", steps: "", issue_description: "" };
+  return { school_code:"",school_user_ids:"",school_issue_area:"",school_update_requested:"", reporter_id: "", contact_channel: "unspecified", linked_ticket_id: "", source: onlySource, customer_name: "", customer_email: "", customer_phone: "", school_name: "", credentials_username: "", issue_date: today, city_id: "", city_other: "", end_user_type: "", platform: "", is_latest_version: "", fawry_payment: "", app_version: "", device_type: "", page_screen: "", steps: "", issue_description: "" };
 }
 export type IntakeFile = { id: string; file: File; uploaded?: boolean };
 type FileInfo = Pick<File, "name" | "size" | "type" | "lastModified">;
@@ -57,4 +57,17 @@ export async function uploadIntakeFiles(ticketId: string, items: IntakeFile[], t
     } catch { failed.push({ ...item, uploaded }); }
   }
   return failed;
+}
+
+/** The list entry that lets the team type a place the administrator has not added yet. */
+export function isOtherCity(name: string | null | undefined) { return (name ?? "").trim().toLowerCase() === "other"; }
+/** The typed place is kept only with the "Other" city, and is then required. */
+export function typedCity(cityName: string | null | undefined, typed: string | null | undefined): { value: string | null; error?: string } {
+  const text = (typed ?? "").trim();
+  if (!isOtherCity(cityName)) return { value: null };
+  return text.length >= 2 ? { value: text } : { value: null, error: "Type the city or country" };
+}
+/** What to show for a case's city: the typed place when the list entry is "Other". */
+export function cityLabel(cityName: string | null | undefined, typed: string | null | undefined) {
+  return isOtherCity(cityName) && typed?.trim() ? typed.trim() : cityName ?? "";
 }

@@ -2,14 +2,44 @@ import { MISSING, field, ranking, type BusinessTicket, type Dimension } from "./
 import countries from "./world-countries.json";
 
 export type Place={name:string;lon:number;lat:number;country:string;level:"city"|"area"|"country"};
-// Area reference points, not customer coordinates. GeoNames/CAPMAS references in docs/map-data.md.
+// Every Egyptian governorate and a few Gulf cities. Area reference points, not customer coordinates. GeoNames/CAPMAS references in docs/map-data.md.
 const places:Record<string,Place>={
- cairo:{name:"Cairo",lon:31.24967,lat:30.06263,country:"Egypt",level:"city"},
- alexandria:{name:"Alexandria",lon:29.91582,lat:31.20176,country:"Egypt",level:"city"},
- asyut:{name:"Asyut",lon:31.16373,lat:27.18859,country:"Egypt",level:"city"},
- damietta:{name:"Damietta",lon:31.81332,lat:31.41648,country:"Egypt",level:"city"},
+ cairo:{name:"Cairo",lon:31.2497,lat:30.0626,country:"Egypt",level:"city"},
+ giza:{name:"Giza",lon:31.2109,lat:30.0081,country:"Egypt",level:"city"},
+ alexandria:{name:"Alexandria",lon:29.9158,lat:31.2018,country:"Egypt",level:"city"},
  qalyubia:{name:"Qalyubia",lon:31.25,lat:30.3,country:"Egypt",level:"area"},
- "red sea":{name:"Red Sea",lon:33.78845,lat:27.18624,country:"Egypt",level:"area"},
+ sharqia:{name:"Sharqia",lon:31.5021,lat:30.5877,country:"Egypt",level:"area"},
+ dakahlia:{name:"Dakahlia",lon:31.3807,lat:31.0364,country:"Egypt",level:"area"},
+ gharbia:{name:"Gharbia",lon:31.0004,lat:30.7885,country:"Egypt",level:"area"},
+ monufia:{name:"Monufia",lon:31.0086,lat:30.5503,country:"Egypt",level:"area"},
+ beheira:{name:"Beheira",lon:30.4682,lat:31.0341,country:"Egypt",level:"area"},
+ "kafr el sheikh":{name:"Kafr El Sheikh",lon:30.9376,lat:31.1107,country:"Egypt",level:"area"},
+ damietta:{name:"Damietta",lon:31.8133,lat:31.4165,country:"Egypt",level:"city"},
+ "port said":{name:"Port Said",lon:32.3019,lat:31.2653,country:"Egypt",level:"city"},
+ ismailia:{name:"Ismailia",lon:32.2723,lat:30.6043,country:"Egypt",level:"city"},
+ suez:{name:"Suez",lon:32.5263,lat:29.9737,country:"Egypt",level:"city"},
+ faiyum:{name:"Faiyum",lon:30.8418,lat:29.3084,country:"Egypt",level:"city"},
+ "beni suef":{name:"Beni Suef",lon:31.0979,lat:29.0744,country:"Egypt",level:"city"},
+ minya:{name:"Minya",lon:30.7503,lat:28.1099,country:"Egypt",level:"city"},
+ asyut:{name:"Asyut",lon:31.1637,lat:27.1886,country:"Egypt",level:"city"},
+ sohag:{name:"Sohag",lon:31.6948,lat:26.5569,country:"Egypt",level:"city"},
+ qena:{name:"Qena",lon:32.7267,lat:26.1642,country:"Egypt",level:"city"},
+ luxor:{name:"Luxor",lon:32.6421,lat:25.6989,country:"Egypt",level:"city"},
+ aswan:{name:"Aswan",lon:32.8998,lat:24.0934,country:"Egypt",level:"city"},
+ "red sea":{name:"Red Sea",lon:33.7885,lat:27.1862,country:"Egypt",level:"area"},
+ "new valley":{name:"New Valley",lon:30.5464,lat:25.439,country:"Egypt",level:"area"},
+ matrouh:{name:"Matrouh",lon:27.2453,lat:31.3525,country:"Egypt",level:"area"},
+ "north sinai":{name:"North Sinai",lon:33.7982,lat:31.1321,country:"Egypt",level:"area"},
+ "south sinai":{name:"South Sinai",lon:33.6176,lat:28.2364,country:"Egypt",level:"area"},
+ riyadh:{name:"Riyadh",lon:46.7219,lat:24.6877,country:"Saudi Arabia",level:"city"},
+ jeddah:{name:"Jeddah",lon:39.1979,lat:21.4858,country:"Saudi Arabia",level:"city"},
+ dubai:{name:"Dubai",lon:55.2708,lat:25.2048,country:"United Arab Emirates",level:"city"},
+ "abu dhabi":{name:"Abu Dhabi",lon:54.3773,lat:24.4539,country:"United Arab Emirates",level:"city"},
+ doha:{name:"Doha",lon:51.531,lat:25.2854,country:"Qatar",level:"city"},
+ "kuwait city":{name:"Kuwait City",lon:47.9783,lat:29.3759,country:"Kuwait",level:"city"},
+ manama:{name:"Manama",lon:50.586,lat:26.2285,country:"Bahrain",level:"city"},
+ muscat:{name:"Muscat",lon:58.4059,lat:23.5859,country:"Oman",level:"city"},
+ amman:{name:"Amman",lon:35.9106,lat:31.9539,country:"Jordan",level:"city"},
 };
 export function resolvePlace(name:string):Place|null{
  const key=name.trim().toLowerCase();if(places[key])return places[key];

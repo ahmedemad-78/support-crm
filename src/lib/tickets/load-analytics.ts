@@ -10,13 +10,17 @@ export async function loadAnalytics() {
   const { data: sources, error: sourceError } = await supabase.from("ticket_sources").select("code, name, is_active");
   if (sourceError) throw sourceError;
   const sourceNames = new Map((sources ?? []).map((source) => [source.code, source.name]));
+  // A typed place counts under its own city as soon as an administrator adds that name to the list.
+  const { data: cityRows, error: cityError } = await supabase.from("cities").select("id, name");
+  if (cityError) throw cityError;
+  const cityByName = new Map((cityRows ?? []).map((city) => [city.name.trim().toLowerCase(), String(city.id)]));
   // Deterministic cursor pagination, no silent 10k/5k cut-off or offset drift.
   let cursor: string | undefined;
   for (;;) {
     let query = supabase
       .from("tickets")
       .select(
-        "reporter_id, created_by, app_version, is_latest_version, device_type, page_screen, reopen_count, last_reopened_at, credentials_username, resolution_notes, reporter:profiles!tickets_reporter_id_fkey(full_name), creator:profiles!tickets_created_by_fkey(full_name), contact_channel, is_historical, id, ticket_number, issue_description, status, source, created_at, updated_at, resolved_at, issue_date, customer_name, customer_email, customer_phone, school_name, end_user_type, city_id, issue_category_id, platform, assignee_id, fawry_payment, assignee:profiles!tickets_assignee_id_fkey(full_name), issue_categories(name), root_causes(name), request_types(name), topics(name), tracker_causes(name), tracker_actions(name), outcomes(name)",
+        "reporter_id, created_by, app_version, is_latest_version, device_type, page_screen, reopen_count, last_reopened_at, credentials_username, resolution_notes, reporter:profiles!tickets_reporter_id_fkey(full_name), creator:profiles!tickets_created_by_fkey(full_name), contact_channel, is_historical, id, ticket_number, city_other, issue_description, status, source, created_at, updated_at, resolved_at, issue_date, customer_name, customer_email, customer_phone, school_name, end_user_type, city_id, issue_category_id, platform, assignee_id, fawry_payment, assignee:profiles!tickets_assignee_id_fkey(full_name), issue_categories(name), root_causes(name), request_types(name), topics(name), tracker_causes(name), tracker_actions(name), outcomes(name)",
       )
       .lte("created_at", asOf)
       .order("id")
@@ -57,7 +61,7 @@ export async function loadAnalytics() {
         createdAt: row.created_at,
         resolvedAt: row.resolved_at,
         endUserType: row.end_user_type ?? "",
-        cityId: row.city_id == null ? "" : String(row.city_id),
+        cityId: row.city_id == null ? "" : (row.city_other && cityByName.get(row.city_other.trim().toLowerCase())) || String(row.city_id),
         categoryId:
           row.issue_category_id == null ? "" : String(row.issue_category_id),
         category: nameOf(row.issue_categories),

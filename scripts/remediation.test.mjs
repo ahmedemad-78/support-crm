@@ -398,6 +398,11 @@ test("school and reporter omissions appear alongside unrelated missing enum fiel
  const draft={...intakeHelpers.initialIntakeDraft("2026-11-14"),source:"june_schools"};
  const errors=schema.intakeDraftErrors(draft,"june_schools",true);
  for(const key of ["reporter_id","school_name","customer_name","city_id","end_user_type","platform","is_latest_version","fawry_payment","issue_description"])assert.ok(errors[key],key);
+ for(const key of ["school_issue_area","school_update_requested"])assert.ok(errors[key],key);
+ const filled=schoolContext.juneIntakeDraft({...draft,reporter_id:"10000000-0000-4000-8000-000000000004",school_name:"Demo School",city_id:"1",end_user_type:"teacher",platform:"android",school_issue_area:"classes",school_update_requested:"no",issue_description:"Teacher has no classes"},"june_schools");
+ assert.deepEqual(schema.intakeDraftErrors(filled,"june_schools",true),{});assert.equal(filled.customer_name,"Demo School");
+ assert.ok(schema.intakeDraftErrors({...filled,school_issue_area:"made-up"},"june_schools",true).school_issue_area);
+ assert.equal(schema.intakeDraftErrors({...draft,source:"call_center"},"call_center",true).school_issue_area,undefined);
 });
 test("Web intake does not request an installed app version or preserve stale app-version data",()=>{
  const input={...intakeHelpers.initialIntakeDraft("2026-11-14"),source:"whatsapp",customer_name:"Demo customer",city_id:"1",end_user_type:"parent",platform:"web",is_latest_version:"",fawry_payment:"unknown",issue_description:"Web access is not working",app_version:"stale mobile version"};
@@ -405,8 +410,15 @@ test("Web intake does not request an installed app version or preserve stale app
  const mobile=schema.supportTicketSchema.safeParse({...input,platform:"android"});assert.equal(mobile.success,false);assert.ok(schema.fieldErrorsOf(mobile.error).is_latest_version);
 });
 test("school context stays structured, source-specific and readable for Support",()=>{
- const input={school_code:" 110 ",school_user_ids:"1001, 1002",school_issue_area:"grade",school_impact:"several",school_expected_grade:"Grade 5",school_shown_grade:"Grade 4",customer_name:"Demo",source:"june_schools"};
- const school=schoolContext.intakeRecord(input,"june_schools");assert.equal(school.school_context.school_code,"110");assert.equal(school.school_code,undefined);assert.equal(school.school_context.school_shown_grade,"Grade 4");
- assert.ok(schoolContext.schoolContextEntries(school.school_context).some(([label,text])=>label==="School issue area"&&text==="Wrong grade / outdated school data"));
+ const input={school_code:" 110 ",school_user_ids:"1001, 1002",school_issue_area:"grade",school_update_requested:"yes",school_impact:"several",customer_name:"Demo",source:"june_schools"};
+ const school=schoolContext.intakeRecord(input,"june_schools");assert.equal(school.school_context.school_code,"110");assert.equal(school.school_code,undefined);assert.equal(school.school_context.school_update_requested,"yes");assert.equal(school.school_context.school_impact,undefined);
+ assert.ok(schoolContext.schoolContextEntries(school.school_context).some(([label,text])=>label==="Issue type"&&text==="Grade not promoted"));
  assert.equal(schoolContext.intakeRecord(input,"call_center").school_context,null);assert.deepEqual(schoolContext.schoolContextEntries(null),[]);
+});
+
+test("a typed place is kept only with the Other city and is required there",()=>{
+ assert.deepEqual(intakeHelpers.typedCity("Other"," Saudi Arabia "),{value:"Saudi Arabia"});
+ assert.ok(intakeHelpers.typedCity("other","").error);assert.ok(intakeHelpers.typedCity("Other","x").error);
+ assert.deepEqual(intakeHelpers.typedCity("Cairo","Saudi Arabia"),{value:null});
+ assert.equal(intakeHelpers.cityLabel("Other","Riyadh"),"Riyadh");assert.equal(intakeHelpers.cityLabel("Cairo","Riyadh"),"Cairo");assert.equal(intakeHelpers.cityLabel("Other",null),"Other");
 });

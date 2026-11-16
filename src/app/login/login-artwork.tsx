@@ -1,21 +1,29 @@
 "use client";
 
-import { useEffect, useRef, type PointerEvent } from "react";
+import { Fragment, useEffect, useRef, useState, type PointerEvent } from "react";
 
 /** An illustrated casebook: one entrance sequence and bounded, frame-paced parallax. */
 export function LoginArtwork() {
   const art = useRef<HTMLDivElement>(null);
   const frame = useRef<number | null>(null);
   const point = useRef({ x: 0, y: 0 });
+  const glare = useRef({ x: 300, y: 160, curl: false });
+  const [flips, setFlips] = useState(0);
+  const step = (flips + 2) % 3;
   useEffect(() => () => { if (frame.current !== null) cancelAnimationFrame(frame.current); }, []);
   function move(event: PointerEvent<HTMLDivElement>) {
     if (event.pointerType !== "mouse" || window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
     const bounds = event.currentTarget.getBoundingClientRect();
     point.current = { x: (0.5 - (event.clientY - bounds.top) / bounds.height) * 5, y: ((event.clientX - bounds.left) / bounds.width - 0.5) * 7 };
+    const across = (event.clientX - bounds.left) / bounds.width, down = (event.clientY - bounds.top) / bounds.height;
+    glare.current = { x: across * 600, y: down * 360, curl: across > 0.68 && down > 0.5 };
     if (frame.current !== null) return;
     frame.current = requestAnimationFrame(() => {
       art.current?.style.setProperty("--book-x", point.current.x + "deg");
       art.current?.style.setProperty("--book-y", point.current.y + "deg");
+      art.current?.style.setProperty("--glare-x", glare.current.x + "px");
+      art.current?.style.setProperty("--glare-y", glare.current.y + "px");
+      if (art.current) art.current.dataset.curl = String(glare.current.curl);
       frame.current = null;
     });
   }
@@ -24,8 +32,9 @@ export function LoginArtwork() {
     frame.current = null;
     art.current?.style.setProperty("--book-x", "0deg");
     art.current?.style.setProperty("--book-y", "0deg");
+    if (art.current) art.current.dataset.curl = "false";
   }
-  return <div className="auth-artwork" aria-hidden="true" onPointerMove={move} onPointerLeave={reset}>
+  return <div className="auth-artwork" aria-hidden="true" onPointerMove={move} onPointerLeave={reset} onClick={() => setFlips((count) => count + 1)} data-step={step}>
     <div className="auth-book" ref={art}>
       <svg viewBox="0 0 600 360" fill="none" focusable="false">
         <defs>
@@ -33,6 +42,8 @@ export function LoginArtwork() {
           <linearGradient id="casebook-right" x1="300" y1="180" x2="529" y2="155" gradientUnits="userSpaceOnUse"><stop stopColor="#BDCBA7" /><stop offset=".12" stopColor="#F6F3DD" /><stop offset="1" stopColor="#E4E7CA" /></linearGradient>
           <linearGradient id="casebook-leaf" x1="300" y1="80" x2="365" y2="170" gradientUnits="userSpaceOnUse"><stop stopColor="#FBF8E8" /><stop offset="1" stopColor="#CFDABB" stopOpacity=".2" /></linearGradient>
           <radialGradient id="casebook-light"><stop stopColor="#BDD99E" stopOpacity=".15" /><stop offset="1" stopColor="#BDD99E" stopOpacity="0" /></radialGradient>
+          <radialGradient id="casebook-glare"><stop stopColor="#FFFFFF" stopOpacity=".55" /><stop offset="1" stopColor="#FFFFFF" stopOpacity="0" /></radialGradient>
+          <clipPath id="casebook-pages"><path d="M76 83C151 49 225 68 300 109V296C224 253 150 235 76 270V83Z" /><path d="M300 109C377 68 451 49 526 83V270C451 235 377 253 300 296V109Z" /></clipPath>
           <radialGradient id="casebook-shadow"><stop stopColor="#061D15" stopOpacity=".65" /><stop offset="1" stopColor="#061D15" stopOpacity="0" /></radialGradient>
         </defs>
         <ellipse cx="300" cy="155" rx="280" ry="150" fill="url(#casebook-light)" />
@@ -48,15 +59,20 @@ export function LoginArtwork() {
             <path d="M106 115C154 96 205 107 263 136" pathLength="1" /><path d="M106 135C154 116 205 127 263 156" pathLength="1" /><path d="M106 155C151 138 194 146 231 162" pathLength="1" />
             <path d="M337 136C392 107 441 96 493 115" pathLength="1" /><path d="M337 156C392 127 441 116 493 135" pathLength="1" /><path d="M365 163C405 146 448 139 493 155" pathLength="1" />
           </g>
+          <g className="auth-book-glare" clipPath="url(#casebook-pages)"><circle r="130" fill="url(#casebook-glare)" /></g>
           <path className="auth-book-ribbon" d="M382 74L397 69V139L389 131L382 146V74Z" fill="#387453" />
+          <g className="auth-book-trail">
           <path className="auth-book-route" d="M127 220C190 181 244 260 300 225C356 190 398 182 471 210" pathLength="1" stroke="#2B7752" strokeWidth="2.4" strokeLinecap="round" />
           <g className="auth-book-point auth-point-one"><circle cx="127" cy="220" r="11" fill="#719762" fillOpacity=".15" /><circle cx="127" cy="220" r="4" fill="#2B6A48" stroke="#F5F2DC" strokeWidth="2" /></g>
           <g className="auth-book-point auth-point-two"><circle cx="300" cy="225" r="11" fill="#719762" fillOpacity=".15" /><circle cx="300" cy="225" r="4" fill="#2B6A48" stroke="#F5F2DC" strokeWidth="2" /></g>
-          <g className="auth-book-seal"><circle cx="471" cy="210" r="17" fill="#2A6849" /><circle cx="471" cy="210" r="21" stroke="#62966B" strokeOpacity=".4" /><path d="M463 210L469 216L480 204" stroke="#EFF1D8" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" /></g>
+          <g className="auth-book-stamp"><g className="auth-book-seal"><circle cx="471" cy="210" r="17" fill="#2A6849" /><circle cx="471" cy="210" r="21" stroke="#62966B" strokeOpacity=".4" /><path d="M463 210L469 216L480 204" stroke="#EFF1D8" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" /></g></g>
+          </g>
+          <g className="auth-book-curl"><path d="M526 240V270L494 266Z" fill="#2C543F" fillOpacity=".28" /><path d="M526 244V270L500 265Z" fill="#9FB28C" /><path d="M526 244L500 265L509 249Z" fill="#FBF8E8" stroke="#9FB38E" strokeWidth=".8" strokeLinejoin="round" /></g>
           <path className="auth-turning-leaf" d="M300 110C312 77 334 62 362 59C338 103 333 179 300 296V110Z" fill="url(#casebook-leaf)" />
+          {flips > 0 && <path key={flips} className="auth-turning-leaf auth-leaf-replay" d="M300 110C312 77 334 62 362 59C338 103 333 179 300 296V110Z" fill="url(#casebook-leaf)" />}
         </g>
       </svg>
     </div>
-    <div className="auth-art-caption"><span><i />Record</span><b /><span><i />Resolve</span><b /><span><i />Follow up</span></div>
+    <div className="auth-art-caption">{["Record", "Resolve", "Follow up"].map((label, index) => <Fragment key={label}>{index > 0 && <b />}<span data-active={flips > 0 && index === step}><i />{label}</span></Fragment>)}</div>
   </div>;
 }

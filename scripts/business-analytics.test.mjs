@@ -20,9 +20,9 @@ const f=(overrides={})=>m.parseBusinessFilters(overrides);
 test('chart tooltips contain the same text in server HTML instead of empty SVG titles',()=>{
  const React=require('react'),{renderToStaticMarkup}=require('react-dom/server');
  const compiled=ts.transpileModule(readFileSync(new URL('../src/app/(app)/dashboard/single-page-charts.tsx',import.meta.url),'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022,jsx:ts.JsxEmit.ReactJSX,esModuleInterop:true}}).outputText;
- const module={exports:{}};const localRequire=(name)=>name==='@/lib/tickets/business-analytics'?m:name==='@/lib/tickets/single-page-model'?single:name==='@/lib/tickets/world-countries.json'?require(join(directory,'world-countries.json')):require(name);
- vm.runInNewContext(compiled,{require:localRequire,exports:module.exports,module});
- const charts=module.exports,tickets=[ticket()];const components=[['DemandArea',{tickets,filters:f(),asOf}],['SourceColumns',{tickets,sources:new Map(),onPick:()=>{}}],['OutcomeDonut',{tickets,onPick:()=>{}}],['LocationMap',{tickets,cities:[{id:'1',name:'Cairo'}],onPick:()=>{}}]];
+ const sandbox={exports:{}};const localRequire=(name)=>name==='./case-map'?{CaseMap:({fallback})=>fallback}:name==='@/lib/tickets/business-analytics'?m:name==='@/lib/tickets/single-page-model'?single:name==='@/lib/tickets/world-countries.json'?require(join(directory,'world-countries.json')):require(name);
+ vm.runInNewContext(compiled,{require:localRequire,exports:sandbox.exports,module:sandbox});
+ const charts=sandbox.exports,tickets=[ticket()];const components=[['DemandArea',{tickets,filters:f(),asOf}],['SourceMix',{tickets,sources:new Map(),onPick:()=>{}}],['OutcomeDonut',{tickets,onPick:()=>{}}],['LocationMap',{tickets,cities:[{id:'1',name:'Cairo'}],onPick:()=>{}}]];
  for(const [name,props]of components){const html=renderToStaticMarkup(React.createElement(charts[name],props)),titles=[...html.matchAll(/<title>(.*?)<\/title>/g)].map(x=>x[1]);assert.ok(titles.length>0,name);assert.ok(titles.every(text=>text.trim().length>0),name+' must serialize nonempty SVG titles');}
 });
 
@@ -31,7 +31,8 @@ test('map coverage accounts for missing, explicit unknown, unrecognized and inte
  const cities=[{id:'1',name:'Cairo'},{id:'3',name:'Alexandria'},{id:'29',name:'Kuwait'},{id:'28',name:'Not recorded'},{id:'999',name:'New unverified city'}];
  const result=single.geographicCases(data,cities);assert.equal(result.mapped,3);assert.equal(result.missing,2);assert.equal(result.unmapped,1);assert.equal(result.mapped+result.missing+result.unmapped,result.total);
  const international=result.locations.find(p=>p.name==='Kuwait');assert.equal(international.place.country,'Kuwait');assert.equal(international.place.level,'country');assert.ok(international.place.lon>46&&international.place.lon<49);assert.equal(result.locations.find(p=>p.id==='999').place,null);
- assert.equal(single.resolvePlace('Red Sea').country,'Egypt');assert.equal(single.resolvePlace('never geocode this customer address'),null);
+ assert.equal(single.resolvePlace('Red Sea').country,'Egypt');for(const name of ['Cairo','Giza','Alexandria','Qalyubia','Sharqia','Dakahlia','Gharbia','Monufia','Beheira','Kafr El Sheikh','Damietta','Port Said','Ismailia','Suez','Faiyum','Beni Suef','Minya','Asyut','Sohag','Qena','Luxor','Aswan','Red Sea','New Valley','Matrouh','North Sinai','South Sinai']){const place=single.resolvePlace(name);assert.equal(place?.country,'Egypt',name);assert.ok(place.lon>24&&place.lon<37&&place.lat>22&&place.lat<32,name);}
+ assert.equal(single.resolvePlace('Riyadh').country,'Saudi Arabia');assert.equal(single.resolvePlace('Other'),null);assert.equal(single.resolvePlace('never geocode this customer address'),null);
 });
 test('clustered source series preserve every case through other request types and missing classification',()=>{
  const data=Array.from({length:70},(_,i)=>ticket({id:String(i),source:['call_center','moderation','whatsapp'][i%3],requestType:i%7?'Type '+i%6:''}));
@@ -107,4 +108,18 @@ test('loader cursor-pages more than 500 tickets and more than 500 workflow event
  const compiled=ts.transpileModule(readFileSync(new URL('../src/lib/tickets/load-analytics.ts',import.meta.url),'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022}}).outputText;
  const mod={exports:{}};vm.runInNewContext(compiled,{exports:mod.exports,require:id=>id==='server-only'?{}:id==='@/lib/supabase/server'?{createClient:async()=>db}:id==='./dashboard-model'?require(join(directory,'dashboard-model.js')):assert.fail('Unexpected dependency '+id),Date,Map,Set});
  const result=await mod.exports.loadAnalytics();assert.equal(result.tickets.length,1001);assert.equal(result.tickets[0].workflowEvents.length,1201);assert.equal(result.tickets[0].workflowEvents[0].actorRole,'support_agent');assert.ok(!('response' in result.tickets[0].workflowEvents[0].resolution_snapshot));assert.ok(requests.filter(r=>r.table==='ticket_workflow_events').length>=3);
+});
+
+test('volume chart gives a source the same colour in every period',()=>{
+ const React=require('react'),{renderToStaticMarkup}=require('react-dom/server');
+ const compiled=ts.transpileModule(readFileSync(new URL('../src/app/(app)/dashboard/single-page-charts.tsx',import.meta.url),'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022,jsx:ts.JsxEmit.ReactJSX,esModuleInterop:true}}).outputText;
+ const sandbox={exports:{}};const localRequire=(name)=>name==='./case-map'?{CaseMap:({fallback})=>fallback}:name==='@/lib/tickets/business-analytics'?m:name==='@/lib/tickets/single-page-model'?single:name==='@/lib/tickets/world-countries.json'?require(join(directory,'world-countries.json')):require(name);
+ vm.runInNewContext(compiled,{require:localRequire,exports:sandbox.exports,module:sandbox});
+ const sources=new Map([['whatsapp','WhatsApp'],['call_center','Call Center'],['june_schools','30 June Schools'],['new_desk','New desk']]);
+ assert.equal(new Set([...sources.keys()].map(id=>sandbox.exports.sourceColor(id,sources))).size,4);
+ const legend=(tickets)=>{const html=renderToStaticMarkup(React.createElement(sandbox.exports.DemandArea,{tickets,filters:f(),asOf,sources}));return Object.fromEntries([...html.matchAll(/<i style="background:(#[0-9a-f]+)"[^>]*><\/i><span>([^<]+)<\/span>/g)].map(x=>[x[2],x[1]]));};
+ const all=legend([ticket({id:'a',source:'whatsapp'}),ticket({id:'b',source:'whatsapp'}),ticket({id:'c',source:'call_center'}),ticket({id:'d',source:'june_schools'})]);
+ const period=legend([ticket({id:'c',source:'call_center'}),ticket({id:'e',source:'call_center'}),ticket({id:'d',source:'june_schools'})]);
+ assert.ok(all['WhatsApp']&&all['Call Center']&&period['Call Center']);
+ assert.equal(period['Call Center'],all['Call Center']);assert.equal(period['30 June Schools'],all['30 June Schools']);
 });

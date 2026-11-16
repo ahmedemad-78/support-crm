@@ -1,4 +1,5 @@
 import { notFound } from "next/navigation";
+import { cityLabel } from "@/lib/tickets/intake";
 import { AgentFrame } from "@/components/app-shell/agent-frame";
 import { requireUser } from "@/lib/auth/session";
 import { createClient } from "@/lib/supabase/server";
@@ -29,7 +30,7 @@ export default async function AgentTicketPage({
     .from("tickets")
     .select(
       `id, ticket_number, status, source, created_at, updated_at, customer_name, customer_email, customer_phone, school_name,
-       school_context, credentials_username, issue_date, end_user_type, platform, is_latest_version, app_version,
+       school_context, city_other, credentials_username, issue_date, end_user_type, platform, is_latest_version, app_version,
        device_type, page_screen, steps, issue_description, assignee_id, issue_category_id, root_cause_id,
        action_taken, resolution_notes, follow_up_notes, tracker_notes, fawry_payment,
        request_type_id, topic_id, tracker_cause_id, tracker_action_id, outcome_id, cities(name),
@@ -77,7 +78,7 @@ export default async function AgentTicketPage({
   const status = ticket.status as TicketStatus;
   const { data: ticketSource } = await supabase.from("ticket_sources").select("name").eq("code", ticket.source).maybeSingle();
   const canEdit = user.role === "support_agent";
-  const city = nameOf(ticket.cities);
+  const city = cityLabel(nameOf(ticket.cities), ticket.city_other);
   const creator = nameOf(ticket.creator);
   const idValue = (value: number | null) => value == null ? "" : String(value);
   return <AgentFrame title="Case file"><CaseWorkspace

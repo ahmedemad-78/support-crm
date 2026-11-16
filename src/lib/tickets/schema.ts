@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { validDay } from "./analytics";
 import { END_USER_TYPES, PLATFORMS } from "./constants";
+import { SCHOOL_ISSUE_AREAS, SCHOOL_UPDATE_REQUESTED } from "./school-context";
 
 const yesNo = (label: string) =>
   z.enum(["yes", "no", "unknown"], { error: `Choose Yes, No or Unknown for "${label}"` }).transform((v) => v === "unknown" ? null : v === "yes");
@@ -35,6 +36,7 @@ const rawTicketSchema = z.object({
     .refine(validDay, "Pick a real date")
     .refine((d) => d <= todayInCairo(), "Date of issue can't be in the future"),
   city_id: z.coerce.number({ error: "Choose a city" }).int().positive("Choose a city"),
+  city_other: optionalText(80),
   end_user_type: z.enum(END_USER_TYPES, { error: "Choose the user type" }),
   platform: z.enum(PLATFORMS, { error: "Choose the platform" }),
   is_latest_version: z.string().optional().default(""),
@@ -46,11 +48,7 @@ const rawTicketSchema = z.object({
   school_code: optionalText(80),
   school_user_ids: optionalText(600),
   school_issue_area: optionalText(40),
-  school_impact: optionalText(40),
-  school_expected_grade: optionalText(80),
-  school_shown_grade: optionalText(80),
-  school_subject: optionalText(160),
-  school_section: optionalText(80),
+  school_update_requested: optionalText(40),
   issue_description: z.string().trim().min(5, "Describe the issue in a few words").max(8000,"Keep the description within 8,000 characters"),
 });
 
@@ -60,13 +58,17 @@ const hasSchool=(value:{school_name?:unknown})=>typeof value.school_name==="stri
 const versionReady=(value:{platform?:unknown;is_latest_version?:unknown})=>value.platform==="web"||["yes","no","unknown"].includes(String(value.is_latest_version??""));
 const versionRule={path:["is_latest_version"],message:"Choose Yes, No or Unknown for the latest app version",when:()=>true};
 const schoolRule={path:["school_name"],message:"Enter the school name for this source",when:()=>true};
+const listed=(items:readonly {value:string}[],value:unknown)=>items.some(item=>item.value===value);
+type JuneFields={source?:unknown;school_issue_area?:unknown;school_update_requested?:unknown};
+const issueTypeRule={path:["school_issue_area"],message:"Choose the issue type",when:()=>true};
+const updateRule={path:["school_update_requested"],message:"Choose whether a MySchool update was already requested",when:()=>true};
 const normalizedLatest=(platform:string,value:string)=>platform==="web"||value==="unknown"?null:value==="yes";
 export const portalTicketSchema=rawTicketSchema.refine(versionReady,versionRule).transform(value=>({...value,is_latest_version:normalizedLatest(value.platform,value.is_latest_version),app_version:value.platform==="web"?null:value.app_version}));
-export function portalTicketSchemaFor(source:string){return rawTicketSchema.refine(value=>!needsSchool(source)||hasSchool(value),schoolRule).refine(versionReady,versionRule).transform(value=>({...value,is_latest_version:normalizedLatest(value.platform,value.is_latest_version),app_version:value.platform==="web"?null:value.app_version}));}
+export function portalTicketSchemaFor(source:string){return rawTicketSchema.refine((value:JuneFields)=>source!=="june_schools"||listed(SCHOOL_ISSUE_AREAS,value.school_issue_area),issueTypeRule).refine((value:JuneFields)=>source!=="june_schools"||listed(SCHOOL_UPDATE_REQUESTED,value.school_update_requested),updateRule).refine(value=>!needsSchool(source)||hasSchool(value),schoolRule).refine(versionReady,versionRule).transform(value=>({...value,is_latest_version:normalizedLatest(value.platform,value.is_latest_version),app_version:value.platform==="web"?null:value.app_version}));}
 export const supportTicketSchema=rawTicketSchema.extend({
  source:z.string().trim().min(1,"Choose a source"),
  reporter_id:z.string().optional().transform(value=>value||null).pipe(z.uuid("Choose a reporting owner").nullable()),
-}).refine(value=>!needsSchool(typeof value.source==="string"?value.source:"")||hasSchool(value),schoolRule).refine(versionReady,versionRule).transform(value=>({...value,is_latest_version:normalizedLatest(value.platform,value.is_latest_version),app_version:value.platform==="web"?null:value.app_version}));
+}).refine((value:JuneFields)=>value.source!=="june_schools"||listed(SCHOOL_ISSUE_AREAS,value.school_issue_area),issueTypeRule).refine((value:JuneFields)=>value.source!=="june_schools"||listed(SCHOOL_UPDATE_REQUESTED,value.school_update_requested),updateRule).refine(value=>!needsSchool(typeof value.source==="string"?value.source:"")||hasSchool(value),schoolRule).refine(versionReady,versionRule).transform(value=>({...value,is_latest_version:normalizedLatest(value.platform,value.is_latest_version),app_version:value.platform==="web"?null:value.app_version}));
 
 export type PortalTicketInput = z.input<typeof portalTicketSchema>;
 export type SupportTicketInput = z.input<typeof supportTicketSchema>;
