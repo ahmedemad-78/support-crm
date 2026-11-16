@@ -13,7 +13,8 @@ const DOT = "#183e2e";
 const HALO = "#17a04a";
 
 function collection(marks: CaseMark[]) {
-  return { type: "FeatureCollection" as const, features: marks.map((mark) => ({ type: "Feature" as const, properties: { id: mark.id, name: mark.name, count: mark.count, level: mark.level }, geometry: { type: "Point" as const, coordinates: [mark.lon, mark.lat] } })) };
+  const max = Math.max(1, ...marks.map((mark) => mark.count));
+  return { type: "FeatureCollection" as const, features: marks.map((mark) => ({ type: "Feature" as const, properties: { id: mark.id, name: mark.name, count: mark.count, level: mark.level, r: 9 + 11 * Math.sqrt(mark.count / max) }, geometry: { type: "Point" as const, coordinates: [mark.lon, mark.lat] } })) };
 }
 
 /** Interactive basemap with one sized marker per recorded place. Renders `fallback` when the basemap cannot load. */
@@ -42,8 +43,8 @@ export function CaseMap({ marks, world, onPick, label, fallback }: { marks: Case
       created.on("style.load", () => {
         styled = true;
         created.addSource("cases", { type: "geojson", data: collection([]) });
-        const radius = ["+", 7, ["*", 3, ["sqrt", ["get", "count"]]]] as unknown as number;
-        created.addLayer({ id: "case-halo", type: "circle", source: "cases", paint: { "circle-radius": ["*", 2.3, radius] as unknown as number, "circle-color": HALO, "circle-opacity": 0.16, "circle-blur": 0.6 } });
+        const radius = ["get", "r"] as unknown as number;
+        created.addLayer({ id: "case-halo", type: "circle", source: "cases", paint: { "circle-radius": ["*", 2.2, radius] as unknown as number, "circle-color": HALO, "circle-opacity": 0.16, "circle-blur": 0.6 } });
         created.addLayer({ id: "case-dot", type: "circle", source: "cases", layout: { "circle-sort-key": ["-", 0, ["get", "count"]] }, paint: { "circle-radius": radius, "circle-color": DOT, "circle-opacity": 0.92, "circle-stroke-color": "#fff", "circle-stroke-width": 1.5 } });
         created.addLayer({ id: "case-count", type: "symbol", source: "cases", layout: { "text-field": ["to-string", ["get", "count"]], "text-font": ["Noto Sans Bold"], "text-size": 12, "text-allow-overlap": true, "text-ignore-placement": true }, paint: { "text-color": "#fff" } });
         const tip = new gl.Popup({ closeButton: false, closeOnClick: false, offset: 14, className: "ov-map-tip" });
