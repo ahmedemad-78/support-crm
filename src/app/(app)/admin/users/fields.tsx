@@ -1,8 +1,9 @@
 "use client";
 
+import { PasswordEye } from "@/components/password-eye";
 import { useState } from "react";
 import { Radio as RadioPrimitive } from "@base-ui/react/radio";
-import { Building2, ChartColumn, Check, Copy, Eye, EyeOff, Headset, MessagesSquare, PhoneCall, RefreshCw, School, type LucideIcon } from "lucide-react";
+import { Building2, ChartColumn, Check, Copy, Headset, MessagesSquare, PhoneCall, RefreshCw, School, type LucideIcon } from "lucide-react";
 import { toast } from "sonner";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -84,16 +85,19 @@ export function PasswordField({
           value={value}
           onChange={(e) => onChange(e.target.value)}
           autoComplete="new-password"
-          className="h-10 pr-16 font-mono"
+          className="h-10 pr-20 font-mono"
         />
-        <div className="absolute top-1/2 right-2 flex -translate-y-1/2 gap-1">
+        <div className="absolute top-1/2 right-2 flex -translate-y-1/2 items-center gap-1">
           <button
             type="button"
             onClick={() => setVisible((v) => !v)}
-            className="rounded p-1 text-muted-foreground hover:text-foreground"
+            className="eye-toggle is-compact"
+            data-open={visible}
+            aria-pressed={visible}
+            aria-label={visible ? "Hide password" : "Show password"}
             title={visible ? "Hide password" : "Show password"}
           >
-            {visible ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
+            <PasswordEye />
           </button>
           <button
             type="button"

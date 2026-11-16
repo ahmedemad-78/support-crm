@@ -15,6 +15,17 @@ const NOT_RECORDED = "#d9ddd4";
 const WARNING = "#d7282f";
 const SERIES = [ACCENT, ACCENT_STRONG, "#f2b90f", "#3f97d3", "#e8744f", "#a3c93a"];
 
+/** A source keeps one colour whatever the period or filter, so the legend never reshuffles. */
+const SOURCE_SERIES: Record<string, string> = { call_center: ACCENT, whatsapp: ACCENT_STRONG, june_schools: "#f2b90f", moderation: "#3f97d3", business_development: "#e8744f", marketing_team: "#a3c93a", google_play: "#8a6fc4" };
+const SOURCE_SPARE = ["#2bb3a3", "#c2569b", "#7a8b99", "#b98a3e"];
+export function sourceColor(id: string, sources: Map<string, string>) {
+  if (id === MISSING) return NOT_RECORDED;
+  if (id === "__other__") return OTHER;
+  if (SOURCE_SERIES[id]) return SOURCE_SERIES[id];
+  const extra = [...sources.keys()].filter((code) => !SOURCE_SERIES[code] && code !== MISSING).sort();
+  return SOURCE_SPARE[Math.max(0, extra.indexOf(id)) % SOURCE_SPARE.length];
+}
+
 /** Colours follow rank order, so two series in one chart never share a hue. */
 export function seriesColor(id: string, index = 0) {
   if (id === MISSING) return NOT_RECORDED;
@@ -83,9 +94,9 @@ function sourceSeries(tickets: BusinessTicket[], filters: BusinessFilters, asOf:
     ...lead.map((r) => ({ id: r.id, name: r.name, ids: new Set([r.id]) })),
     ...(rest.length ? [{ id: "__other__", name: `${rest.length} other sources`, ids: new Set(rest.map((r) => r.id)) }] : []),
   ];
-  const series = groups.map((g, i) => {
+  const series = groups.map((g) => {
     const counts = timeBuckets(tickets.filter((t) => g.ids.has(field(t, "source"))), pinned, asOf).map((b) => b.count);
-    return { id: g.id, name: g.name, color: seriesColor(g.id, i), total: counts.reduce((n, c) => n + c, 0), counts };
+    return { id: g.id, name: g.name, color: sourceColor(g.id, sources), total: counts.reduce((n, c) => n + c, 0), counts };
   });
   return series.every((r) => r.counts.length === bins.length) ? series : [];
 }

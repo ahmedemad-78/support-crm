@@ -64,18 +64,6 @@ export function TicketControls({
   );
 }
 
-export function CredentialsValue({ value }: { value: string }) {
-  const [shown, setShown] = useState(false);
-  return (
-    <span className="flex items-center gap-2">
-      <span className="font-mono text-sm">{shown ? value : "••••••••"}</span>
-      <button type="button" onClick={() => setShown((open) => !open)} className="text-xs font-semibold text-brand-action">
-        {shown ? "Hide" : "Show"}
-      </button>
-    </span>
-  );
-}
-
 export function CopyTicketNumber({ value }: { value: string }) {
   const [copied, setCopied] = useState(false);
   return (
