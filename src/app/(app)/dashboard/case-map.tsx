@@ -9,6 +9,8 @@ export type CaseMark = { id: string; name: string; count: number; lon: number; l
 /* OpenFreeMap serves OpenStreetMap vector tiles without a key or quota. Only map tiles are requested; no case data leaves the browser. */
 const STYLE = "https://tiles.openfreemap.org/styles/positron";
 const EGYPT: [number, number, number, number] = [24, 22, 37, 33];
+/* The country label is drawn once, as "Palestine"; the data's own entries for it are dropped so it is not repeated. */
+const PALESTINE_DUPLICATES = ["Palestine", "State of Palestine", "Palestinian Territories", "Palestinian Territory"];
 const DOT = "#183e2e";
 const HALO = "#17a04a";
 
@@ -42,6 +44,14 @@ export function CaseMap({ marks, world, onPick, label, fallback }: { marks: Case
       created.on("error", giveUp);
       created.on("style.load", () => {
         styled = true;
+        /* English names only: the two-script labels of the stock style collide at country scale. */
+        const english = ["coalesce", ["get", "name_en"], ["get", "name:latin"], ["get", "name"]];
+        for (const layer of created.getStyle().layers ?? []) {
+          if (layer.type !== "symbol" || !JSON.stringify(layer.layout?.["text-field"] ?? "").includes("name:nonlatin")) continue;
+          const country = layer.id.startsWith("label_country");
+          created.setLayoutProperty(layer.id, "text-field", country ? ["match", english, "Israel", "Palestine", english] : english);
+          if (country && layer.filter) created.setFilter(layer.id, ["all", layer.filter, ["!", ["in", english, ["literal", PALESTINE_DUPLICATES]]]] as never);
+        }
         created.addSource("cases", { type: "geojson", data: collection([]) });
         const radius = ["get", "r"] as unknown as number;
         created.addLayer({ id: "case-halo", type: "circle", source: "cases", paint: { "circle-radius": ["*", 2.2, radius] as unknown as number, "circle-color": HALO, "circle-opacity": 0.16, "circle-blur": 0.6 } });
