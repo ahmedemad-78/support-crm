@@ -34,7 +34,7 @@ export function CaseMap({ marks, world, onPick, label, fallback }: { marks: Case
     import("maplibre-gl").then(({ default: gl }) => {
       if (cancelled || !box.current) return;
       try {
-        instance = new gl.Map({ container: box.current, style: STYLE, bounds: EGYPT, fitBoundsOptions: { padding: 40 }, dragRotate: false, pitchWithRotate: false, cooperativeGestures: true, attributionControl: { compact: true }, canvasContextAttributes: { preserveDrawingBuffer: true } });
+        instance = new gl.Map({ container: box.current, style: STYLE, bounds: EGYPT, fitBoundsOptions: { padding: 40 }, renderWorldCopies: false, dragRotate: false, pitchWithRotate: false, cooperativeGestures: true, attributionControl: { compact: true }, canvasContextAttributes: { preserveDrawingBuffer: true } });
       } catch { giveUp(); return; }
       const created = instance;
       created.touchZoomRotate.disableRotation();
@@ -71,7 +71,7 @@ export function CaseMap({ marks, world, onPick, label, fallback }: { marks: Case
     if (state !== "ready" || !current) return;
     (current.getSource("cases") as GeoJSONSource | undefined)?.setData(collection(marks));
     const lon = marks.map((mark) => mark.lon), lat = marks.map((mark) => mark.lat);
-    const bounds: [number, number, number, number] = world ? [-150, -50, 170, 72] : [Math.min(EGYPT[0], ...lon) - 1.5, Math.min(EGYPT[1], ...lat) - 1, Math.max(EGYPT[2], ...lon) + 1.5, Math.max(EGYPT[3], ...lat) + 1];
+    const bounds: [number, number, number, number] = world ? [-125, -45, 150, 68] : [Math.min(EGYPT[0], ...lon) - 1.5, Math.min(EGYPT[1], ...lat) - 1, Math.max(EGYPT[2], ...lon) + 1.5, Math.max(EGYPT[3], ...lat) + 1];
     current.fitBounds(bounds, { padding: 40, maxZoom: 7, duration: 600 });
   }, [marks, world, state]);
 
