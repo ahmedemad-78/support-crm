@@ -1,185 +1,185 @@
-# وثيقة متطلبات العمل
+# Business Requirements
 
-## نظام إدارة دعم العملاء
+## Support CRM
 
-| البند | البيان |
+| Item | Detail |
 | --- | --- |
-| اسم الوثيقة | متطلبات العمل النهائية |
-| المنتج | Support CRM |
-| الإصدار | 1.0 |
-| الحالة | نهائية لنطاق الإدخال اليدوي |
-| التاريخ | 17 نوفمبر 2026 |
-| المنطقة الزمنية | أفريقيا/القاهرة |
-| الجمهور | مدير التحول الرقمي، فريق الدعم، وفريق البرمجيات |
-| تحل محل | مسودة سبتمبر 2026 فيما يخص واتساب الآلي وملف التتبع الخارجي |
+| Document | Final business requirements |
+| Product | Support CRM |
+| Version | 1.0 |
+| Status | Final for the manual-intake release |
+| Date | 17 November 2026 |
+| Time zone | Africa/Cairo |
+| Audience | Digital Director, Support, and the Software Team |
+| Supersedes | The September 2026 draft on connected WhatsApp and the external tracker file |
 
-هذه الوثيقة تصف النظام كما هو مبني ومقبول لنطاق العمل الحالي. أي سلوك غير مذكور هنا ليس متطلباً في هذا الإصدار.
+This document describes the system as built and accepted for the current scope. Behavior that is not stated here is not a requirement of this release.
 
 ---
 
-## 1. الغرض
+## 1. Purpose
 
-تجميع بلاغات عملاء منصة التعليم في سجل واحد، من لحظة ورود البلاغ حتى الحل أو الإغلاق، مع وضوح من فتح الحالة، ومن يتابعها، وماذا تم، ومتى.
+Collect customer issues for the learning platform in one register, from the moment an issue arrives until it is resolved or closed, with a clear record of who opened it, who follows it, what was done, and when.
 
-النظام هو سجل الحالات الوحيد من تاريخ هذه الوثيقة. ملف التتبع القديم، سواء كان إكسيل أو جوجل شيت، لم يعد مصدر تسجيل ولا مصدر سحب. لا يُطلب ربطه ولا استيراد صفوف جديدة منه.
+From the date of this document, the system is the only register of cases. The old tracker file, whether Excel or Google Sheets, is no longer a place to record cases and is not a source to import from. No connection to it, and no import of new rows from it, is required.
 
-## 2. المشكلة التي يعالجها
+## 2. Problem
 
-البلاغات كانت تصل من أكثر من جهة وتُسجَّل خارج النظام. ذلك يفرّق صاحب البلاغ عن رد الدعم، ويصعّب معرفة حالة العميل، ويجعل التقرير معتمداً على ملف يمكن تعديله أو نسخه.
+Issues arrived from several teams and were written down outside the system. That split the reporting owner from Support’s response, made the customer’s current state hard to see, and left reporting dependent on a file that could be edited or copied.
 
-النظام يجمع الجهات في تذكرة واحدة لها رقم، ومصدر، وصاحب إبلاغ، وتصنيف، ورد، وتاريخ، مع صلاحيات تمنع كل فريق من رؤية عمل فريق آخر إلا بالقدر المتفق عليه.
+The system keeps each issue as one case with a number, a source, a reporting owner, a classification, a response, and a history. Access rules keep each team to the cases it is allowed to see.
 
-## 3. نطاق هذا الإصدار
+## 3. Scope of this release
 
-داخل النطاق:
+In scope:
 
-- تسجيل البلاغ يدوياً من فريق لديه حساب، أو من الدعم الفني نيابة عن مصدر ليس له حساب.
-- متابعة الحالة حتى الحل أو الإغلاق بدون رد.
-- إعادة فتح نفس المشكلة بسبب، أو فتح حالة جديدة مرتبطة لمشكلة مختلفة.
-- ملاحظات داخلية منفصلة عن الرد الظاهر لصاحب البلاغ.
-- إشعارات داخل النظام.
-- لوحة تقارير للمدير والدعم الفني، مع تصدير.
-- إدارة المستخدمين وإعدادات القوائم لمن له صلاحية الإدارة.
+- Manual registration by a team that has an account, or by Technical Support on behalf of a source that has no account.
+- Follow-up until the case is resolved or closed without a response.
+- Reopening the same problem with a reason, or opening a linked new case for a different problem.
+- Internal notes kept apart from the reply the reporting owner can see.
+- In-app notifications.
+- A reporting dashboard for the Manager and Technical Support, with export.
+- User administration and lookup lists for the account that has administration rights.
 
-خارج هذا الإصدار، ويُستكمل لاحقاً بقرار منفصل:
+Outside this release, and to be decided separately:
 
-- إرسال البريد الإلكتروني. الإشعار داخل النظام يعمل. الإرسال إلى صندوق بريد مؤجَّل، والوجهة الحالية صندوق جيميل مؤقت، وآخر اختبار رفض بيانات الدخول.
-- تصحيح الحالات القديمة الناقص تصنيفها. تبقى ظاهرة كما سُجّلت ولا تُعاد كتابتها في هذا الإصدار.
-- صندوق واتساب متصل، وسحب بريد الـ B2B، وأي أتمتة من ملف خارجي.
-- نقل الاستضافة، وتجربة استرجاع النسخة الاحتياطية، واختبار الحمل.
+- Outbound email. In-app notification works. Delivery to a mailbox is deferred. The current destination is a temporary Gmail mailbox, and the last connection test rejected the sign-in details.
+- Correction of older cases that are missing classification. They stay visible as recorded and are not rewritten in this release.
+- A connected WhatsApp inbox, intake from B2B email, and any automation from an external file.
+- Company hosting, a backup-restore rehearsal, and a load test. Those are the next preparation step after this document, not acceptance criteria of this release.
 
-## 4. المستخدمون والصلاحيات
+## 4. Users and access
 
-الدخول بالبريد وكلمة المرور. لا استرجاع ذاتي لكلمة المرور. من له صلاحية الإدارة ينشئ المستخدم، ويحدد الدور، ويعيد كلمة المرور، ويفك القفل، ويوقف الحساب. إيقاف الحساب يخفيه عن العمل دون حذف تاريخه.
+Sign-in is by email and password. There is no self-service password reset. The administrator creates the user, sets the role, resets the password, unlocks the account, and deactivates it. Deactivation removes the person from work and keeps their history.
 
-| الدور | ماذا يفعل | ماذا لا يفعل |
+| Role | Can | Cannot |
 | --- | --- | --- |
-| الدعم الفني | يرى كل الحالات، ينشئ حالة لمصدر بلا حساب، يغيّر الحالة والتصنيف والرد، يكتب ملاحظات داخلية، ويرى اللوحة | — |
-| الدعم الفني مع الإدارة | كل ما للدعم الفني، إضافة إلى المستخدمين والإعدادات | لا يُمنح علم الإدارة من الشاشة؛ يُضبط مرة في قاعدة البيانات |
-| الإشراف | ينشئ بلاغاته ويرى بلاغاته فقط | لا يرى حالات الفرق الأخرى ولا يعدل بعد الإرسال |
-| الكول سنتر | نفس حدود الإشراف على بلاغاته | نفس القيد |
-| مدارس 30 يونيو | نفس البوابة، مع حقول المدرسة الإلزامية | لا يسجّل بلاغاً ناقص اسم المدرسة أو نوع المشكلة أو إجابة MySchool |
-| مدارس B2B | نفس البوابة، واسم المدرسة إلزامي | لا يسجّل بلاغاً بلا اسم مدرسة |
-| المدير | يرى كل الحالات وكل بياناتها، بما فيها معرّف حساب العميل، ويرى اللوحة ويصدّر | لا يعدل الحالة ولا بيانات التذكرة |
+| Technical Support | See every case, create a case for a source with no account, change status, classification, and the response, write internal notes, and use the dashboard | — |
+| Technical Support with administration | Everything Technical Support can do, plus users and settings | Grant the administration flag from the screen. It is set once in the database |
+| Moderation | Create its own cases and see only those cases | See other teams’ cases, or edit a case after it is submitted |
+| Call Center | The same limits as Moderation, on its own cases | The same restriction |
+| 30 June Schools | The same portal, with the school fields required | Save a case without the school name, the issue type, or the MySchool answer |
+| B2B Schools | The same portal, with the school name required | Save a case without a school name |
+| Manager | Read every case and all of its data, including the customer account identifier, and use the dashboard and export | Change the status or any submitted case data |
 
-بعد الدخول يفتح الدعم الفني سجل الحالات، والمدير اللوحة، وفرق البوابة قائمة بلاغاتهم.
+After sign-in, Technical Support opens the case register, the Manager opens the dashboard, and portal teams open their own case list.
 
-مصدر الحالة يتحدد من دور صاحب الحساب في البوابة. الدعم الفني يختار المصدر عندما يسجّل نيابة عن جهة. أصحاب الإبلاغ المعتمدون للمصادر ذات الحساب: الكول سنتر كاباني، الإشراف سونيا، B2B أولاء، 30 يونيو ياسر. واتساب وجوجل بلاي يفتحهما أحمد من الدعم الفني. أي مصدر بلا حساب بوابة يفتحه الدعم الفني ويختار المصدر.
+The source of a portal case comes from the signed-in role. Technical Support chooses the source when recording on behalf of a team. Approved reporting owners for the sources that have accounts: Call Center is Kabany, Moderation is Sonia, B2B is Olaa, and 30 June is Yasser. WhatsApp and Google Play are opened by Ahmed in Technical Support. Any source without a portal account is opened by Technical Support, who selects the source.
 
-## 5. رحلة الحالة
+## 5. Case journey
 
-1. تصل المعلومة إلى أحد المصادر: واتساب، الإشراف، الكول سنتر، فريق التسويق، مدارس 30 يونيو، مدارس B2B، أو جوجل بلاي.
-2. صاحب الحساب المختص، أو الدعم الفني نيابة عنه، يسجّل الحالة. النظام يعطيها رقماً ويحفظ من أنشأها ومن هو صاحب الإبلاغ. صاحب الإبلاغ لا يتبدل لاحقاً.
-3. بيانات الإدخال تُقفل بعد الحفظ. التصحيح بعدها يكون بملاحظة أو برد أو بحالة جديدة مرتبطة، لا بتعديل أصل البلاغ.
-4. الدعم الفني يصنّف الحالة أثناء العمل: نوع الطلب، الموضوع، السبب، الإجراء، والنتيجة.
-5. الحالات المفتوحة: جديدة، قيد المعالجة، بانتظار رد العميل.
-6. «تم الحل والإغلاق» لا يُقبل إلا برد واضح من خمسة أحرف على الأقل، ومعه الحقول الخمسة للتصنيف.
-7. «مغلق بدون رد» لا يطلب الحقول الخمسة. معناه أن العميل لم يُستكمل معه الرد، وليس أنه حُلّت مشكلته.
-8. إعادة الفتح لنفس المشكلة تتطلب سبباً، وتزيد عداد إعادة الفتح مرة واحدة، وتحتفظ بلقطة الحل السابق.
-9. مشكلة مختلفة تُفتح كتذكرة جديدة مرتبطة بالحالة الأصلية، ولا تُكتب فوقها.
-10. تعليق ظاهر لصاحب البلاغ لا يغيّر الحالة وحده. الملاحظة الداخلية لا يراها فريق الإبلاغ.
+1. The issue arrives from one source: WhatsApp, Moderation, Call Center, Marketing Team, 30 June Schools, B2B Schools, or Google Play.
+2. The matching account, or Technical Support on its behalf, records the case. The system assigns a number and stores who created it and who the reporting owner is. The reporting owner does not change later.
+3. Intake details lock after save. Later correction is a note, a reply, or a linked new case, not an edit of the original intake.
+4. Technical Support classifies the case while it is being worked: request type, topic, cause, action, and outcome.
+5. Open statuses are New, In Progress, and Awaiting Customer Reply.
+6. Resolved & closed is accepted only with a clear response of at least five characters and with all five classification fields.
+7. Closed - No Response does not require the five fields. It means the customer was not followed through to a response. It is not a resolution.
+8. Reopening the same problem requires a reason, increases the reopen count once, and keeps a snapshot of the earlier resolution.
+9. A different problem is a new case linked to the original. It does not overwrite it.
+10. A comment visible to the reporting owner does not change status by itself. An internal note is hidden from reporting teams.
 
-لا يُحذف سجل. المستخدم والقيمة المرجعية يوقفان بدل حذفهما.
+Nothing in the case history is deleted. A user or a lookup value is deactivated instead of removed.
 
-## 6. بيانات البلاغ
+## 6. Case data
 
-مطلوب عند الإنشاء لكل المصادر: تاريخ البلاغ، المدينة، نوع العميل، المنصة، ووصف المشكلة. اسم المدرسة مطلوب لمصدرَي المدارس. الدفع عبر فوري يُسجَّل نعم أو لا على الحالات الجديدة، وهو علامة على البلاغ وليس إثبات تحصيل.
+Required on every new case: reported date, city, customer type, platform, and issue description. School name is required for both school sources. Fawry payment is recorded as yes or no on new cases. It is a flag on the case, not proof of collection.
 
-حقول مدارس 30 يونيو الإضافية، ومطلوبة في الشاشة وفي قاعدة البيانات:
+Additional 30 June fields, required on the form and in the database:
 
-- اسم المدرسة.
-- نوع المشكلة: لا يوجد اشتراك فعّال، لا يستطيع الدخول أو الحساب غير مفعّل، الفصول ناقصة أو مكررة، الصف لم يُرقَّ، المادة أو الأسئلة ناقصة، أو غير ذلك.
-- هل طُلب تحديث MySchool من قبل: نعم، لا، أو غير متأكد.
+- School name.
+- Issue type: no active subscription, cannot log in or the account is not activated, classes missing or duplicated, grade not promoted, subject or questions missing, or other.
+- Whether a MySchool update was already requested: yes, no, or not sure.
 
-يمكن تسجيل كود المدرسة ومعرّفات المستخدمين المتأثرين. هذه الحقائق تُقفل مع باقي الإدخال. تغيير الحالة لا يمسحها. مسار الكتابة المباشر، وليس الفورم فقط، يرفض حالة 30 يونيو إذا نقص واحد من الثلاثة.
+School code and affected user IDs may be recorded. These facts lock with the rest of the intake. A status change does not clear them. A direct write, not only the form, rejects a 30 June case when any of the three required facts is missing.
 
-معرّف حساب العميل، وهو الإيميل أو الموبايل الذي يدخل به إلى المنصة، يراه الدعم الفني وصاحب التذكرة والمدير. المدير يراه ولا يعدّله. فرق البوابة الأخرى لا تتصفح حالات ليست لها.
+The customer account identifier, the email or mobile number used to sign in to the platform, is visible to Technical Support, to the case owner, and to the Manager. The Manager can see it and cannot edit it. Other portal teams cannot browse cases that are not theirs.
 
-المرفقات اختيارية: حتى خمسة ملفات للرسالة أو للبلاغ. الصور والفيديو القصير والصوت وPDF وإكسيل مسموحة. الفيديو حتى 50 ميجابايت، وباقي الأنواع حتى 10. الملفات خاصة وليست روابطاً عامة.
+Attachments are optional: up to five files on a submission or a message. Images, short video, audio, PDF, and Excel are allowed. Video is up to 50 MB. Other allowed types are up to 10 MB. Files are private and are not public links.
 
-## 7. المتطلبات الوظيفية
+## 7. Functional requirements
 
-### 7.1 الدخول والحسابات
+### 7.1 Sign-in and accounts
 
-- BR-01: لا يدخل إلا حساب نشط بكلمة مرور صحيحة.
-- BR-02: المحاولات الخاطئة تُقيَّد، والحساب يُقفل مؤقتاً بعد تكرارها.
-- BR-03: المدير لا يدير المستخدمين. الإدارة من حساب الدعم الفني الذي عليه علم الإدارة.
-- BR-04: إيقاف مستخدم يمنعه من الدخول ويبقي حالاته التاريخية باسمه.
+- BR-01: Only an active account with the correct password can sign in.
+- BR-02: Failed attempts are recorded, and the account locks for a period after repeated failures.
+- BR-03: The Manager does not administer users. Administration belongs to the Technical Support account that has the administration flag.
+- BR-04: Deactivating a user blocks sign-in and keeps that person’s name on historical cases.
 
-### 7.2 التسجيل والمتابعة
+### 7.2 Registration and follow-up
 
-- BR-05: كل حالة لها رقم ظاهر ومصدر وحالة وتاريخا إنشاء وتحديث.
-- BR-06: فريق البوابة يرى حالاته فقط، ويفتح حالة جديدة من نموذجه.
-- BR-07: الدعم الفني يرى الكل وينشئ حالة لمصدر بلا حساب.
-- BR-08: المدير يرى الكل للقراءة والتصدير، وتعديل التذكرة مغلق عليه.
-- BR-09: بعد الحفظ لا تُعاد كتابة وصف المشكلة وبيانات العميل والمدرسة ومعرّف الحساب.
-- BR-10: الحل يطلب الرد والتصنيف الخماسي. الإغلاق بدون رد لا يطلب هذا التصنيف.
-- BR-11: إعادة الفتح بسبب، وتُحفظ لقطة الحل السابق.
-- BR-12: مشكلة جديدة تُربط بحالة قائمة ولا تستبدلها.
-- BR-13: الملاحظات الداخلية للدعم الفني والمدير. صاحب البلاغ لا يراها.
-- BR-14: الرد الظاهر لصاحب البلاغ يُحفظ كنشاط، ولا يغيّر الحالة وحده.
+- BR-05: Every case has a visible number, a source, a status, and created and updated times.
+- BR-06: A portal team sees only its own cases and opens a new case from its form.
+- BR-07: Technical Support sees every case and can create one for a source that has no account.
+- BR-08: The Manager sees every case for reading and export. Editing the case is closed.
+- BR-09: After save, the issue description, customer details, school details, and account identifier are not rewritten.
+- BR-10: Resolution requires the response and the five classification fields. Closure without a response does not.
+- BR-11: Reopening requires a reason, and the previous resolution snapshot is kept.
+- BR-12: A new problem is linked to an existing case and does not replace it.
+- BR-13: Internal notes are for Technical Support and the Manager. The reporting owner does not see them.
+- BR-14: A reply visible to the reporting owner is stored as activity and does not change status by itself.
 
-### 7.3 الإشعار
+### 7.3 Notification
 
-- BR-15: إشعار داخل النظام يصل لصاحب الإبلاغ عند تحديث الدعم، وللدعم عند بلاغ جديد أو رد صاحب البلاغ أو إعادة الفتح. من نفّذ الفعل لا يُشعَر نفسه.
-- BR-16: البريد الإلكتروني ليس شرط قبول لهذا الإصدار. لا يُعتبر الإشعار مكتملاً إلى صندوق البريد حتى يُختبر الإرسال ويُقبل بقرار لاحق.
+- BR-15: An in-app notice goes to the reporting owner when Support updates the case, and to Support when a case is new, the reporting owner replies, or the case is reopened. The person who performed the action is not notified of their own action.
+- BR-16: Email is not an acceptance condition of this release. Notification is not treated as delivered to a mailbox until sending is tested and accepted in a later decision.
 
-### 7.4 التقارير
+### 7.4 Reporting
 
-- BR-17: اللوحة للدعم الفني والمدير. فرق البوابة لا تملك لوحة عامة.
-- BR-18: الفترة الافتراضية كل الحالات. يمكن تضييقها بفترة أو مصدر أو بعد آخر، والفلاتر تتقاطع.
-- BR-19: الأرقام تفصل الإجمالي، وما زال مفتوحاً، وتم حله، وأُغلق بدون رد، وما أُعيد فتحه. الإغلاق بدون رد لا يُحسب حلاً.
-- BR-20: القيمة الناقصة تبقى ظاهرة ولا تُستنتج. علامة فوري ليست إيراداً ولا تسوية دفع.
-- BR-21: التصدير من نفس المجموعة المعروضة. ملف CSV لا يحتوي أسرار الدخول ولا الملاحظات الداخلية ولا روابط الملفات.
-- BR-22: اختيار جزء من الرسم يضيّق الفترة أو البُعد ولا يغيّر طريقة عدّ الحالات.
+- BR-17: The dashboard is for Technical Support and the Manager. Portal teams do not have the general dashboard.
+- BR-18: The default period is all cases. It can be narrowed by period, source, or another dimension, and filters intersect.
+- BR-19: Figures keep the total, what is still open, what was resolved, what was closed without a response, and what was reopened apart. Closed without a response is not counted as resolved.
+- BR-20: A missing value stays visible and is not inferred. The Fawry flag is not revenue and is not payment settlement.
+- BR-21: Export uses the same selected population. The CSV contains no sign-in secrets, no internal notes, and no file links.
+- BR-22: Choosing part of a chart narrows the period or the dimension and does not change how a case is counted.
 
-### 7.5 الإعدادات
+### 7.5 Settings
 
-- BR-23: قوائم النوع والموضوع والسبب والإجراء والنتيجة والمدن قابلة للتمديد من الإعدادات، وتبدأ من قيم موسم العمل الحالي.
-- BR-24: إيقاف قيمة مرجعية يخفيها عن الحالات الجديدة ويبقيها على الحالات القديمة.
+- BR-23: Request type, topic, cause, action, outcome, and city lists can be extended in settings. They start from the current season’s values.
+- BR-24: Deactivating a lookup value hides it from new cases and leaves it on older cases.
 
-## 8. قواعد العمل التي لا تقبل الاستثناء
+## 8. Rules with no exception
 
-- النظام، لا الشيت، هو مكان تسجيل الحالة الجديدة.
-- لا حذف للحالات ولا للمرفقات ولا لسجل النشاط.
-- لا حل بلا رد واضح وتصنيف خماسي.
-- لا حالة لمدارس 30 يونيو بلا اسم مدرسة ونوع مشكلة وإجابة MySchool، مهما كان مسار الكتابة.
-- لا تعديل على أصل البلاغ بعد إرساله.
-- المدير يقرأ كل بيانات التذكرة ولا يكتبها.
-- فريق البوابة لا يرى إلا ما فتحه.
-- البيانات القديمة الناقصة تُعرض كما هي إلى أن يُقرَّر تصحيحها في عمل لاحق.
+- The system, not the sheet, is where a new case is recorded.
+- Cases, attachments, and activity history are not deleted.
+- There is no resolution without a clear response and the five classification fields.
+- There is no 30 June case without a school name, an issue type, and a MySchool answer, on any write path.
+- The original intake is not edited after it is submitted.
+- The Manager reads every case field and does not write it.
+- A portal team sees only the cases it opened.
+- Older cases with missing classification stay as recorded until a later decision rewrites them.
 
-## 9. القبول
+## 9. Acceptance
 
-يُقبل هذا الإصدار إذا أمكن تنفيذ السيناريوهات الآتية على حسابات الأدوار الستة:
+This release is accepted when the following can be done with accounts for all six roles:
 
-- كل دور يدخل ويصل إلى شاشته فقط.
-- الإشراف والكول سنتر وB2B و30 يونيو ينشئ كل منهم حالة ويرى حالته، ولا يرى حالة زميل من فريق آخر.
-- حالة 30 يونيو تُرفض بلا اسم المدرسة أو بلا نوع المشكلة أو بلا إجابة MySchool، من الفورم ومن الكتابة المباشرة.
-- حالة B2B تُرفض بلا اسم المدرسة وتُقبل بلا حقلي 30 يونيو.
-- الدعم الفني يحل حالة بعد الرد والتصنيف، ويغلق أخرى بدون رد، ويعيد فتح الأولى بسبب، ويفتح حالة مرتبطة لمشكلة مختلفة.
-- المدير يرى معرّف الحساب وباقي الحالة، ولا يجد وسيلة تعديل، ولا يُرجَع من التقرير إلى جلسة أضيق.
-- اللوحة تفصل المحلول عن المغلق بدون رد، والتصدير يخرج بنفس النطاق.
-- إيقاف مستخدم يمنعه من الدخول ويبقي اسمه على حالاته.
+- Each role signs in and reaches only its own screens.
+- Moderation, Call Center, B2B, and 30 June each create a case, see that case, and do not see another team’s case.
+- A 30 June case is rejected without the school name, without the issue type, or without the MySchool answer, from the form and from a direct write.
+- A B2B case is rejected without a school name and is accepted without the two 30 June answers.
+- Technical Support resolves one case after the response and classification, closes another without a response, reopens the first with a reason, and opens a linked case for a different problem.
+- The Manager sees the account identifier and the rest of the case, finds no edit control, and is not sent back from the report to a narrower session.
+- The dashboard keeps resolved apart from closed without a response, and export matches that selection.
+- Deactivating a user blocks sign-in and leaves the name on existing cases.
 
-اختبار البريد، وتصحيح الثماني والعشرين حالة القديمة الناقص تصنيفها، وربط واتساب أو بريد B2B، وتجربة الاستضافة والنسخ الاحتياطي والحمل، ليست جزءاً من قبول هذه الوثيقة.
+An email test, correction of the older cases missing classification, a WhatsApp or B2B email connection, and the hosting, backup, and load rehearsal are not part of accepting this document.
 
-## 10. ما تغيّر عن المسودة القديمة
+## 10. What changed from the old draft
 
-مسودة سبتمبر افترضت صندوق واتساب متصل وملفاً خارجياً مصدراً للتصنيف. هذا الإصدار يثبت القرارين الآتيين:
+The September draft assumed a connected WhatsApp inbox and an external file as the source of classification. This release fixes two decisions:
 
-- التسجيل يتم داخل النظام. لا سحب من الشيت ولا من واتساب ولا من بريد B2B.
-- واتساب وجوجل بلاي والتسويق مصادر تُختار عند إنشاء الحالة، وليست قنوات تلقائية.
+- New cases are recorded in the system. There is no pull from the sheet, from WhatsApp, or from B2B email.
+- WhatsApp, Google Play, and Marketing are sources chosen when a case is created. They are not automatic channels.
 
-## 11. المصطلحات
+## 11. Terms
 
-| المصطلح | المعنى |
+| Term | Meaning |
 | --- | --- |
-| الحالة / التذكرة | بلاغ عميل واحد برقمه وسجله |
-| المصدر | الجهة التي ورد منها البلاغ |
-| صاحب الإبلاغ | حساب الفريق المسؤول عن هذا المصدر |
-| معرّف الحساب | الإيميل أو الموبايل الذي يستخدمه العميل في المنصة |
-| تم الحل والإغلاق | الدعم أنهى المشكلة وردّ عليها |
-| مغلق بدون رد | أُغلقت لأن العميل لم يُستكمل معه، وليست حلاً |
-| الملاحظة الداخلية | كلام بين الدعم والإدارة ولا يظهر لصاحب البلاغ |
-| MySchool | سؤال مدارس 30 يونيو: هل طُلب تحديث بيانات المدرسة مسبقاً |
+| Case | One customer issue, with its number and history |
+| Source | The team or channel the issue came from |
+| Reporting owner | The account responsible for that source |
+| Account identifier | The email or mobile number the customer uses on the platform |
+| Resolved & closed | Support finished the problem and wrote the response |
+| Closed - No Response | Closed because the customer was not followed through. It is not a resolution |
+| Internal note | A note between Support and the Manager. Hidden from the reporting team |
+| MySchool | The 30 June question: was a school-data update already requested |
