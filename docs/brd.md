@@ -6,14 +6,14 @@
 | --- | --- |
 | Document | Final business requirements |
 | Product | Support CRM |
-| Version | 1.0 |
+| Version | 1.1 |
 | Status | Final for the manual-intake release |
-| Date | 17 November 2026 |
+| Date | 21 November 2026 |
 | Time zone | Africa/Cairo |
 | Audience | Digital Director, Support, and the Software Team |
 | Supersedes | The September 2026 draft on connected WhatsApp and the external tracker file |
 
-This document describes the system as built and accepted for the current scope. Behavior that is not stated here is not a requirement of this release.
+This revision describes the manual-intake workflow on the documentation branch. Section 9 gives the business acceptance scenarios. Production rollout and sign-off are tracked separately.
 
 ---
 
@@ -83,7 +83,7 @@ Nothing in the case history is deleted. A user or a lookup value is deactivated 
 
 ## 6. Case data
 
-Required on every new case: reported date, city, customer type, platform, and issue description. School name is required for both school sources. Fawry payment is recorded as yes or no on new cases. It is a flag on the case, not proof of collection.
+On the standard form, record the customer name and type, city, issue date, platform and description. The issue date can be today in Cairo or earlier. Choose a listed city or type a place. Contact details and the customer account identifier are optional. B2B Schools also requires the school name. For installed apps, record whether the version is current (Yes, No or Unknown). Web skips that question. The standard Fawry field accepts Yes, No or Unknown.
 
 Additional 30 June fields, required on the form and in the database:
 
@@ -91,7 +91,7 @@ Additional 30 June fields, required on the form and in the database:
 - Issue type: no active subscription, cannot log in or the account is not activated, classes missing or duplicated, grade not promoted, subject or questions missing, or other.
 - Whether a MySchool update was already requested: yes, no, or not sure.
 
-School code and affected user IDs may be recorded. These facts lock with the rest of the intake. A status change does not clear them. A direct write, not only the form, rejects a 30 June case when any of the three required facts is missing.
+For 30 June, select a school or enter its name. The school supplies the customer name. Select or enter the city if it cannot be filled from the school. Record who is affected, the platform and the problem. School code and affected user IDs are optional. The form skips personal contact, app-version and payment questions. It saves Fawry as No automatically. A No on these cases therefore gives no evidence about a payment. These facts lock with the rest of the intake. A status change does not clear them. A direct write, not only the form, rejects a 30 June case when any of the three required facts is missing.
 
 The customer account identifier, the email or mobile number used to sign in to the platform, is visible to Technical Support, to the case owner, and to the Manager. The Manager can see it and cannot edit it. Other portal teams cannot browse cases that are not theirs.
 
@@ -130,7 +130,7 @@ Attachments are optional: up to five files on a submission or a message. Images,
 - BR-18: The default period is all cases. It can be narrowed by period, source, or another dimension, and filters intersect.
 - BR-19: Figures keep the total, what is still open, what was resolved, what was closed without a response, and what was reopened apart. Closed without a response is not counted as resolved.
 - BR-20: A missing value stays visible and is not inferred. The Fawry flag is not revenue and is not payment settlement.
-- BR-21: Export uses the same selected population. The CSV contains no sign-in secrets, no internal notes, and no file links.
+- BR-21: In the case register, CSV and PDF / Print include every matching case across pages within the reader’s access. CSV excludes sign-in secrets, internal notes and file links.
 - BR-22: Choosing part of a chart narrows the period or the dimension and does not change how a case is counted.
 
 ### 7.5 Settings
@@ -156,7 +156,7 @@ This release is accepted when the following can be done with accounts for all si
 - Each role signs in and reaches only its own screens.
 - Moderation, Call Center, B2B, and 30 June each create a case, see that case, and do not see another team’s case.
 - A 30 June case is rejected without the school name, without the issue type, or without the MySchool answer, from the form and from a direct write.
-- A B2B case is rejected without a school name and is accepted without the two 30 June answers.
+- A B2B case requires a school name and uses the standard form. Submit it with Fawry marked Unknown. For 30 June, select a listed school, then try an unlisted school and enter its city. Confirm that the saved customer name matches the school and that the form never asks the reporter about payment.
 - Technical Support resolves one case after the response and classification, closes another without a response, reopens the first with a reason, and opens a linked case for a different problem.
 - The Manager sees the account identifier and the rest of the case, finds no edit control, and is not sent back from the report to a narrower session.
 - The dashboard keeps resolved apart from closed without a response, and export matches that selection.

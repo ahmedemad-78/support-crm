@@ -1,5 +1,7 @@
 # UI/UX Spec — Support Ticketing & WhatsApp CRM (Phase 1)
 
+> Historical design or release snapshot. For current workflows, permissions and reporting rules, use the [business requirements](brd.md) and [documentation index](README.md).
+
 Design target: Wonder canvas, desktop 1440×900, **English only** (no Arabic UI, no RTL).
 
 ## 1. Visual Direction — "Clean SaaS" on the Selah El Telmeez brand
