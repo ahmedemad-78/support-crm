@@ -2,6 +2,15 @@
 
 The [business requirements](brd.md) describe the manual-intake release reviewed on 21 November 2026. Use the [PDF edition](brd.pdf) for circulation. Its editable layout is in [brd.typ](brd.typ).
 
+## Business handover
+
+[Download the complete business handover (ZIP)](Support-CRM-Business-Handover-2026-11-21.zip).
+
+1. Read the [BRD](brd.md) for scope, requirements and release boundaries.
+2. Use the [operating guide](business-workflow.md) for source ownership, case decisions, reporting definitions and a worked example.
+3. Use the [user stories and acceptance criteria](user-stories.md) to review each role and exercise BR-01 through BR-24. Record the outcome, evidence and reviewer for each story during acceptance.
+4. Consult the release documents below for implementation evidence and outstanding rollout decisions.
+
 | Business question | Documents |
 | --- | --- |
 | Who records a case, who can see it, and what counts as resolved? | [Business requirements, sections 4–7](brd.md#4-users-and-access) · [Case lifecycle](case-lifecycle-release.md) |
