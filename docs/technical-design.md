@@ -1,5 +1,7 @@
 # Technical Design — Support Ticketing & WhatsApp CRM System
 
+> Historical design or release snapshot. For current workflows, permissions and reporting rules, use the [business requirements](brd.md) and [documentation index](README.md).
+
 | Field | Details |
 |---|---|
 | Based on | BRD v1.0, FRD/SRS v1.0, User Stories v1.0 |

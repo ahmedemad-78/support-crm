@@ -1,5 +1,7 @@
 # Support dashboard
 
+> Historical design or release snapshot. For current workflows, permissions and reporting rules, use the [business requirements](brd.md) and [documentation index](README.md).
+
 The dashboard uses authenticated Supabase access and the existing ticket RLS policies.
 It refreshes every 30 seconds while visible, and on returning to the tab. This is
 polling, not a Supabase Realtime subscription. Failed refreshes preserve the last
