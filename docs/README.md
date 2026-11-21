@@ -7,9 +7,10 @@ The [business requirements](brd.md) describe the manual-intake release reviewed 
 [Download the complete business handover (ZIP)](Support-CRM-Business-Handover-2026-11-21.zip).
 
 1. Read the [BRD](brd.md) for scope, requirements and release boundaries.
-2. Use the [operating guide](business-workflow.md) for source ownership, case decisions, reporting definitions and a worked example.
-3. Use the [user stories and acceptance criteria](user-stories.md) to review each role and exercise BR-01 through BR-24. Record the outcome, evidence and reviewer for each story during acceptance.
-4. Consult the release documents below for implementation evidence and outstanding rollout decisions.
+2. Read the [product requirements](prd.md) for every production screen, role permission and success or failure outcome.
+3. Use the [operating guide](business-workflow.md) for source ownership, case decisions, reporting definitions and a worked example.
+4. Use the [user stories and acceptance criteria](user-stories.md) to review each role and exercise BR-01 through BR-24. Record the outcome, evidence and reviewer for each story during acceptance.
+5. Consult the release documents below for implementation evidence and outstanding rollout decisions.
 
 | Business question | Documents |
 | --- | --- |
