@@ -20,6 +20,10 @@ The [business requirements](brd.md) describe the manual-intake release reviewed 
 | How do alerts work, and what does email rollout require? | [Notifications](notification-rollout.md) · [Company Outlook setup](company-outlook-email.md) |
 | What was tested, and what is needed for handover? | [Readiness record](release-readiness-2026-11.md) · [Transfer runbook](company-transfer-runbook.md) · [Demo script](demo-script.md) |
 
+## Current interface
+
+[Design system](design-system.md) · [Visual palette](design-system-palette.svg)
+
 ## Design and release history
 
 The [technical design](technical-design.md) and [UI specification](ui-ux-spec.md) preserve the original design. The [dashboard specification](dashboard-analytics.md), [analytics business release](analytics-business-release.md) and [single-page analytics release](single-page-analytics-release.md) record successive iterations. Counts and QA results in those notes refer to the review that produced them.
