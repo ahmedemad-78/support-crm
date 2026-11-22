@@ -1,5 +1,7 @@
 # Single-page Support Intelligence — 2026-11-13
 
+> Historical design or release snapshot. For current workflows, permissions and reporting rules, use the [business requirements](brd.md) and [documentation index](README.md).
+
 Approved scope: consolidate the three Analytics tabs into one report, retaining real filters and case-register drilldowns; add an Area chart, clustered source/request columns, a resolution-outcome donut and a free geographic concentration map. Keep historical records unchanged and email deferred.
 
 ## Analytical contract

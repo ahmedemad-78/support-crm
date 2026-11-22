@@ -1,6 +1,6 @@
 # Locally bundled map reference data
 
-No map subscription, external tiles, customer geocoding or paid API is used.
+The interactive map loads the Positron basemap from OpenFreeMap. The browser overlays case counts at reference locations. Egypt opens at fixed bounds. World view includes overseas locations. Marker sizes are relative to the busiest displayed place. If the basemap cannot load, the dashboard uses its bundled fallback. The tile provider receives map requests without customer addresses or case records.
 
 World boundaries: world-atlas 2.0.2 countries-110m TopoJSON, derived from Natural Earth, decoded into WGS84 polygon rings with three decimal places. Source: https://github.com/topojson/world-atlas (ISC distribution); Natural Earth geographic data is public domain. Original asset: https://cdn.jsdelivr.net/npm/world-atlas@2.0.2/countries-110m.json. Country fallback markers use the bounding-box centre of the main polygon and are explicitly country-level reference points. Low-resolution boundaries are for aggregate context, not legal/administrative delineation.
 

@@ -2,10 +2,7 @@
 
 Internal support ticketing and reporting workspace. Next.js 16 (App Router) + Supabase. Intake is manual; the Conversations page is a disconnected placeholder, not a live WhatsApp integration.
 
-Current delivery and transfer documents:
-- `docs/release-readiness-2026-11.md`: tested scope, exclusions and release gates.
-- `docs/company-transfer-runbook.md`: inventory, migration choices, cutover and recovery.
-- `docs/demo-script.md`: presentation flow and demonstration boundaries.
+[Documentation index](docs/README.md) · [Business requirements](docs/brd.md) · [Printable BRD](docs/brd.pdf)
 
 Run `npm test` for application regression checks. `npm run test:lifecycle` exercises database lifecycle rules using the separately installed local PGlite test dependency; see `docs/case-lifecycle-release.md`.
 
@@ -23,9 +20,9 @@ Design docs: `docs/technical-design.md`, `docs/ui-ux-spec.md`. UI designs live i
 
 | Role | Sees |
 |---|---|
-| Technical Support | Inbox, all tickets, dashboard |
+| Technical Support | Case register, case operations and dashboard |
 | Technical Support + Admin (the owner) | same, plus Users and Settings |
-| Moderation / Call Center | New ticket form and their own tickets |
+| Moderation / Call Center / 30 June Schools / B2B Schools | New ticket form and their own tickets |
 | Manager | Dashboard and tickets, view only |
 
 Permissions are enforced in Postgres with row-level security, not only in the UI.
