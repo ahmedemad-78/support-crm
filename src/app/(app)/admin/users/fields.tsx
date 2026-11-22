@@ -1,13 +1,32 @@
 "use client";
 
-import { useState } from "react";
-import { Copy, Eye, EyeOff, RefreshCw } from "lucide-react";
+import { PasswordEye, useEyeLook } from "@/components/password-eye";
+import { useRef, useState } from "react";
+import { Radio as RadioPrimitive } from "@base-ui/react/radio";
+import { Building2, ChartColumn, Check, Copy, Headset, MessagesSquare, PhoneCall, RefreshCw, School, type LucideIcon } from "lucide-react";
 import { toast } from "sonner";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
-import { cn } from "@/lib/utils";
+import { RadioGroup } from "@/components/ui/radio-group";
 import { ROLE_DESCRIPTIONS, ROLE_LABELS, ROLES, type Role } from "@/lib/auth/roles";
+
+const ROLE_ICONS: Record<Role, LucideIcon> = {
+  support_agent: Headset,
+  moderation: MessagesSquare,
+  call_center: PhoneCall,
+  june_schools: School,
+  business_development: Building2,
+  manager: ChartColumn,
+};
+
+export function RoleIcon({ role, size = "md" }: { role: Role; size?: "sm" | "md" }) {
+  const Icon = ROLE_ICONS[role];
+  return (
+    <span className="role-icon" data-role={role} data-size={size} aria-hidden="true">
+      <Icon size={size === "sm" ? 13 : 15} strokeWidth={2.25} />
+    </span>
+  );
+}
 
 export function RoleOptions({
   value,
@@ -26,20 +45,16 @@ export function RoleOptions({
       className="flex flex-col gap-1.5"
     >
       {ROLES.map((role) => (
-        <Label
-          key={role}
-          className={cn(
-            "flex cursor-pointer items-center gap-2.5 rounded-lg border px-3 py-2.5 font-normal",
-            value === role && "border-2 border-brand-action bg-brand-tint",
-            disabled && "cursor-not-allowed opacity-60",
-          )}
-        >
-          <RadioGroupItem value={role} />
-          <span className="flex flex-col">
-            <span className="text-[13px] font-semibold">{ROLE_LABELS[role]}</span>
-            <span className="text-xs text-muted-foreground">{ROLE_DESCRIPTIONS[role]}</span>
+        <RadioPrimitive.Root key={role} value={role} className="role-option">
+          <RoleIcon role={role} />
+          <span className="role-option-text">
+            <span>{ROLE_LABELS[role]}</span>
+            <small>{ROLE_DESCRIPTIONS[role]}</small>
           </span>
-        </Label>
+          <RadioPrimitive.Indicator className="role-option-check">
+            <Check size={12} strokeWidth={3} />
+          </RadioPrimitive.Indicator>
+        </RadioPrimitive.Root>
       ))}
     </RadioGroup>
   );
@@ -57,6 +72,8 @@ export function PasswordField({
   help?: string;
 }) {
   const [visible, setVisible] = useState(false);
+  const eyeRef = useRef<HTMLButtonElement>(null);
+  const look = useEyeLook(eyeRef);
 
   return (
     <div className="flex flex-col gap-2">
@@ -69,17 +86,23 @@ export function PasswordField({
           type={visible ? "text" : "password"}
           value={value}
           onChange={(e) => onChange(e.target.value)}
+          onInput={(e) => look(e.currentTarget)}
+          onSelect={(e) => look(e.currentTarget)}
           autoComplete="new-password"
-          className="h-10 pr-16 font-mono"
+          className="h-10 pr-20 font-mono"
         />
-        <div className="absolute top-1/2 right-2 flex -translate-y-1/2 gap-1">
+        <div className="absolute top-1/2 right-2 flex -translate-y-1/2 items-center gap-1">
           <button
+            ref={eyeRef}
             type="button"
             onClick={() => setVisible((v) => !v)}
-            className="rounded p-1 text-muted-foreground hover:text-foreground"
+            className="eye-toggle is-compact"
+            data-open={visible}
+            aria-pressed={visible}
+            aria-label={visible ? "Hide password" : "Show password"}
             title={visible ? "Hide password" : "Show password"}
           >
-            {visible ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
+            <PasswordEye />
           </button>
           <button
             type="button"

@@ -1,14 +1,18 @@
 import Image from "next/image";
+import { Manrope, Playfair_Display } from "next/font/google";
 import { ArrowUpRight, Mail, ShieldCheck } from "lucide-react";
 import { LoginForm } from "./login-form";
 import { LoginArtwork } from "./login-artwork";
 import type { SignInState } from "./actions";
 import "./login.css";
 
+const manrope = Manrope({ variable: "--font-manrope", subsets: ["latin"], weight: ["400", "500", "600", "700"] });
+const playfair = Playfair_Display({ variable: "--font-playfair", subsets: ["latin"], style: ["italic"], weight: ["400", "500"] });
+
 const helpHref = "mailto:ahmed.emad@selaheltelmeez.com?subject=Support%20Center%20%E2%80%94%20Sign-in%20help&body=Hello%20Ahmed%2C%0A%0AI%20need%20help%20accessing%20Support%20Center.%0AWork%20email%3A%20%0AIssue%3A%20%0A%0A";
 
 export function LoginScreen({ deactivated = false, initialState }: { deactivated?: boolean; initialState?: SignInState }) {
-  return <main className="login-v2">
+  return <main className={`login-v2 ${manrope.variable} ${playfair.variable}`}>
     <section className="auth-brand-pane" aria-label="Selah El Telmeez Technical Support Center">
       <header className="auth-brand-header">
         <Image src="/brand/logo.jpg" alt="Selah El Telmeez" width={1476} height={570} priority sizes="(max-width: 900px) 140px, 176px" className="auth-brand-logo" />
@@ -16,8 +20,8 @@ export function LoginScreen({ deactivated = false, initialState }: { deactivated
       </header>
       <div className="auth-brand-body">
         <p className="auth-eyebrow"><span /> THE SUPPORT WORKSPACE</p>
-        <h2 className="auth-headline"><span>Every case.</span><span>A clear</span><em>next step.</em></h2>
-        <p className="auth-brand-description">Keep the issue, the response and the follow-up<br className="auth-desktop-break" /> in one place.</p>
+        <h2 className="auth-headline"><span>Every issue.</span><span>Every update.</span><em>One clear solution.</em></h2>
+        <p className="auth-brand-description">Track every request, manage every response, and keep every case moving forward.</p>
         <LoginArtwork />
       </div>
       <footer className="auth-brand-footer">A shared record. A thoughtful response.</footer>

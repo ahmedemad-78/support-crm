@@ -6,7 +6,7 @@ export async function loadCaseWorkflow(id: string) {
   const db = await createClient();
   const [{ data: ticket, error }, events,notices] = await Promise.all([
     db.from("tickets").select("reporter_id, created_by, reopen_count, contact_channel, linked_ticket_id, reporter:profiles!tickets_reporter_id_fkey(full_name)").eq("id",id).single(),
-    db.from("ticket_workflow_events").select("id, kind, body, created_at, actor_id, to_status, resolution_snapshot, actor:profiles!ticket_workflow_events_actor_id_fkey(full_name,role)").eq("ticket_id",id).order("created_at",{ascending:false}),
+    db.from("ticket_workflow_events").select("id, kind, body, created_at, actor_id, sender_name, is_automated, to_status, resolution_snapshot, actor:profiles!ticket_workflow_events_actor_id_fkey(full_name,role)").eq("ticket_id",id).order("created_at",{ascending:false}),
     db.from("notifications").select("event_id,event:ticket_workflow_events!inner(kind)").eq("ticket_id",id).is("read_at",null).in("event.kind",["comment","resolved","reopened"]).order("created_at",{ascending:false}).limit(500),
   ]);
   if(error) throw error; if(events.error) throw events.error;

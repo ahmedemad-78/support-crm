@@ -23,6 +23,7 @@ import {
   Headphones,
   PlusCircle,
   Settings,
+  ShieldCheck,
   Users,
   type LucideIcon,
 } from "lucide-react";
@@ -110,29 +111,27 @@ export function Sidebar({
         })}
       </nav>
 
-      <div className="support-nav-footer border-t">
-        <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-brand-action text-[13px] font-semibold text-white">
-          {initials}
-        </div>
-        <div className="support-nav-user flex min-w-0 flex-1 flex-col">
-          <span title={user.fullName} className="support-nav-fullname text-sm font-semibold">
-            {user.fullName}
+      <div className="support-nav-footer">
+        <div className="support-nav-account">
+          <span className="support-nav-avatar" data-admin={user.isAdmin || undefined} title={user.isAdmin ? "Admin" : undefined}>
+            <span aria-hidden="true">{initials}</span>
+            {user.isAdmin && <i aria-hidden="true"><ShieldCheck /></i>}
           </span>
-          <span className="support-nav-role text-xs text-muted-foreground">
-            {ROLE_LABELS[user.role]}
-            {user.isAdmin ? " · Admin" : ""}
-          </span>
+          <div className="support-nav-user">
+            <span title={user.fullName} className="support-nav-fullname">
+              {user.fullName}
+            </span>
+            <span className="support-nav-role" title={`${ROLE_LABELS[user.role]}${user.isAdmin ? " · Admin" : ""}`}>
+              {ROLE_LABELS[user.role]}
+              {user.isAdmin && <span className="sr-only"> · Admin</span>}
+            </span>
+          </div>
+          <form action="/auth/signout" method="post">
+            <button type="submit" title="Sign out" aria-label="Sign out" className="support-nav-signout">
+              <LogOut className="size-4" />
+            </button>
+          </form>
         </div>
-        <form action="/auth/signout" method="post">
-          <button
-            type="submit"
-            title="Sign out"
-            className="support-nav-signout text-muted-foreground hover:bg-muted hover:text-foreground"
-          >
-            <LogOut className="size-4" />
-            <span className="support-nav-signout-label">Sign out</span>
-          </button>
-        </form>
       </div>
     </div>
   );
