@@ -1,7 +1,8 @@
 {
   "git": {
     "deploymentEnabled": {
-      "codex/internal-requests-preview": false
+      "codex/internal-requests-preview": false,
+      "cursor/preview-workflow-fixes-3b60": false
     }
   },
   "crons": [

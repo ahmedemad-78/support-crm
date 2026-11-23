@@ -92,16 +92,19 @@ export function WorkActions({
     if (!finished) {
       if (ticket.state === "in_progress")
         choices.push({ value: "wait", label: "Ask owner for information" });
+      choices.push({
+        value: "resolve",
+        label:
+          ticket.kind === "execution_request"
+            ? "Complete request & close"
+            : "Resolve & close",
+      });
+      if (ticket.state !== "assigned_pending") {
+        choices.push({ value: "transfer", label: "Transfer to a colleague" });
+        if (ticket.state !== "new" && ticket.state !== "available")
+          choices.push({ value: "return", label: "Return to team" });
+      }
       choices.push(
-        {
-          value: "resolve",
-          label:
-            ticket.kind === "execution_request"
-              ? "Complete request & close"
-              : "Resolve & close",
-        },
-        { value: "transfer", label: "Transfer to a colleague" },
-        { value: "return", label: "Return to team" },
         { value: "cancel", label: "Cancel with reason" },
         { value: "close_no_response", label: "Close — no response" },
       );
