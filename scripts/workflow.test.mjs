@@ -230,6 +230,19 @@ test("follow-up actions validate role and input before calling a constrained RPC
   }
 });
 
+test("preview delivery returns before opening the queue or constructing a privileged client", async () => {
+  const previous = process.env.CRM_EXTERNAL_DELIVERY_DISABLED;
+  process.env.CRM_EXTERNAL_DELIVERY_DISABLED = "true";
+  try {
+    const load = loadWith({"server-only": {}, "@/lib/supabase/admin": {createAdminClient: () => {throw Error("Preview must not access the delivery queue");}}, "@/lib/email/send": {}});
+    const result = await load("src/lib/email/deliver.ts").deliverPendingEmails();
+    assert.deepEqual(result, {sent:0, failed:0, deferred:true});
+  } finally {
+    if (previous === undefined) delete process.env.CRM_EXTERNAL_DELIVERY_DISABLED;
+    else process.env.CRM_EXTERNAL_DELIVERY_DISABLED = previous;
+  }
+});
+
 test("central email delivery excludes all legacy jobs and other recipients", async () => {
   const central="ahmed.emad@selaheltelmeez.com",sent=[];
   const rows=[

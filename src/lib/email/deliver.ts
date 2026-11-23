@@ -37,6 +37,8 @@ function messageText(row: OutboxJob) {
 }
 
 export async function deliverPendingEmails() {
+  // This branch is a preview: never dispatch legacy mail while testing.
+  if (process.env.CRM_EXTERNAL_DELIVERY_DISABLED === "true" || process.env.VERCEL_ENV === "preview" || process.env.NEXT_PUBLIC_APP_ENV === "preview") return { sent: 0, failed: 0, deferred: true };
   const admin = createAdminClient();
   const { data: setting, error: policyError } = await admin.from("app_settings").select("value").eq("key", "workflow_notifications").single();
   if(policyError || setting?.value?.mode !== "central_only") throw new Error("Central notification routing is unavailable");

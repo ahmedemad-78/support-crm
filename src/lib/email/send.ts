@@ -75,6 +75,7 @@ export type SendOptions = {
 
 export async function sendOutbound(message: OutboundMessage, options: SendOptions = {}) {
   const env = options.env ?? process.env;
+  if (!options.env && (process.env.CRM_EXTERNAL_DELIVERY_DISABLED === "true" || process.env.VERCEL_ENV === "preview" || process.env.NEXT_PUBLIC_APP_ENV === "preview")) throw new MailNotConfiguredError();
   if (graphConfigured(env)) {
     await sendGraph(message, env, options.fetchImpl ?? fetch);
     return { provider: "microsoft-graph" as const };

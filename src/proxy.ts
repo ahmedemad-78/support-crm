@@ -1,15 +1,23 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 import { skipsBrowserSession } from "@/lib/http/session-boundary";
+import { previewDeliveryBlocked, previewPublicConfig } from "@/lib/supabase/environment";
 
 const PUBLIC_PATHS = ["/login"];
 
 export async function proxy(request: NextRequest) {
+  if (previewDeliveryBlocked(request.nextUrl.pathname)) {
+    return NextResponse.json({ error: "External delivery and integrations are disabled in this preview." }, { status: 403 });
+  }
+  let backend: {url:string;key:string};
+  try { backend = previewPublicConfig(); } catch {
+    return new NextResponse("Preview is waiting for its isolated backend configuration.", { status: 503, headers: {"Cache-Control":"no-store"} });
+  }
   let supabaseResponse = NextResponse.next({ request });
 
   const supabase = createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY!,
+    backend.url,
+    backend.key,
     {
       cookies: {
         getAll() {

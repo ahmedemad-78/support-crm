@@ -1,4 +1,9 @@
 {
+  "git": {
+    "deploymentEnabled": {
+      "codex/internal-requests-preview": false
+    }
+  },
   "crons": [
     {
       "path": "/api/email/dispatch",
