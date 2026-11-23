@@ -169,9 +169,11 @@ export default async function WorkTicketPage({
               <header>
                 <strong>{name(event.actor_id)}</strong>
                 <span>
-                  {event.visibility === "internal"
-                    ? "Internal note"
-                    : event.kind.replaceAll("_", " ")}
+                  {event.kind === "controls"
+                    ? "Team planning updated"
+                    : event.visibility === "internal"
+                      ? "Internal note"
+                      : event.kind.replaceAll("_", " ")}
                 </span>
                 <time dateTime={event.created_at}>
                   {stamp(event.created_at)}

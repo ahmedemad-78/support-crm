@@ -587,6 +587,27 @@ try {
   );
   check(JSON.stringify(publicEvents).includes("urgent"), false);
   check(JSON.stringify(publicEvents).includes("Synthetic private note"), false);
+  check(
+    publicEvents.some((e) => e.kind === "controls"),
+    false,
+  );
+  const managerEvents = await success(
+    clients.manager.db
+      .from("work_ticket_events")
+      .select("id,kind")
+      .eq("ticket_id", mediaTicket.id),
+  );
+  check(
+    managerEvents.some((e) => e.kind === "controls"),
+    false,
+  );
+  const controlNotices = await success(
+    service
+      .from("work_notifications")
+      .select("id")
+      .eq("event_id", mediaTicket.event_id),
+  );
+  check(controlNotices.length, 0);
   const staleRevision = mediaTicket.revision - 1;
   await denied(
     invoke(

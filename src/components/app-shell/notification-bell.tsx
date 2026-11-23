@@ -36,8 +36,14 @@ export function NotificationBell({
 }) {
   const [open, setOpen] = useState(false);
   const router=useRouter();
+  const [prevProps, setPrevProps] = useState({ initial, unreadCount });
   const [items, setItems] = useState(initial);
   const [unread, setUnread] = useState(unreadCount);
+  if (prevProps.initial !== initial || prevProps.unreadCount !== unreadCount) {
+    setPrevProps({ initial, unreadCount });
+    setItems(initial);
+    setUnread(unreadCount);
+  }
   const root=useRef<HTMLDivElement>(null);
   const trigger=useRef<HTMLButtonElement>(null);
   useEffect(()=>{

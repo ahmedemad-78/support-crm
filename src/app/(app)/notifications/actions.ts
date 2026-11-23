@@ -34,6 +34,7 @@ export async function markNotificationRead(id: string) {
     .eq("recipient_id", user.id)
     .is("read_at", null);
   await supabase.from("work_notifications").update({read_at:new Date().toISOString()}).eq("id",id).eq("recipient_id",user.id).is("read_at",null);
+  revalidatePath("/", "layout");
 }
 
 export async function markAllNotificationsRead() {
@@ -45,6 +46,6 @@ export async function markAllNotificationsRead() {
     .update({ read_at: new Date().toISOString() })
     .eq("recipient_id", user.id)
     .is("read_at", null);
-  revalidatePath("/", "layout");
   await supabase.from("work_notifications").update({read_at:new Date().toISOString()}).eq("recipient_id",user.id).is("read_at",null);
+  revalidatePath("/", "layout");
 }
