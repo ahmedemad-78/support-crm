@@ -25,6 +25,7 @@ export async function markTicketRepliesRead(ticketId:string,eventIds:string[]){
 export async function markNotificationRead(id: string) {
   const user = await getCurrentUser();
   if (!user) return;
+  if(!z.uuid().safeParse(id).success)return;
   const supabase = await createClient();
   await supabase
     .from("notifications")
@@ -32,6 +33,7 @@ export async function markNotificationRead(id: string) {
     .eq("id", id)
     .eq("recipient_id", user.id)
     .is("read_at", null);
+  await supabase.from("work_notifications").update({read_at:new Date().toISOString()}).eq("id",id).eq("recipient_id",user.id).is("read_at",null);
 }
 
 export async function markAllNotificationsRead() {
@@ -44,4 +46,5 @@ export async function markAllNotificationsRead() {
     .eq("recipient_id", user.id)
     .is("read_at", null);
   revalidatePath("/", "layout");
+  await supabase.from("work_notifications").update({read_at:new Date().toISOString()}).eq("recipient_id",user.id).is("read_at",null);
 }

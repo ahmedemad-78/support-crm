@@ -19,12 +19,15 @@ import type { Role } from "@/lib/auth/roles";
 import { createUser } from "./actions";
 import { PasswordField, RoleOptions } from "./fields";
 
-export function AddUserDialog() {
+export function AddUserDialog({
+  departments = [],
+}: { departments?: { id: string; name: string }[] } = {}) {
   const [open, setOpen] = useState(false);
   const [fullName, setFullName] = useState("");
   const [email, setEmail] = useState("");
   const [role, setRole] = useState<Role>("moderation");
   const [password, setPassword] = useState("");
+  const [departmentId, setDepartmentId] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
 
@@ -33,6 +36,7 @@ export function AddUserDialog() {
     setEmail("");
     setRole("moderation");
     setPassword("");
+    setDepartmentId("");
     setError(null);
   }
 
@@ -51,7 +55,10 @@ export function AddUserDialog() {
       <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-md">
         <DialogHeader>
           <DialogTitle>Add user</DialogTitle>
-          <DialogDescription>Share the password with them directly. They can&apos;t reset it themselves.</DialogDescription>
+          <DialogDescription>
+            Share the password with them directly. They can&apos;t reset it
+            themselves.
+          </DialogDescription>
         </DialogHeader>
 
         <form
@@ -60,7 +67,13 @@ export function AddUserDialog() {
             e.preventDefault();
             setError(null);
             startTransition(async () => {
-              const result = await createUser({ fullName, email, role, password });
+              const result = await createUser({
+                fullName,
+                email,
+                role,
+                password,
+                departmentId,
+              });
               if (!result.ok) {
                 setError(result.error);
                 return;
@@ -73,19 +86,54 @@ export function AddUserDialog() {
         >
           <div className="flex flex-col gap-1.5">
             <Label htmlFor="full-name">Full name</Label>
-            <Input id="full-name" value={fullName} onChange={(e) => setFullName(e.target.value)} required />
+            <Input
+              id="full-name"
+              value={fullName}
+              onChange={(e) => setFullName(e.target.value)}
+              required
+            />
           </div>
           <div className="flex flex-col gap-1.5">
             <Label htmlFor="email">Work email</Label>
-            <Input id="email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} required />
+            <Input
+              id="email"
+              type="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              required
+            />
           </div>
           <div className="flex flex-col gap-2">
             <Label className="text-[13px] font-semibold">Role</Label>
             <RoleOptions value={role} onChange={setRole} />
           </div>
-          <PasswordField label="Password" value={password} onChange={setPassword} help="At least 10 characters." />
+          <PasswordField
+            label="Password"
+            value={password}
+            onChange={setPassword}
+            help="At least 10 characters."
+          />
+          <div className="flex flex-col gap-1.5">
+            <Label htmlFor="new-user-department">Department</Label>
+            <select
+              id="new-user-department"
+              value={departmentId}
+              onChange={(e) => setDepartmentId(e.target.value)}
+              required
+              className="rounded-md border p-2"
+            >
+              <option value="">Choose a department…</option>
+              {departments.map((d) => (
+                <option key={d.id} value={d.id}>
+                  {d.name}
+                </option>
+              ))}
+            </select>
+          </div>
 
-          {error && <p className="text-sm font-medium text-destructive">{error}</p>}
+          {error && (
+            <p className="text-sm font-medium text-destructive">{error}</p>
+          )}
 
           <DialogFooter>
             <Button type="submit" disabled={pending}>

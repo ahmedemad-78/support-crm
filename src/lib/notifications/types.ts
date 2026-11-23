@@ -12,4 +12,5 @@ export type AppNotification = {
   createdAt: string;
   readAt: string | null;
   href: string;
+  workState?: string;
 };

@@ -2,6 +2,8 @@
 
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
+import {WORK_STATE_LABELS,type WorkState} from "@/lib/work/types";
 import { Bell, X } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { formatRelative } from "@/lib/format";
@@ -33,6 +35,7 @@ export function NotificationBell({
   hint: string;
 }) {
   const [open, setOpen] = useState(false);
+  const router=useRouter();
   const [items, setItems] = useState(initial);
   const [unread, setUnread] = useState(unreadCount);
   const root=useRef<HTMLDivElement>(null);
@@ -72,11 +75,12 @@ export function NotificationBell({
           setUnread((count) => count + 1);
         },
       )
+      .on("postgres_changes",{event:"INSERT",schema:"public",table:"work_notifications",filter:`recipient_id=eq.${userId}`},()=>router.refresh())
       .subscribe();
     return () => {
       void supabase.removeChannel(channel);
     };
-  }, [hrefBase, userId]);
+  }, [hrefBase, userId,router]);
 
   function markRead(id: string) {
     setItems((current) => current.map((item) => (item.id === id ? { ...item, readAt: item.readAt ?? new Date().toISOString() } : item)));
@@ -140,7 +144,7 @@ export function NotificationBell({
                       <span className="block text-sm font-medium">
                         {item.kind === "new_ticket"
                           ? `${item.ticketNumber} · New ticket`
-                          : `${item.ticketNumber} · ${STATUS_LABELS[item.status]}`}
+                          : `${item.ticketNumber} · ${item.workState?WORK_STATE_LABELS[item.workState as WorkState]:STATUS_LABELS[item.status]}`}
                       </span>
                       <span className="block truncate text-[13px] text-muted-foreground">{item.summary}</span>
                       <span className="block text-xs text-muted-foreground">{formatRelative(item.createdAt)}</span>

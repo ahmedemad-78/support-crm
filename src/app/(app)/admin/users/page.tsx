@@ -9,14 +9,25 @@ import { UsersTable, type UserRow } from "./users-table";
 export default async function UsersPage() {
   const me = await requireAdmin();
   const admin = createAdminClient();
+  const departments = await admin
+    .from("departments")
+    .select("id,name")
+    .eq("is_active", true)
+    .order("name");
+  if (departments.error) throw departments.error;
 
   const [{ data: profiles, error }, { data: authUsers }] = await Promise.all([
-    admin.from("profiles").select("id, full_name, email, role, is_admin, is_active").order("full_name"),
+    admin
+      .from("profiles")
+      .select("id, full_name, email, role, is_admin, is_active")
+      .order("full_name"),
     admin.auth.admin.listUsers({ perPage: 1000 }),
   ]);
   if (error) throw error;
 
-  const lastSignIn = new Map(authUsers?.users.map((u) => [u.id, u.last_sign_in_at ?? null]));
+  const lastSignIn = new Map(
+    authUsers?.users.map((u) => [u.id, u.last_sign_in_at ?? null]),
+  );
 
   const rows: UserRow[] = await Promise.all(
     (profiles ?? []).map(async (p) => {
@@ -36,7 +47,10 @@ export default async function UsersPage() {
 
   return (
     <>
-      <PageHeader title="Users" actions={<AddUserDialog />} />
+      <PageHeader
+        title="Users"
+        actions={<AddUserDialog departments={departments.data ?? []} />}
+      />
       <UsersTable rows={rows} currentUserId={me.id} />
     </>
   );

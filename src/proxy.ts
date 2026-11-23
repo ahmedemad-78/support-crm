@@ -13,6 +13,7 @@ export async function proxy(request: NextRequest) {
   try { backend = previewPublicConfig(); } catch {
     return new NextResponse("Preview is waiting for its isolated backend configuration.", { status: 503, headers: {"Cache-Control":"no-store"} });
   }
+  if(request.nextUrl.pathname==="/api/preview/status")return NextResponse.next({request});
   let supabaseResponse = NextResponse.next({ request });
 
   const supabase = createServerClient(

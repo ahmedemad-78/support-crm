@@ -21,7 +21,22 @@ The optional scripts/prepare-preview-env.mjs uses the authenticated official Sup
 - Current production-source baseline plus preview checks: 107 tests pass.
 - Isolation checks cover target host, key audience, production rejection, integration route block and no queue/transport access during preview delivery.
 - TypeScript passes.
-- A functional deployment is not yet certified: server key, synthetic Auth account, Storage write/read and deployment verification still required.
-- Business workflow implementation starts only after functional isolation checks. n8n is deferred.
+- Preview server credentials, synthetic Auth sign-in, private Storage upload/read, RLS and the deployed baseline health endpoint were verified successfully before business changes.
+- New workflow migrations are applied only to the disposable Preview database. All accounts, tickets and attachments used for testing are synthetic.
+- `scripts/workflow-v2-api.test.mjs`: 70 integration assertions, including concurrent starts, optimistic concurrency, idempotency, ownership, department boundaries, private media, final-solver credit and notification recipients.
+- `scripts/workflow-v2-ui.test.mjs`: end-to-end intake, media, work/wait/reply/resolve, manager visibility, member reports, export and responsive layout.
+- `scripts/workflow-v2-admin-ui.test.mjs`: six checks covering actual admin department/account provisioning, automatic department assignment and restricted administration.
+- Legacy PostgreSQL regression suite: 209 assertions. Full lint and TypeScript pass. Deployment evidence is recorded separately after the final build.
+- n8n, Telegram, AI and company-email integration are deferred. Outbound transports remain blocked.
+
+## Local review accounts
+
+Synthetic fixture credentials are in the ignored local file `.vercel/preview-accounts.json`. Start with `preview-admin@example.test`; representative, worker and manager fixtures are available in the same file. Passwords must not be committed or pasted into deployment logs.
+
+## Release boundary
+
+This branch intentionally rejects any backend other than the isolated Preview project. It is **not ready to promote to Production**. A separately reviewed release must select the Production configuration, review and apply the additive migrations, assign existing accounts to departments, and explicitly approve the cutover. No such Production operation has been performed.
+
+See [workflow-preview-review.md](workflow-preview-review.md) for review scenarios and operational limits.
 
 Test commands: npm test; node --test --experimental-test-isolation=none scripts/isolation.test.mjs; npm run typecheck.

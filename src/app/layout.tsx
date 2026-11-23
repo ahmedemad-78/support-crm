@@ -29,6 +29,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
       className={`${plexSans.variable} ${plexMono.variable} h-full antialiased`}
     >
       <body className="min-h-full flex flex-col">
+        {process.env.NEXT_PUBLIC_APP_ENV==="preview"&&<div className="border-b bg-muted px-4 py-1.5 text-center text-xs text-muted-foreground">Preview · synthetic test data</div>}
         {children}
         <Toaster richColors position="top-right" />
       </body>

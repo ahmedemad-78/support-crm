@@ -1,6 +1,6 @@
 // Real PostgreSQL (WASM), synthetic users only. No network or production data.
 // Local dependency: npm install --prefix audit/db-test --ignore-scripts @electric-sql/pglite
-import { PGlite } from '../audit/db-test/node_modules/@electric-sql/pglite/dist/index.js';
+import { PGlite } from '@electric-sql/pglite';
 import {readFileSync,readdirSync} from 'node:fs';
 import assert from 'node:assert/strict';
 const db = await PGlite.create();
@@ -21,8 +21,9 @@ try {
     alter table storage.objects enable row level security;
     create function storage.foldername(text) returns text[] language sql immutable as $$select string_to_array($1,'/')$$;
   `);
-  const files=readdirSync('supabase/migrations').filter(f=>f.endsWith('.sql')).sort();
-  for(const file of files.filter(f=>!f.includes('case_lifecycle') && !f.includes('intake_optional_contacts') && !f.includes('conversation_media_and_reporter_notifications') && !f.includes('portal_ticket_workspace'))) await db.exec(readFileSync(`supabase/migrations/${file}`,'utf8'));
+  // This regression fixture verifies the legacy workflow before the opt-in v2 cutover.
+  const files=readdirSync('supabase/migrations').filter(f=>f.endsWith('.sql') && f < '20261123110839').sort();
+  for(const file of files.filter(f=>!f.includes('case_lifecycle') && !f.includes('intake_optional_contacts') && !f.includes('conversation_media_and_reporter_notifications') && !f.includes('portal_ticket_workspace') && !f.includes('n8n') && !f.includes('internal_request') && !f.includes('workflow_boundary') && !f.includes('workflow_validation'))) await db.exec(readFileSync(`supabase/migrations/${file}`,'utf8'));
   const names=['Ahmed Emad','sonia','kabany','Olaa','Yasser Arab','Manager'];
   const roles=['support_agent','moderation','call_center','business_development','june_schools','manager'];
   const ids=names.map((_,i)=>`10000000-0000-4000-8000-${String(i+1).padStart(12,'0')}`);

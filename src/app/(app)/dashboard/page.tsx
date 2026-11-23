@@ -4,6 +4,7 @@ import { createClient } from "@/lib/supabase/server";
 import { loadAnalytics } from "@/lib/tickets/load-analytics";
 import { parseBusinessFilters } from "@/lib/tickets/business-analytics";
 import { DashboardBoard } from "./analytics-dashboard";
+import Link from "next/link";
 
 export default async function DashboardPage({
   searchParams,
@@ -20,6 +21,7 @@ export default async function DashboardPage({
   if (categories.error) throw categories.error;
   return (
     <AgentFrame title="Analytics" hideTicketSearch>
+      <div className="m-5 rounded-lg border bg-background p-4 text-sm">Legacy case analysis. <Link className="font-semibold underline" href="/reports/work">Open combined internal and external reports</Link></div>
       <DashboardBoard
         initialSnapshot={snapshot}
         userId={user.id}

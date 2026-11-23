@@ -17,6 +17,7 @@ const ROLE_ICONS: Record<Role, LucideIcon> = {
   june_schools: School,
   business_development: Building2,
   manager: ChartColumn,
+  department_member: Building2,
 };
 
 export function RoleIcon({ role, size = "md" }: { role: Role; size?: "sm" | "md" }) {

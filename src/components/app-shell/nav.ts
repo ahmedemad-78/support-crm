@@ -22,9 +22,10 @@ export function navFor(user: CurrentUser): NavSection[] {
         {
           heading: "Support",
           items: [
-            { href: "/tickets", label: "Case register", icon: "tickets" },
-            { href: "/dashboard", label: "Analytics", icon: "dashboard" },
-            { href: "/tickets/new", label: "Create case", icon: "new-ticket" },
+            { href: "/tickets", label: "Ticket register", icon: "tickets" },
+            { href: "/dashboard", label: "Legacy analysis", icon: "dashboard" },
+            { href: "/work/new", label: "Create ticket", icon: "new-ticket" },
+            { href: "/reports/work", label: "Work reports", icon: "dashboard" },
             { href: "/inbox", label: "Conversations", icon: "inbox", badge: "Soon" },
           ],
         },
@@ -34,6 +35,8 @@ export function navFor(user: CurrentUser): NavSection[] {
           heading: "Admin",
           items: [
             { href: "/admin/users", label: "Users", icon: "users" },
+            { href: "/admin/departments", label: "Departments", icon: "users" },
+            { href: "/reports/performance", label: "Team performance", icon: "dashboard" },
             { href: "/admin/settings", label: "Settings", icon: "settings" },
           ],
         });
@@ -47,6 +50,9 @@ export function navFor(user: CurrentUser): NavSection[] {
           items: [
             { href: "/dashboard", label: "Dashboard", icon: "dashboard" },
             { href: "/tickets", label: "Tickets", icon: "tickets" },
+            { href: "/work/new", label: "Create ticket", icon: "new-ticket" },
+            { href: "/reports/work", label: "Work reports", icon: "dashboard" },
+            { href: "/reports/performance", label: "Team performance", icon: "dashboard" },
           ],
         },
       ];
@@ -56,8 +62,8 @@ export function navFor(user: CurrentUser): NavSection[] {
         {
           heading: ROLE_LABELS[user.role],
           items: [
-            { href: "/portal/new-ticket", label: "Create ticket", icon: "new-ticket" },
-            { href: "/portal/my-tickets", label: "My tickets", icon: "my-tickets" },
+            { href: "/work/new", label: "Create ticket", icon: "new-ticket" },
+            { href: "/portal/my-tickets", label: "Department tickets", icon: "my-tickets" },
           ],
         },
       ];

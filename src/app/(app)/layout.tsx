@@ -10,9 +10,9 @@ export default async function AppLayout({ children }: LayoutProps<"/">) {
   if (user.role === "support_agent" || user.role === "manager") {
     const supabase = await createClient();
     const { count } = await supabase
-      .from("tickets")
+      .from("case_register_v2")
       .select("id", { count: "exact", head: true })
-      .eq("status", "new");
+      .eq("state", "new");
     if (count) {
       for (const section of sections) {
         for (const item of section.items) {
