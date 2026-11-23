@@ -8,7 +8,7 @@ Preview branch: codex/internal-requests-preview. Production is not a release tar
 - Baseline: 15 existing non-n8n schema migrations applied to the empty preview project. No customer data, users or files copied.
 - Public/server/browser clients validate the exact preview hostname and key audience. A missing or production configuration fails before constructing a client.
 - Proxy rejects email and integration endpoints. Outbound delivery is blocked for preview runtime before queue reads or transport use.
-- Git automatic deployments are disabled for this preview branch in vercel.json. Deploy manually with explicit preview target; do not promote or alter the canonical production alias.
+- Git automatic deployments are disabled for this preview branch in vercel.json. Use a separate hosting project for further publication; the shared project's staging deployment unexpectedly changed the canonical alias and has been recovered. Do not publish again into the Production hosting project.
 
 ## Credential setup
 
@@ -26,7 +26,7 @@ The optional scripts/prepare-preview-env.mjs uses the authenticated official Sup
 - `scripts/workflow-v2-api.test.mjs`: 70 integration assertions, including concurrent starts, optimistic concurrency, idempotency, ownership, department boundaries, private media, final-solver credit and notification recipients.
 - `scripts/workflow-v2-ui.test.mjs`: end-to-end intake, media, work/wait/reply/resolve, manager visibility, member reports, export and responsive layout.
 - `scripts/workflow-v2-admin-ui.test.mjs`: six checks covering actual admin department/account provisioning, automatic department assignment and restricted administration.
-- Legacy PostgreSQL regression suite: 209 assertions. Full lint and TypeScript pass. Deployment evidence is recorded separately after the final build.
+- Legacy PostgreSQL regression suite: 209 assertions. Full lint, TypeScript and optimized build pass. Remote publication is pending separate Vercel project access; see the incident and hosting status in workflow-preview-review.md.
 - n8n, Telegram, AI and company-email integration are deferred. Outbound transports remain blocked.
 
 ## Local review accounts

@@ -4,7 +4,13 @@
 
 The approved system changes run on `codex/internal-requests-preview` against the separate Free Supabase project `support-crm-preview` (`vojietqeyfkrfisxcsrs`). No Production users, tickets, files or credentials were copied. No paid branch or additional paid service was created. This is a review environment, with synthetic fixtures and outbound delivery disabled.
 
-Production remains on its existing source, database, lifecycle and canonical alias. New migrations have only been applied to Preview. The Preview branch contains a fail-closed backend pin and must not be promoted directly.
+Production is currently restored to its existing source, database, lifecycle and canonical alias. New migrations have only been applied to Preview. The Preview branch contains a fail-closed backend pin and must not be promoted directly.
+
+## Hosting status and recovered alias incident
+
+The first same-project `staging` deployment (`dpl_JDmfQyBH8VcvCwvngJ4yQsBoQqGF`, preparation commit `8168ebd`) unexpectedly acquired the canonical `support-crm-emad25.vercel.app` alias. A subsequent verification discovered this. The in-progress business deployment `dpl_2QnuZ2Ry9YMUV9FvZXKj279qzkVF` was canceled before completion; the canonical alias was restored to original Production deployment `dpl_ELY9teECCDC4aGGbiuK6LfuhjnGm` (commit `06e144924e550c0bffc17b79a6a1aec6faf2d145`). Both Production aliases were rechecked against that deployment, and the original login page was fetched successfully without the Preview banner. Production database writes/migrations were never performed.
+
+Do not publish this branch into the shared hosting project again. The intended destination is a new, separate `support-crm-isolated-preview` Vercel project. Its creation was denied by the connector (403); the installed CLI is logged out. Automatic approval also rejected transferring the Preview server key to that new project without explicit authorization for that destination. No new Vercel project or credential transfer was completed. Remote publication remains blocked pending the user's Vercel login and explicit permission for the Preview-only credentials. The optimized local build is available at `http://127.0.0.1:3017` for review, using only the isolated Preview database.
 
 ## Implemented behavior
 
